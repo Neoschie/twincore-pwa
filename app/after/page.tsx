@@ -1,17 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 const BRIDGE_KEY = "twincore_bridge_shown_v1";
 
-export default function AfterPage() {
+function AfterInner() {
   const params = useSearchParams();
   const from = params.get("from") ?? "";
 
   const isPartyMode = from === "pre" || from === "post";
-
   const [showBridge, setShowBridge] = useState(false);
 
   useEffect(() => {
@@ -37,12 +36,13 @@ export default function AfterPage() {
             Stay a little longer
           </Link>
         </div>
+
+        <div className="pt-2">
+          <a href="/" className="text-xs opacity-40 hover:opacity-70 transition">
+            Home
+          </a>
+        </div>
       </div>
-<div className="pt-2">
-  <a href="/" className="text-xs opacity-40 hover:opacity-70 transition">
-    Home
-  </a>
-</div>
 
       {showBridge && (
         <div className="absolute inset-0 flex items-center justify-center px-6">
@@ -71,5 +71,17 @@ export default function AfterPage() {
         </div>
       )}
     </main>
+  );
+}
+
+export default function AfterPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen flex items-center justify-center px-6" />
+      }
+    >
+      <AfterInner />
+    </Suspense>
   );
 }
