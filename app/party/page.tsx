@@ -1,3 +1,9 @@
+<Link
+  href="/car"
+  className="block text-center rounded-2xl px-6 py-3 text-sm border border-white/15 hover:border-white/35 transition"
+>
+  Car Mode
+</Link>
 "use client";
 
 import Link from "next/link";
