@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
 
 const CONTENT: Record<string, string> = {
   baseline: `You’re here.
@@ -48,17 +47,18 @@ function speak(text: string) {
 }
 
 export default function GroundingPage() {
-  const params = useSearchParams();
-  const mode = params.get("mode") ?? "baseline";
-
-  const key = useMemo(() => (CONTENT[mode] ? mode : "baseline"), [mode]);
-  const text = CONTENT[key];
-
+  const [mode, setMode] = useState("baseline");
   const [isSupported, setIsSupported] = useState(false);
 
   useEffect(() => {
     setIsSupported("speechSynthesis" in window);
+    const params = new URLSearchParams(window.location.search);
+    const m = params.get("mode") ?? "baseline";
+    setMode(m);
   }, []);
+
+  const key = useMemo(() => (CONTENT[mode] ? mode : "baseline"), [mode]);
+  const text = CONTENT[key];
 
   return (
     <main className="min-h-screen flex flex-col items-center justify-center px-6">
@@ -69,22 +69,16 @@ export default function GroundingPage() {
 
         <div className="flex items-center gap-3">
           <button
-            type="button"
             onClick={() => isSupported && speak(text)}
             className="rounded-2xl px-4 py-2 text-sm border border-white/15 hover:border-white/35 transition disabled:opacity-40"
-            aria-label="Play audio"
-            title="Play audio"
             disabled={!isSupported}
           >
             🔊 Play
           </button>
 
           <button
-            type="button"
             onClick={() => window.speechSynthesis.cancel()}
             className="rounded-2xl px-4 py-2 text-sm border border-white/15 hover:border-white/35 transition"
-            aria-label="Stop audio"
-            title="Stop audio"
           >
             ⏸ Stop
           </button>
@@ -95,10 +89,17 @@ export default function GroundingPage() {
           >
             Continue
           </Link>
+
+          <a
+            href="/"
+            className="rounded-2xl px-4 py-2 text-sm border border-white/15 hover:border-white/35 transition"
+          >
+            Home
+          </a>
         </div>
 
         <p className="text-xs opacity-50">
-          For hands-free listening, connect to Bluetooth audio and press Play. Avoid interacting while driving.
+          For hands-free listening, connect to Bluetooth audio and press Play.
         </p>
       </div>
     </main>
