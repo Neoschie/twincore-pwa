@@ -37,11 +37,23 @@ function AfterInner() {
           </Link>
         </div>
 
-        <div className="pt-2">
-          <a href="/" className="text-xs opacity-40 hover:opacity-70 transition">
-            Home
-          </a>
-        </div>
+     ><div className="pt-2 space-y-3">
+  <Link
+    href="/"
+    prefetch={false}
+    className="inline-block rounded-2xl px-6 py-3 text-sm border border-white/15 hover:border-white/35 transition"
+  >
+    Home
+  </Link>
+
+  <button
+    type="button"
+    onClick={() => (window.location.href = "/")}
+    className="text-xs opacity-40 hover:opacity-70 transition"
+  >
+    If Home doesn’t open, tap here
+  </button>
+</div>
       </div>
 
       {showBridge && (
