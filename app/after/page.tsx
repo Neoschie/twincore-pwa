@@ -39,12 +39,12 @@ function AfterInner() {
 
      <div className="pt-2 space-y-3">
   <Link
-    href="/"
-    prefetch={false}
-    className="inline-block rounded-2xl px-6 py-3 text-sm border border-white/15 hover:border-white/35 transition"
-  >
-    Home
-  </Link>
+  href="/"
+  prefetch={false}
+  className="rounded-2xl px-4 py-2 text-sm border border-white/15 hover:border-white/35 transition"
+>
+  See everyday TwinCore™
+</Link>
 
   <button
     type="button"
