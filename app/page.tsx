@@ -1,87 +1,61 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
 
-const BRIDGE_KEY = "twincore_bridge_shown_v1";
-
-function AfterInner() {
-  const params = useSearchParams();
-  const from = params.get("from") ?? "";
-
-  const isPartyMode = from === "pre" || from === "post";
-  const [showBridge, setShowBridge] = useState(false);
-
-  useEffect(() => {
-    if (!isPartyMode) return;
-
-    const alreadyShown = localStorage.getItem(BRIDGE_KEY) === "true";
-    if (!alreadyShown) {
-      setShowBridge(true);
-      localStorage.setItem(BRIDGE_KEY, "true");
-    }
-  }, [isPartyMode]);
-
+export default function HomePage() {
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center px-6 relative">
-      <div className="w-full max-w-md text-center space-y-6">
-        <div className="h-12" />
+    <main className="min-h-screen flex flex-col items-center justify-center px-6">
+      <div className="w-full max-w-md text-center space-y-8">
+        <div className="space-y-2">
+          <h1 className="text-4xl font-semibold">TwinCore™</h1>
+          <p className="text-sm opacity-70">A quiet place to pause.</p>
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-sm leading-6 opacity-80">
+            A minimalist grounding space for moments that feel loud.
+          </p>
+          <p className="text-sm leading-6 opacity-70">
+            Before something. During something. After something.
+          </p>
+          <p className="text-sm leading-6 opacity-70">
+            Nothing to fix. Nothing to solve.
+          </p>
+        </div>
 
         <div className="space-y-3">
           <Link
-            href="/second-layer"
-            className="inline-block rounded-2xl px-6 py-3 text-sm border border-white/15 hover:border-white/35 transition"
+            href="/grounding?mode=baseline"
+            className="block rounded-2xl px-6 py-3 text-sm border border-white/15 hover:border-white/35 transition"
           >
-            Stay a little longer
+            Begin
+          </Link>
+
+          <Link
+            href="/party"
+            className="block rounded-2xl px-6 py-3 text-sm border border-white/15 hover:border-white/35 transition"
+          >
+            Party Mode
+          </Link>
+
+          <Link
+            href="/car"
+            className="block rounded-2xl px-6 py-3 text-sm border border-white/15 hover:border-white/35 transition"
+          >
+            Car Mode
           </Link>
         </div>
 
-        <div className="pt-2">
-          <a href="/" className="text-xs opacity-40 hover:opacity-70 transition">
-            Home
-          </a>
-        </div>
+        <p className="text-xs opacity-50 leading-5">
+          Short grounding moments through text or optional audio. Use it quietly,
+          hands-free, or just for a pause.
+        </p>
+
+        <p className="text-[11px] opacity-40 leading-5">
+          TwinCore is not therapy or medical care. It’s a gentle space to slow
+          down when things feel like a lot.
+        </p>
       </div>
-
-      {showBridge && (
-        <div className="absolute inset-0 flex items-center justify-center px-6">
-          <div className="w-full max-w-md rounded-2xl border border-white/15 bg-black/60 backdrop-blur p-6 text-center space-y-4">
-            <p className="text-sm opacity-90">
-              The same presence you used tonight is here for everyday moments too.
-            </p>
-
-            <div className="flex gap-3 justify-center">
-              <button
-                type="button"
-                onClick={() => setShowBridge(false)}
-                className="rounded-2xl px-4 py-2 text-sm border border-white/15 hover:border-white/35 transition"
-              >
-                Close
-              </button>
-
-              <a
-                href="/"
-                className="rounded-2xl px-4 py-2 text-sm border border-white/15 hover:border-white/35 transition"
-              >
-                See everyday TwinCore™
-              </a>
-            </div>
-          </div>
-        </div>
-      )}
     </main>
-  );
-}
-
-export default function AfterPage() {
-  return (
-    <Suspense
-      fallback={
-        <main className="min-h-screen flex items-center justify-center px-6" />
-      }
-    >
-      <AfterInner />
-    </Suspense>
   );
 }
