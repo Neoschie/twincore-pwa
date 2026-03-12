@@ -19,13 +19,9 @@ type ProfileData = {
 export default function ContactCardPage() {
   const [profile, setProfile] = useState<ProfileData>({});
   const [crewCode, setCrewCode] = useState("");
-  const [baseUrl, setBaseUrl] = useState("");
+  const [shareUrl, setShareUrl] = useState("https://twincore.co/join");
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      setBaseUrl(window.location.origin);
-    }
-
     const rawProfile = localStorage.getItem(PROFILE_STORAGE_KEY);
     if (rawProfile) {
       try {
@@ -40,13 +36,20 @@ export default function ContactCardPage() {
     }
   }, []);
 
-  const joinLink = useMemo(() => {
-    const resolvedBaseUrl = baseUrl || "https://twincore.co";
+  useEffect(() => {
+    const base =
+      typeof window !== "undefined" && window.location.hostname
+        ? "https://twincore.co"
+        : "https://twincore.co";
 
-    return crewCode
-      ? `${resolvedBaseUrl}/join?code=${crewCode}`
-      : `${resolvedBaseUrl}/join`;
-  }, [crewCode, baseUrl]);
+    const nextUrl = crewCode
+      ? `${base}/join?code=${crewCode}`
+      : `${base}/join`;
+
+    setShareUrl(nextUrl);
+  }, [crewCode]);
+
+  const qrValue = useMemo(() => shareUrl, [shareUrl]);
 
   function shareCard() {
     alert("TwinCore Contact Card ready to share.");
@@ -54,7 +57,7 @@ export default function ContactCardPage() {
 
   function copyJoinLink() {
     navigator.clipboard
-      .writeText(joinLink)
+      .writeText(shareUrl)
       .then(() => alert("Join link copied."))
       .catch(() => alert("Could not copy join link."));
   }
@@ -143,7 +146,7 @@ export default function ContactCardPage() {
             wordBreak: "break-all",
           }}
         >
-          {joinLink}
+          {shareUrl}
         </div>
 
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
@@ -160,8 +163,8 @@ export default function ContactCardPage() {
       <section style={cardStyle}>
         <h3 style={{ marginTop: 0 }}>Scan to Join</h3>
 
-        <p style={{ color: "#A1A1AA" }}>
-          This QR opens your live TwinCore join page.
+        <p style={{ color: "#A1A1AA", marginBottom: 12 }}>
+          This QR should open the exact URL shown below it.
         </p>
 
         <div
@@ -170,9 +173,24 @@ export default function ContactCardPage() {
             padding: 16,
             borderRadius: 14,
             width: "fit-content",
+            marginBottom: 12,
           }}
         >
-          <QRCodeCanvas value={joinLink} size={220} />
+          <QRCodeCanvas value={qrValue} size={220} />
+        </div>
+
+        <div
+          style={{
+            background: "#18181B",
+            border: "1px solid #27272A",
+            borderRadius: 14,
+            padding: 12,
+            color: "#D4D4D8",
+            wordBreak: "break-all",
+            fontSize: 13,
+          }}
+        >
+          QR value: {qrValue}
         </div>
       </section>
 
