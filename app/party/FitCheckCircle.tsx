@@ -1,149 +1,160 @@
 "use client";
 
-import Link from "next/link";
-import { useState, useEffect } from "react";
-import CrewMemberRow from "@/components/CrewMemberRow";
-import { mockCircle } from "@/data/mockCircle";
+import { useState } from "react";
 
-const STORAGE_KEY = "twincore_party_members";
+type CrewStatus =
+  | "ready"
+  | "not_ready"
+  | "outside"
+  | "drinking"
+  | "at_club"
+  | "listening"
+  | "watching_netflix"
+  | "heading_home"
+  | "safe";
 
-export default function PartyPage() {
-  const [members, setMembers] = useState(mockCircle.members);
+type CrewMember = {
+  id: string;
+  name: string;
+  status: CrewStatus;
+  batteryLevel?: number;
+  isCurrentUser?: boolean;
+};
 
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        setMembers(JSON.parse(saved));
-      } catch {}
-    }
-  }, []);
+const initialMembers: CrewMember[] = [
+  {
+    id: "1",
+    name: "Neo",
+    status: "not_ready",
+    batteryLevel: 82,
+    isCurrentUser: true,
+  },
+  {
+    id: "2",
+    name: "Angellette",
+    status: "ready",
+    batteryLevel: 67,
+  },
+  {
+    id: "3",
+    name: "Marcus",
+    status: "outside",
+    batteryLevel: 54,
+  },
+];
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(members));
-  }, [members]);
+export default function FitCheckCircle() {
+  const [members, setMembers] = useState<CrewMember[]>(initialMembers);
 
-  const readyCount = members.filter((m) => m.status === "ready").length;
-  const preparingCount = members.filter((m) => m.status === "preparing").length;
-  const missingCount = members.filter((m) => m.status === "not_joined").length;
-
-  function handleReady() {
-    const updated = members.map((m) =>
-      m.isCurrentUser ? { ...m, status: "ready" } : m
+  function markCurrentUserReady() {
+    const updated: CrewMember[] = members.map((member) =>
+      member.isCurrentUser ? { ...member, status: "ready" as CrewStatus } : member
     );
     setMembers(updated);
   }
 
+  function getStatusLabel(status: CrewStatus) {
+    switch (status) {
+      case "ready":
+        return "Ready";
+      case "not_ready":
+        return "Not Ready";
+      case "outside":
+        return "Outside";
+      case "drinking":
+        return "Drinking";
+      case "at_club":
+        return "At Club";
+      case "listening":
+        return "Listening to Music";
+      case "watching_netflix":
+        return "Watching Netflix";
+      case "heading_home":
+        return "Heading Home";
+      case "safe":
+        return "Safe";
+      default:
+        return status;
+    }
+  }
+
   return (
-    <main
+    <section
       style={{
-        minHeight: "100vh",
-        backgroundColor: "#09090B",
-        color: "white",
-        padding: 24,
-        fontFamily: "Inter, Arial, Helvetica, sans-serif",
+        background: "#111113",
+        border: "1px solid #232326",
+        borderRadius: 20,
+        padding: 18,
       }}
     >
-      <div style={{ maxWidth: 520, margin: "0 auto" }}>
-        <h1 style={{ fontSize: 32, fontWeight: 700, marginBottom: 8 }}>
-          Fit Check Circle
-        </h1>
-
-        <p style={{ color: "#A1A1AA", marginBottom: 20 }}>
-          Get aligned before heading out
-        </p>
-
-        <div
-          style={{
-            backgroundColor: "#111827",
-            borderRadius: 18,
-            padding: 16,
-            marginBottom: 16,
-          }}
-        >
-          <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>
-            Tonight's crew
-          </h2>
-
-          {members.map((member) => (
-            <CrewMemberRow key={member.id} member={member} />
-          ))}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 14,
+          gap: 12,
+        }}
+      >
+        <div>
+          <h3 style={{ margin: 0 }}>Fit Check Circle</h3>
+          <p style={{ margin: "6px 0 0", color: "#A1A1AA" }}>
+            Quick crew readiness snapshot
+          </p>
         </div>
 
-        <div
+        <button
+          onClick={markCurrentUserReady}
           style={{
-            display: "flex",
-            justifyContent: "space-between",
-            backgroundColor: "#111827",
-            borderRadius: 18,
-            padding: 16,
-            marginBottom: 20,
+            background: "white",
+            color: "black",
+            border: "none",
+            borderRadius: 12,
+            padding: "10px 14px",
+            fontWeight: 700,
+            cursor: "pointer",
           }}
         >
-          <div>
-            <p style={{ color: "#A1A1AA", fontSize: 12 }}>Ready</p>
-            <p style={{ fontSize: 20, fontWeight: 700 }}>{readyCount}</p>
-          </div>
+          I’m Ready
+        </button>
+      </div>
 
-          <div>
-            <p style={{ color: "#A1A1AA", fontSize: 12 }}>Preparing</p>
-            <p style={{ fontSize: 20, fontWeight: 700 }}>{preparingCount}</p>
-          </div>
-
-          <div>
-            <p style={{ color: "#A1A1AA", fontSize: 12 }}>Not Joined</p>
-            <p style={{ fontSize: 20, fontWeight: 700 }}>{missingCount}</p>
-          </div>
-        </div>
-
-        <div style={{ display: "grid", gap: 12 }}>
-          <button
+      <div style={{ display: "grid", gap: 12 }}>
+        {members.map((member) => (
+          <div
+            key={member.id}
             style={{
-              backgroundColor: "#2563EB",
-              color: "white",
-              padding: "16px",
+              background: "#18181B",
+              border: "1px solid #27272A",
               borderRadius: 14,
-              border: "none",
-              fontWeight: 700,
-              fontSize: 16,
+              padding: 14,
             }}
           >
-            Invite Crew
-          </button>
-
-          <button
-            onClick={handleReady}
-            style={{
-              backgroundColor: "#22C55E",
-              color: "#052E16",
-              padding: "16px",
-              borderRadius: 14,
-              border: "none",
-              fontWeight: 700,
-              fontSize: 16,
-            }}
-          >
-            I'm Ready
-          </button>
-
-          <Link href="/party/dashboard">
-            <button
+            <div
               style={{
-                backgroundColor: "#18181B",
-                color: "white",
-                padding: "16px",
-                borderRadius: 14,
-                border: "1px solid #27272A",
-                fontWeight: 700,
-                fontSize: 16,
-                width: "100%",
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 12,
+                alignItems: "center",
               }}
             >
-              Start Party Mode
-            </button>
-          </Link>
-        </div>
+              <div>
+                <div style={{ fontWeight: 700 }}>
+                  {member.name}
+                  {member.isCurrentUser ? " (You)" : ""}
+                </div>
+                <div style={{ color: "#A1A1AA", marginTop: 4 }}>
+                  {getStatusLabel(member.status)}
+                </div>
+              </div>
+
+              <div style={{ color: "#A1A1AA", fontSize: 14 }}>
+                {member.batteryLevel ?? "--"}%
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
-    </main>
+    </section>
   );
 }
