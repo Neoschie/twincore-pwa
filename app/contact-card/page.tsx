@@ -7,13 +7,6 @@ import { QRCodeCanvas } from "qrcode.react";
 const PROFILE_STORAGE_KEY = "twincore_profile";
 const CREW_CODE_STORAGE_KEY = "twincore_crew_code";
 
-/**
- * IMPORTANT:
- * Replace this if your computer's local network IP changes.
- * Use the "Network" URL shown in your terminal from `npm run dev`.
- */
-const SHARE_BASE_URL = "http://192.168.2.11:3000";
-
 type ProfileData = {
   displayName?: string;
   vibe?: string;
@@ -26,8 +19,13 @@ type ProfileData = {
 export default function ContactCardPage() {
   const [profile, setProfile] = useState<ProfileData>({});
   const [crewCode, setCrewCode] = useState("");
+  const [baseUrl, setBaseUrl] = useState("");
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      setBaseUrl(window.location.origin);
+    }
+
     const rawProfile = localStorage.getItem(PROFILE_STORAGE_KEY);
     if (rawProfile) {
       try {
@@ -43,16 +41,18 @@ export default function ContactCardPage() {
   }, []);
 
   const joinLink = useMemo(() => {
+    const resolvedBaseUrl = baseUrl || "https://twincore.co";
+
     return crewCode
-      ? `${SHARE_BASE_URL}/join?code=${crewCode}`
-      : `${SHARE_BASE_URL}/join`;
-  }, [crewCode]);
+      ? `${resolvedBaseUrl}/join?code=${crewCode}`
+      : `${resolvedBaseUrl}/join`;
+  }, [crewCode, baseUrl]);
 
   function shareCard() {
     alert("TwinCore Contact Card ready to share.");
   }
 
-  function copyInviteLink() {
+  function copyJoinLink() {
     navigator.clipboard
       .writeText(joinLink)
       .then(() => alert("Join link copied."))
@@ -151,7 +151,7 @@ export default function ContactCardPage() {
             Share Card
           </button>
 
-          <button onClick={copyInviteLink} style={buttonStyle}>
+          <button onClick={copyJoinLink} style={buttonStyle}>
             Copy Join Link
           </button>
         </div>
@@ -161,7 +161,7 @@ export default function ContactCardPage() {
         <h3 style={{ marginTop: 0 }}>Scan to Join</h3>
 
         <p style={{ color: "#A1A1AA" }}>
-          This QR opens your TwinCore join page on your local network.
+          This QR opens your live TwinCore join page.
         </p>
 
         <div
