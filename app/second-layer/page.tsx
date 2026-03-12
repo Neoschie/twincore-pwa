@@ -23,11 +23,15 @@ export default function SecondLayerPage() {
           >
             Return to silence
           </Link>
+
+          <Link
+            href="/"
+            className="rounded-2xl px-4 py-2 text-sm border border-white/15 hover:border-white/35 transition"
+          >
+            Home
+          </Link>
         </div>
       </div>
     </main>
   );
 }
-<a href="/" className="text-xs opacity-40 hover:opacity-70 transition">
-  Home
-</a>
