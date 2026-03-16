@@ -1,390 +1,130 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import {
-  PageHeader,
-  cardStyle,
-  colors,
-  heroCardStyle,
-  inputStyle,
-  navButtonStyle,
-  navGridThreeStyle,
-  primaryButtonStyle,
-  secondaryButtonStyle,
-  shellStyle,
-  sectionHeadingStyle,
-} from "@/components/twincore-ui";
-import {
-  formatTimeAgo,
-  getStatusTone,
-  isStaleCheckIn,
-} from "@/components/status-utils";
 
 type CrewMember = {
   name: string;
-  activity: string;
-  updatedAt?: string;
+  status: string;
+  minutesAgo: number;
 };
 
-type SavedProfile = {
-  displayName?: string;
-};
-
-type SavedPartyStatus = {
-  name?: string;
-  status?: string;
-  updatedAt?: string;
-};
-
-const PROFILE_STORAGE_KEY = "twincore_profile";
-const PARTY_STATUS_STORAGE_KEY = "twincore_party_status";
-
-/*
- TEMP TEST VALUE
- change back to 45 after confirming warnings work
-*/
 const STALE_MINUTES = 10;
 
-function generateCrewCode() {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let code = "TC-";
-
-  for (let i = 0; i < 5; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
-  }
-
-  return code;
-}
+const crew: CrewMember[] = [
+  { name: "Neo", status: "Listening to music", minutesAgo: 34 },
+  { name: "Marcus", status: "Listening to music", minutesAgo: 8 },
+  { name: "Angellette", status: "Watching Netflix", minutesAgo: 3 },
+  { name: "Jade", status: "Heading out", minutesAgo: 18 }
+];
 
 export default function CrewPage() {
-  const [displayName, setDisplayName] = useState("Neo");
-  const [liveStatus, setLiveStatus] = useState("Not active");
-  const [liveUpdatedAt, setLiveUpdatedAt] = useState<string | undefined>();
-
-  const [crewCode, setCrewCode] = useState("");
-  const [inviteOpen, setInviteOpen] = useState(false);
-  const [joinCode, setJoinCode] = useState("");
-  const [statusMessage, setStatusMessage] = useState("");
-
-  const [crew, setCrew] = useState<CrewMember[]>([
-    {
-      name: "Marcus",
-      activity: "Listening to music",
-      updatedAt: new Date(Date.now() - 9 * 60000).toISOString(),
-    },
-    {
-      name: "Angellette",
-      activity: "Watching Netflix",
-      updatedAt: new Date(Date.now() - 4 * 60000).toISOString(),
-    },
-    {
-      name: "Jade",
-      activity: "Heading out",
-      updatedAt: new Date(Date.now() - 19 * 60000).toISOString(),
-    },
-  ]);
-
-  useEffect(() => {
-    const raw = localStorage.getItem(PROFILE_STORAGE_KEY);
-
-    if (!raw) return;
-
-    try {
-      const parsed = JSON.parse(raw) as SavedProfile;
-
-      if (parsed.displayName) {
-        setDisplayName(parsed.displayName);
-      }
-    } catch {}
-  }, []);
-
-  useEffect(() => {
-    const savedCrewCode = localStorage.getItem("twincore_crew_code");
-
-    if (savedCrewCode) {
-      setCrewCode(savedCrewCode);
-    } else {
-      const newCode = generateCrewCode();
-      setCrewCode(newCode);
-      localStorage.setItem("twincore_crew_code", newCode);
-    }
-  }, []);
-
-  useEffect(() => {
-    function loadPartyStatus() {
-      const rawStatus = localStorage.getItem(PARTY_STATUS_STORAGE_KEY);
-
-      if (!rawStatus) {
-        setLiveStatus("Not active");
-        setLiveUpdatedAt(undefined);
-        return;
-      }
-
-      try {
-        const parsed = JSON.parse(rawStatus) as SavedPartyStatus;
-
-        const nextStatus = parsed.status || "Not active";
-        const nextUpdatedAt = parsed.updatedAt;
-
-        setLiveStatus(nextStatus);
-        setLiveUpdatedAt(nextUpdatedAt);
-
-        setCrew((prev) => {
-          const others = prev.filter((m) => m.name !== displayName);
-
-          return [
-            {
-              name: displayName,
-              activity: nextStatus,
-              updatedAt: nextUpdatedAt,
-            },
-            ...others,
-          ];
-        });
-      } catch {}
-    }
-
-    loadPartyStatus();
-
-    const interval = setInterval(loadPartyStatus, 1000);
-
-    return () => clearInterval(interval);
-  }, [displayName]);
-
-  const inviteLink = useMemo(() => {
-    return `https://twincore.co/join?code=${crewCode}`;
-  }, [crewCode]);
-
-  const liveTone = getStatusTone(liveStatus);
-  const liveIsStale = isStaleCheckIn(liveUpdatedAt, STALE_MINUTES);
-
-  function handleInviteCrew() {
-    setInviteOpen((prev) => !prev);
-  }
-
-  function regenerateCode() {
-    const newCode = generateCrewCode();
-
-    setCrewCode(newCode);
-    localStorage.setItem("twincore_crew_code", newCode);
-  }
-
-  function handleJoinCrew() {
-    if (!joinCode.trim()) {
-      setStatusMessage("Enter a crew code first.");
-      return;
-    }
-
-    setStatusMessage(
-      `${displayName} joined crew with code ${joinCode.toUpperCase()}.`
-    );
-
-    setJoinCode("");
-  }
-
-  async function copyInviteLink() {
-    try {
-      await navigator.clipboard.writeText(inviteLink);
-      setStatusMessage("Invite link copied.");
-    } catch {
-      setStatusMessage("Could not copy invite link.");
-    }
-  }
-
   return (
-    <main style={shellStyle}>
-      <PageHeader
-        title="Crew Radar"
-        action={
-          <Link href="/profile" style={navButtonStyle}>
-            Profile
-          </Link>
-        }
-      />
+    <main
+      style={{
+        padding: 20,
+        maxWidth: 800,
+        margin: "0 auto",
+        color: "white"
+      }}
+    >
+      <h1 style={{ marginBottom: 20 }}>Crew Pulse</h1>
 
-      <section style={heroCardStyle}>
-        <p style={{ fontSize: 12, color: colors.muted, marginBottom: 6 }}>
-          Live Crew Signal
-        </p>
+      {crew.map((member) => {
+        const stale = member.minutesAgo > STALE_MINUTES;
 
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span
+        return (
+          <div
+            key={member.name}
             style={{
-              width: 14,
-              height: 14,
-              borderRadius: "50%",
-              background: liveIsStale ? "#EF4444" : liveTone.dot,
-              display: "inline-block",
-              boxShadow: `0 0 12px ${
-                liveIsStale ? "#EF4444" : liveTone.dot
-              }`,
+              background: "#18181B",
+              border: stale
+                ? "1px solid #7F1D1D"
+                : "1px solid #27272A",
+              borderRadius: 14,
+              padding: 16,
+              marginBottom: 14
             }}
-          />
-
-          <h2 style={{ margin: 0, fontSize: 24 }}>
-            {displayName} — {liveIsStale ? "No recent update" : liveTone.label}
-          </h2>
-        </div>
-
-        <p style={{ color: colors.muted, marginTop: 10 }}>
-          Last check-in: {formatTimeAgo(liveUpdatedAt)}
-        </p>
-      </section>
-
-      <section style={cardStyle}>
-        <button onClick={handleInviteCrew} style={primaryButtonStyle}>
-          {inviteOpen ? "Close Invite" : "Invite Crew"}
-        </button>
-
-        {inviteOpen && (
-          <div style={{ marginTop: 16 }}>
-            <div style={{ marginBottom: 10 }}>
-              <strong>Crew Code:</strong> {crewCode}
-            </div>
-
-            <div style={{ marginBottom: 10 }}>
-              <strong>Invite Link:</strong>
-              <div style={{ wordBreak: "break-all", color: colors.soft }}>
-                {inviteLink}
-              </div>
-            </div>
-
-            <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={copyInviteLink} style={secondaryButtonStyle}>
-                Copy Invite Link
-              </button>
-
-              <button onClick={regenerateCode} style={secondaryButtonStyle}>
-                New Code
-              </button>
-            </div>
-          </div>
-        )}
-      </section>
-
-      <section style={cardStyle}>
-        <h3 style={sectionHeadingStyle}>Join Crew</h3>
-
-        <input
-          value={joinCode}
-          onChange={(e) => setJoinCode(e.target.value)}
-          placeholder="Enter crew code"
-          style={inputStyle}
-        />
-
-        <div style={{ marginTop: 10 }}>
-          <button onClick={handleJoinCrew} style={primaryButtonStyle}>
-            Join
-          </button>
-        </div>
-      </section>
-
-      <section style={cardStyle}>
-        <h3 style={sectionHeadingStyle}>Crew Pulse</h3>
-
-        <div style={{ display: "grid", gap: 12 }}>
-          {crew.map((member) => {
-            const tone = getStatusTone(member.activity);
-            const stale = isStaleCheckIn(member.updatedAt, STALE_MINUTES);
-
-            return (
-              <div
-                key={member.name}
-                style={{
-                  background: "#18181B",
-                  border: stale
-                    ? "1px solid #7F1D1D"
-                    : "1px solid #27272A",
-                  borderRadius: 14,
-                  padding: 14,
-                }}
-              >
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between"
+              }}
+            >
+              <div>
                 <div
                   style={{
                     display: "flex",
-                    justifyContent: "space-between",
                     alignItems: "center",
+                    gap: 10,
+                    fontWeight: 700
                   }}
                 >
-                  <div>
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 10,
-                        fontWeight: 700,
-                      }}
-                    >
-                      <span
-                        style={{
-                          width: 12,
-                          height: 12,
-                          borderRadius: "50%",
-                          background: stale ? "#EF4444" : tone.dot,
-                          boxShadow: `0 0 10px ${
-                            stale ? "#EF4444" : tone.dot
-                          }`,
-                        }}
-                      />
+                  <span
+                    style={{
+                      width: 12,
+                      height: 12,
+                      borderRadius: "50%",
+                      background: stale ? "#EF4444" : "#8B5CF6",
+                      boxShadow: `0 0 10px ${
+                        stale ? "#EF4444" : "#8B5CF6"
+                      }`
+                    }}
+                  />
 
-                      {member.name}
-                    </div>
+                  {member.name}
+                </div>
 
-                    <div
-                      style={{
-                        marginTop: 6,
-                        color: stale ? "#FCA5A5" : colors.muted,
-                      }}
-                    >
-                      {stale ? "No recent update" : tone.label}
-                    </div>
-                  </div>
-
-                  <div style={{ textAlign: "right" }}>
-                    {stale && (
-                      <div
-                        style={{
-                          background: "#7F1D1D",
-                          color: "#FECACA",
-                          borderRadius: 999,
-                          padding: "4px 8px",
-                          fontSize: 12,
-                          fontWeight: 700,
-                          marginBottom: 6,
-                        }}
-                      >
-                        WARNING
-                      </div>
-                    )}
-
-                    <div style={{ fontSize: 13 }}>
-                      {formatTimeAgo(member.updatedAt)}
-                    </div>
-                  </div>
+                <div
+                  style={{
+                    marginTop: 6,
+                    color: stale ? "#FCA5A5" : "#9CA3AF",
+                    fontWeight: stale ? 600 : 400
+                  }}
+                >
+                  {stale
+                    ? "No recent update"
+                    : member.status}
                 </div>
               </div>
-            );
-          })}
-        </div>
-      </section>
 
-      {statusMessage && (
-        <p style={{ marginTop: 14, color: "#86EFAC" }}>{statusMessage}</p>
-      )}
+              <div style={{ textAlign: "right" }}>
+                {stale && (
+                  <div
+                    style={{
+                      background: "#7F1D1D",
+                      color: "#FECACA",
+                      borderRadius: 999,
+                      padding: "4px 8px",
+                      fontSize: 12,
+                      fontWeight: 700,
+                      marginBottom: 6
+                    }}
+                  >
+                    WARNING
+                  </div>
+                )}
 
-      <div style={navGridThreeStyle}>
-        <Link href="/" style={navButtonStyle}>
-          Home
-        </Link>
+                <div style={{ fontSize: 13 }}>
+                  {member.minutesAgo} min ago
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })}
 
-        <Link href="/party" style={navButtonStyle}>
-          Party
-        </Link>
-
-        <Link href="/contact-card" style={navButtonStyle}>
-          Contact Card
-        </Link>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr 1fr",
+          gap: 12,
+          marginTop: 20
+        }}
+      >
+        <Link href="/">Home</Link>
+        <Link href="/party">Party</Link>
+        <Link href="/contact-card">Contact Card</Link>
       </div>
     </main>
   );
