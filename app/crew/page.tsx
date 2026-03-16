@@ -15,10 +15,16 @@ import {
   shellStyle,
   sectionHeadingStyle,
 } from "@/components/twincore-ui";
+import {
+  formatTimeAgo,
+  getStatusTone,
+  isStaleCheckIn,
+} from "@/components/status-utils";
 
 type CrewMember = {
   name: string;
   activity: string;
+  updatedAt?: string;
 };
 
 type SavedProfile = {
@@ -46,15 +52,28 @@ function generateCrewCode() {
 export default function CrewPage() {
   const [displayName, setDisplayName] = useState("Neo");
   const [liveStatus, setLiveStatus] = useState("Not active");
+  const [liveUpdatedAt, setLiveUpdatedAt] = useState<string | undefined>();
   const [crewCode, setCrewCode] = useState("");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [joinCode, setJoinCode] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
 
   const [crew, setCrew] = useState<CrewMember[]>([
-    { name: "Marcus", activity: "Listening to music" },
-    { name: "Angellette", activity: "Watching Netflix" },
-    { name: "Jade", activity: "Heading out" },
+    {
+      name: "Marcus",
+      activity: "Listening to music",
+      updatedAt: new Date(Date.now() - 8 * 60000).toISOString(),
+    },
+    {
+      name: "Angellette",
+      activity: "Watching Netflix",
+      updatedAt: new Date(Date.now() - 3 * 60000).toISOString(),
+    },
+    {
+      name: "Jade",
+      activity: "Not active",
+      updatedAt: new Date(Date.now() - 62 * 60000).toISOString(),
+    },
   ]);
 
   useEffect(() => {
@@ -87,17 +106,28 @@ export default function CrewPage() {
 
       if (!rawStatus) {
         setLiveStatus("Not active");
+        setLiveUpdatedAt(undefined);
         return;
       }
 
       try {
         const parsed = JSON.parse(rawStatus) as SavedPartyStatus;
         const nextStatus = parsed.status || "Not active";
+        const nextUpdatedAt = parsed.updatedAt;
+
         setLiveStatus(nextStatus);
+        setLiveUpdatedAt(nextUpdatedAt);
 
         setCrew((prev) => {
           const others = prev.filter((m) => m.name !== displayName);
-          return [{ name: displayName, activity: nextStatus }, ...others];
+          return [
+            {
+              name: displayName,
+              activity: nextStatus,
+              updatedAt: nextUpdatedAt,
+            },
+            ...others,
+          ];
         });
       } catch {}
     }
@@ -110,6 +140,9 @@ export default function CrewPage() {
   const inviteLink = useMemo(() => {
     return `https://twincore.co/join?code=${crewCode}`;
   }, [crewCode]);
+
+  const liveTone = getStatusTone(liveStatus);
+  const liveIsStale = isStaleCheckIn(liveUpdatedAt);
 
   function handleInviteCrew() {
     setInviteOpen((prev) => !prev);
@@ -158,12 +191,35 @@ export default function CrewPage() {
           Live Crew Signal
         </p>
 
-        <h2 style={{ margin: 0, fontSize: 24 }}>
-          {displayName} — {liveStatus}
-        </h2>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            flexWrap: "wrap",
+          }}
+        >
+          <span
+            style={{
+              width: 14,
+              height: 14,
+              borderRadius: "50%",
+              background: liveIsStale ? "#EF4444" : liveTone.dot,
+              display: "inline-block",
+              boxShadow: `0 0 12px ${liveIsStale ? "#EF4444" : liveTone.dot}`,
+            }}
+          />
+          <h2 style={{ margin: 0, fontSize: 24 }}>
+            {displayName} — {liveIsStale ? "No recent update" : liveTone.label}
+          </h2>
+        </div>
 
-        <p style={{ color: colors.soft, marginTop: 10, marginBottom: 0 }}>
+        <p style={{ color: colors.soft, marginTop: 10, marginBottom: 6 }}>
           Crew statuses update live from Party Mode.
+        </p>
+
+        <p style={{ color: colors.muted, margin: 0 }}>
+          Last check-in: {formatTimeAgo(liveUpdatedAt)}
         </p>
       </section>
 
@@ -219,20 +275,71 @@ export default function CrewPage() {
         <h3 style={sectionHeadingStyle}>Crew Pulse</h3>
 
         <div style={{ display: "grid", gap: 12 }}>
-          {crew.map((member) => (
-            <div
-              key={member.name}
-              style={{
-                background: "#18181B",
-                border: "1px solid #27272A",
-                borderRadius: 14,
-                padding: 14,
-              }}
-            >
-              <div style={{ fontWeight: 700 }}>{member.name}</div>
-              <div style={{ color: colors.muted }}>{member.activity}</div>
-            </div>
-          ))}
+          {crew.map((member) => {
+            const tone = getStatusTone(member.activity);
+            const stale = isStaleCheckIn(member.updatedAt);
+
+            return (
+              <div
+                key={member.name}
+                style={{
+                  background: "#18181B",
+                  border: "1px solid #27272A",
+                  borderRadius: 14,
+                  padding: 14,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                    gap: 12,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div>
+                    <div
+                      style={{
+                        fontWeight: 700,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: 12,
+                          height: 12,
+                          borderRadius: "50%",
+                          background: stale ? "#EF4444" : tone.dot,
+                          display: "inline-block",
+                          boxShadow: `0 0 10px ${stale ? "#EF4444" : tone.dot}`,
+                        }}
+                      />
+                      {member.name}
+                    </div>
+
+                    <div style={{ color: colors.muted, marginTop: 6 }}>
+                      {stale ? "No recent update" : tone.label}
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      color: stale ? "#FCA5A5" : colors.soft,
+                      fontSize: 13,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {stale
+                      ? `⚠ ${formatTimeAgo(member.updatedAt)}`
+                      : formatTimeAgo(member.updatedAt)}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </section>
 
