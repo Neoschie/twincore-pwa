@@ -39,14 +39,21 @@ type SavedPartyStatus = {
 
 const PROFILE_STORAGE_KEY = "twincore_profile";
 const PARTY_STATUS_STORAGE_KEY = "twincore_party_status";
-const STALE_MINUTES = 45;
+
+/*
+ TEMP TEST VALUE
+ change back to 45 after confirming warnings work
+*/
+const STALE_MINUTES = 10;
 
 function generateCrewCode() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "TC-";
+
   for (let i = 0; i < 5; i++) {
     code += chars[Math.floor(Math.random() * chars.length)];
   }
+
   return code;
 }
 
@@ -54,6 +61,7 @@ export default function CrewPage() {
   const [displayName, setDisplayName] = useState("Neo");
   const [liveStatus, setLiveStatus] = useState("Not active");
   const [liveUpdatedAt, setLiveUpdatedAt] = useState<string | undefined>();
+
   const [crewCode, setCrewCode] = useState("");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [joinCode, setJoinCode] = useState("");
@@ -63,26 +71,28 @@ export default function CrewPage() {
     {
       name: "Marcus",
       activity: "Listening to music",
-      updatedAt: new Date(Date.now() - 8 * 60000).toISOString(),
+      updatedAt: new Date(Date.now() - 9 * 60000).toISOString(),
     },
     {
       name: "Angellette",
       activity: "Watching Netflix",
-      updatedAt: new Date(Date.now() - 3 * 60000).toISOString(),
+      updatedAt: new Date(Date.now() - 4 * 60000).toISOString(),
     },
     {
       name: "Jade",
-      activity: "Outside",
-      updatedAt: new Date(Date.now() - 62 * 60000).toISOString(),
+      activity: "Heading out",
+      updatedAt: new Date(Date.now() - 19 * 60000).toISOString(),
     },
   ]);
 
   useEffect(() => {
     const raw = localStorage.getItem(PROFILE_STORAGE_KEY);
+
     if (!raw) return;
 
     try {
       const parsed = JSON.parse(raw) as SavedProfile;
+
       if (parsed.displayName) {
         setDisplayName(parsed.displayName);
       }
@@ -113,6 +123,7 @@ export default function CrewPage() {
 
       try {
         const parsed = JSON.parse(rawStatus) as SavedPartyStatus;
+
         const nextStatus = parsed.status || "Not active";
         const nextUpdatedAt = parsed.updatedAt;
 
@@ -121,6 +132,7 @@ export default function CrewPage() {
 
         setCrew((prev) => {
           const others = prev.filter((m) => m.name !== displayName);
+
           return [
             {
               name: displayName,
@@ -134,7 +146,9 @@ export default function CrewPage() {
     }
 
     loadPartyStatus();
+
     const interval = setInterval(loadPartyStatus, 1000);
+
     return () => clearInterval(interval);
   }, [displayName]);
 
@@ -151,6 +165,7 @@ export default function CrewPage() {
 
   function regenerateCode() {
     const newCode = generateCrewCode();
+
     setCrewCode(newCode);
     localStorage.setItem("twincore_crew_code", newCode);
   }
@@ -164,6 +179,7 @@ export default function CrewPage() {
     setStatusMessage(
       `${displayName} joined crew with code ${joinCode.toUpperCase()}.`
     );
+
     setJoinCode("");
   }
 
@@ -192,14 +208,7 @@ export default function CrewPage() {
           Live Crew Signal
         </p>
 
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            flexWrap: "wrap",
-          }}
-        >
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <span
             style={{
               width: 14,
@@ -207,19 +216,18 @@ export default function CrewPage() {
               borderRadius: "50%",
               background: liveIsStale ? "#EF4444" : liveTone.dot,
               display: "inline-block",
-              boxShadow: `0 0 12px ${liveIsStale ? "#EF4444" : liveTone.dot}`,
+              boxShadow: `0 0 12px ${
+                liveIsStale ? "#EF4444" : liveTone.dot
+              }`,
             }}
           />
+
           <h2 style={{ margin: 0, fontSize: 24 }}>
             {displayName} — {liveIsStale ? "No recent update" : liveTone.label}
           </h2>
         </div>
 
-        <p style={{ color: colors.soft, marginTop: 10, marginBottom: 6 }}>
-          Crew statuses update live from Party Mode.
-        </p>
-
-        <p style={{ color: colors.muted, margin: 0 }}>
+        <p style={{ color: colors.muted, marginTop: 10 }}>
           Last check-in: {formatTimeAgo(liveUpdatedAt)}
         </p>
       </section>
@@ -237,12 +245,12 @@ export default function CrewPage() {
 
             <div style={{ marginBottom: 10 }}>
               <strong>Invite Link:</strong>
-              <div style={{ color: colors.soft, wordBreak: "break-all" }}>
+              <div style={{ wordBreak: "break-all", color: colors.soft }}>
                 {inviteLink}
               </div>
             </div>
 
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 10 }}>
               <button onClick={copyInviteLink} style={secondaryButtonStyle}>
                 Copy Invite Link
               </button>
@@ -285,7 +293,9 @@ export default function CrewPage() {
                 key={member.name}
                 style={{
                   background: "#18181B",
-                  border: stale ? "1px solid #7F1D1D" : "1px solid #27272A",
+                  border: stale
+                    ? "1px solid #7F1D1D"
+                    : "1px solid #27272A",
                   borderRadius: 14,
                   padding: 14,
                 }}
@@ -294,18 +304,16 @@ export default function CrewPage() {
                   style={{
                     display: "flex",
                     justifyContent: "space-between",
-                    alignItems: "flex-start",
-                    gap: 12,
-                    flexWrap: "wrap",
+                    alignItems: "center",
                   }}
                 >
                   <div>
                     <div
                       style={{
-                        fontWeight: 700,
                         display: "flex",
                         alignItems: "center",
                         gap: 10,
+                        fontWeight: 700,
                       }}
                     >
                       <span
@@ -314,55 +322,43 @@ export default function CrewPage() {
                           height: 12,
                           borderRadius: "50%",
                           background: stale ? "#EF4444" : tone.dot,
-                          display: "inline-block",
-                          boxShadow: `0 0 10px ${stale ? "#EF4444" : tone.dot}`,
+                          boxShadow: `0 0 10px ${
+                            stale ? "#EF4444" : tone.dot
+                          }`,
                         }}
                       />
+
                       {member.name}
                     </div>
 
                     <div
                       style={{
-                        color: stale ? "#FCA5A5" : colors.muted,
                         marginTop: 6,
-                        fontWeight: stale ? 700 : 400,
+                        color: stale ? "#FCA5A5" : colors.muted,
                       }}
                     >
                       {stale ? "No recent update" : tone.label}
                     </div>
                   </div>
 
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "flex-end",
-                      gap: 6,
-                    }}
-                  >
+                  <div style={{ textAlign: "right" }}>
                     {stale && (
-                      <span
+                      <div
                         style={{
                           background: "#7F1D1D",
                           color: "#FECACA",
-                          border: "1px solid #991B1B",
                           borderRadius: 999,
                           padding: "4px 8px",
                           fontSize: 12,
                           fontWeight: 700,
+                          marginBottom: 6,
                         }}
                       >
                         WARNING
-                      </span>
+                      </div>
                     )}
 
-                    <div
-                      style={{
-                        color: stale ? "#FCA5A5" : colors.soft,
-                        fontSize: 13,
-                        whiteSpace: "nowrap",
-                      }}
-                    >
+                    <div style={{ fontSize: 13 }}>
                       {formatTimeAgo(member.updatedAt)}
                     </div>
                   </div>
@@ -374,7 +370,7 @@ export default function CrewPage() {
       </section>
 
       {statusMessage && (
-        <p style={{ marginTop: 14, color: colors.success }}>{statusMessage}</p>
+        <p style={{ marginTop: 14, color: "#86EFAC" }}>{statusMessage}</p>
       )}
 
       <div style={navGridThreeStyle}>
