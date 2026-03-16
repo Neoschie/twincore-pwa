@@ -1,43 +1,85 @@
 "use client";
 
-import Link from "next/link";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
-type CrewMember = {
+type CrewStatus = {
+  id: string;
   name: string;
   status: string;
-  minutesAgo: number;
+  updated_at: string;
 };
 
-const STALE_MINUTES = 10;
+function minutesAgo(time: string) {
+  const now = new Date().getTime();
+  const then = new Date(time).getTime();
 
-const crew: CrewMember[] = [
-  { name: "Neo", status: "Listening to music", minutesAgo: 36 },
-  { name: "Marcus", status: "Listening to music", minutesAgo: 8 },
-  { name: "Angellette", status: "Watching Netflix", minutesAgo: 3 },
-  { name: "Jade", status: "Heading out", minutesAgo: 18 }
-];
+  const diff = Math.floor((now - then) / 60000);
+
+  if (diff <= 1) return "Just now";
+  return `${diff} min ago`;
+}
+
+function isStale(time: string) {
+  const now = new Date().getTime();
+  const then = new Date(time).getTime();
+
+  const diff = Math.floor((now - then) / 60000);
+
+  return diff > 45;
+}
 
 export default function CrewPage() {
+  const [crew, setCrew] = useState<CrewStatus[]>([]);
+
+  async function loadCrew() {
+    const { data } = await supabase
+      .from("crew_status")
+      .select("*")
+      .order("updated_at", { ascending: false });
+
+    if (data) setCrew(data);
+  }
+
+  useEffect(() => {
+    loadCrew();
+
+    const channel = supabase
+      .channel("crew-live")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "crew_status" },
+        () => loadCrew()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   return (
     <main
       style={{
-        padding: 20,
         maxWidth: 700,
         margin: "0 auto",
+        padding: 20,
         color: "white"
       }}
     >
-      <h1 style={{ marginBottom: 20 }}>Crew Pulse</h1>
+      <h1 style={{ marginBottom: 20 }}>Crew Radar</h1>
 
       {crew.map((member) => {
-        const stale = member.minutesAgo > STALE_MINUTES;
+        const stale = isStale(member.updated_at);
 
         return (
           <div
-            key={member.name}
+            key={member.id}
             style={{
               background: "#18181B",
-              border: stale ? "1px solid #7F1D1D" : "1px solid #27272A",
+              border: stale
+                ? "1px solid #7F1D1D"
+                : "1px solid #27272A",
               borderRadius: 14,
               padding: 16,
               marginBottom: 14
@@ -63,8 +105,7 @@ export default function CrewPage() {
                       width: 12,
                       height: 12,
                       borderRadius: "50%",
-                      background: stale ? "#EF4444" : "#8B5CF6",
-                      boxShadow: `0 0 10px ${stale ? "#EF4444" : "#8B5CF6"}`
+                      background: stale ? "#EF4444" : "#8B5CF6"
                     }}
                   />
 
@@ -74,8 +115,7 @@ export default function CrewPage() {
                 <div
                   style={{
                     marginTop: 6,
-                    color: stale ? "#FCA5A5" : "#9CA3AF",
-                    fontWeight: stale ? 600 : 400
+                    color: stale ? "#FCA5A5" : "#9CA3AF"
                   }}
                 >
                   {stale ? "No recent update" : member.status}
@@ -100,26 +140,13 @@ export default function CrewPage() {
                 )}
 
                 <div style={{ fontSize: 13 }}>
-                  {member.minutesAgo} min ago
+                  {minutesAgo(member.updated_at)}
                 </div>
               </div>
             </div>
           </div>
         );
       })}
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr 1fr",
-          gap: 12,
-          marginTop: 20
-        }}
-      >
-        <Link href="/">Home</Link>
-        <Link href="/party">Party</Link>
-        <Link href="/contact-card">Contact Card</Link>
-      </div>
     </main>
   );
 }

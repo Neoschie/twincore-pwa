@@ -1,11 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-
-type SavedProfile = {
-  displayName?: string;
-};
+import { useEffect, useState } from "react";
+import {
+  PageHeader,
+  cardStyle,
+  colors,
+  gridFourStyle,
+  navButtonStyle,
+  primaryButtonStyle,
+  shellStyle,
+  sectionHeadingStyle,
+} from "@/components/twincore-ui";
 
 const PROFILE_STORAGE_KEY = "twincore_profile";
 
@@ -19,7 +25,7 @@ export default function JoinPage() {
 
     if (rawProfile) {
       try {
-        const parsed = JSON.parse(rawProfile) as SavedProfile;
+        const parsed = JSON.parse(rawProfile);
         if (parsed.displayName) {
           setDisplayName(parsed.displayName);
         }
@@ -34,10 +40,6 @@ export default function JoinPage() {
     }
   }, []);
 
-  const inviterName = useMemo(() => {
-    return crewCode ? "TwinCore Crew Host" : "Unknown Host";
-  }, [crewCode]);
-
   function joinCrew() {
     if (!crewCode.trim()) {
       setStatusMessage("No crew code found.");
@@ -50,46 +52,20 @@ export default function JoinPage() {
   }
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "#0A0A0B",
-        color: "white",
-        padding: "24px 16px 120px",
-        maxWidth: 680,
-        margin: "0 auto",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 24,
-          gap: 12,
-        }}
-      >
-        <div>
-          <p style={{ fontSize: 12, color: "#A1A1AA", marginBottom: 6 }}>
-            TwinCore
-          </p>
-          <h1 style={{ fontSize: 30, fontWeight: 800, margin: 0 }}>
-            Join Crew
-          </h1>
-        </div>
-
-        <Link href="/" style={navButton}>
-          Home
-        </Link>
-      </div>
+    <main style={shellStyle}>
+      <PageHeader
+        title="Join Crew"
+        action={
+          <Link href="/" style={navButtonStyle}>
+            Home
+          </Link>
+        }
+      />
 
       <section style={cardStyle}>
-        <h2 style={{ marginTop: 0, marginBottom: 10 }}>Crew Invite</h2>
+        <h2 style={{ ...sectionHeadingStyle, marginBottom: 10 }}>Crew Invite</h2>
 
-        <div style={{ lineHeight: 1.9, color: "#D4D4D8" }}>
-          <div>
-            <strong>Invited by:</strong> {inviterName}
-          </div>
+        <div style={{ lineHeight: 1.9, color: colors.soft }}>
           <div>
             <strong>Your name:</strong> {displayName}
           </div>
@@ -100,75 +76,39 @@ export default function JoinPage() {
       </section>
 
       <section style={cardStyle}>
-        <h3 style={{ marginTop: 0, marginBottom: 12 }}>What happens next</h3>
+        <h3 style={{ ...sectionHeadingStyle, marginBottom: 12 }}>Join</h3>
 
-        <div style={{ lineHeight: 1.9, color: "#D4D4D8" }}>
-          <div>• You join this TwinCore crew</div>
-          <div>• Your party status can sync into Crew Pulse</div>
-          <div>• You can access shared crew experiences later</div>
+        <div style={{ lineHeight: 1.9, color: colors.soft }}>
+          <div>• Join this TwinCore crew</div>
+          <div>• Save the crew code locally</div>
+          <div>• Use Party Mode with this crew later</div>
         </div>
 
         <div style={{ marginTop: 18 }}>
-          <button onClick={joinCrew} style={primaryButton}>
+          <button onClick={joinCrew} style={primaryButtonStyle}>
             Join This Crew
           </button>
         </div>
       </section>
 
       {statusMessage && (
-        <p style={{ marginTop: 14, color: "#86EFAC" }}>{statusMessage}</p>
+        <p style={{ marginTop: 14, color: colors.success }}>{statusMessage}</p>
       )}
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr 1fr 1fr",
-          gap: 10,
-          marginTop: 20,
-        }}
-      >
-        <Link href="/" style={navButton}>
+      <div style={gridFourStyle}>
+        <Link href="/" style={navButtonStyle}>
           Home
         </Link>
-        <Link href="/crew" style={navButton}>
+        <Link href="/crew" style={navButtonStyle}>
           Crew
         </Link>
-        <Link href="/party" style={navButton}>
+        <Link href="/party" style={navButtonStyle}>
           Party
         </Link>
-        <Link href="/contact-card" style={navButton}>
+        <Link href="/contact-card" style={navButtonStyle}>
           Contact Card
         </Link>
       </div>
     </main>
   );
 }
-
-const cardStyle: React.CSSProperties = {
-  background: "#111113",
-  border: "1px solid #232326",
-  borderRadius: 20,
-  padding: 18,
-  marginBottom: 18,
-};
-
-const navButton: React.CSSProperties = {
-  textDecoration: "none",
-  color: "white",
-  background: "#18181B",
-  border: "1px solid #27272A",
-  borderRadius: 12,
-  padding: "10px 14px",
-  fontSize: 14,
-  textAlign: "center",
-};
-
-const primaryButton: React.CSSProperties = {
-  background: "white",
-  color: "black",
-  border: "none",
-  borderRadius: 14,
-  padding: "14px 18px",
-  fontWeight: 700,
-  cursor: "pointer",
-};
