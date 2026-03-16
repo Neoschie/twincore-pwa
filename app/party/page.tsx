@@ -2,6 +2,17 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import {
+  PageHeader,
+  cardStyle,
+  colors,
+  gridTwoStyle,
+  navGridThreeStyle,
+  navButtonStyle,
+  secondaryButtonStyle,
+  shellStyle,
+  sectionHeadingStyle,
+} from "@/components/twincore-ui";
 
 const PROFILE_STORAGE_KEY = "twincore_profile";
 const PARTY_STATUS_STORAGE_KEY = "twincore_party_status";
@@ -79,67 +90,42 @@ export default function PartyPage() {
   }
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "#0A0A0B",
-        color: "white",
-        padding: "24px 16px 120px",
-        maxWidth: 680,
-        margin: "0 auto",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 24,
-          gap: 12,
-        }}
-      >
-        <div>
-          <p style={{ fontSize: 12, color: "#A1A1AA", marginBottom: 6 }}>
-            TwinCore
-          </p>
-          <h1 style={{ fontSize: 30, fontWeight: 800, margin: 0 }}>
-            Party Mode
-          </h1>
-        </div>
-
-        <Link href="/profile" style={navButton}>
-          Profile
-        </Link>
-      </div>
+    <main style={shellStyle}>
+      <PageHeader
+        title="Party Mode"
+        action={
+          <Link href="/profile" style={navButtonStyle}>
+            Profile
+          </Link>
+        }
+      />
 
       <section style={cardStyle}>
-        <h2 style={{ marginTop: 0 }}>Tonight</h2>
-        <p style={{ color: "#D4D4D8", marginBottom: 8 }}>
+        <h2 style={sectionHeadingStyle}>Tonight</h2>
+        <p style={{ color: colors.soft, marginBottom: 8 }}>
           <strong>{displayName}</strong>
         </p>
-        <p style={{ color: "#A1A1AA", marginBottom: 0 }}>
+        <p style={{ color: colors.muted, marginBottom: 0 }}>
           Current status: <span style={{ color: "white" }}>{status}</span>
         </p>
       </section>
 
       <section style={cardStyle}>
-        <h2 style={{ marginTop: 0, marginBottom: 14 }}>Set Your Status</h2>
+        <h2 style={{ ...sectionHeadingStyle, marginBottom: 14 }}>
+          Set Your Status
+        </h2>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: 12,
-          }}
-        >
+        <div style={gridTwoStyle}>
           {partyStatuses.map((item) => (
             <button
               key={item}
               onClick={() => updateStatus(item)}
               style={{
-                ...statusButton,
+                ...secondaryButtonStyle,
                 border:
-                  status === item ? "1px solid white" : "1px solid #27272A",
+                  status === item
+                    ? "1px solid white"
+                    : "1px solid #27272A",
               }}
             >
               {item}
@@ -149,85 +135,36 @@ export default function PartyPage() {
       </section>
 
       <section style={cardStyle}>
-        <h2 style={{ marginTop: 0, marginBottom: 14 }}>Quick Actions</h2>
+        <h2 style={{ ...sectionHeadingStyle, marginBottom: 14 }}>
+          Quick Actions
+        </h2>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: 12,
-          }}
-        >
-          <button onClick={sendCheckIn} style={actionButton}>
+        <div style={gridTwoStyle}>
+          <button onClick={sendCheckIn} style={secondaryButtonStyle}>
             Send Check-In
           </button>
 
-          <button onClick={shareContactCard} style={actionButton}>
+          <button onClick={shareContactCard} style={secondaryButtonStyle}>
             Share Contact Card
           </button>
         </div>
       </section>
 
       {statusMessage && (
-        <p style={{ marginTop: 14, color: "#86EFAC" }}>{statusMessage}</p>
+        <p style={{ marginTop: 14, color: colors.success }}>{statusMessage}</p>
       )}
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr 1fr",
-          gap: 10,
-          marginTop: 20,
-        }}
-      >
-        <Link href="/" style={navButton}>
+      <div style={navGridThreeStyle}>
+        <Link href="/" style={navButtonStyle}>
           Home
         </Link>
-        <Link href="/crew" style={navButton}>
+        <Link href="/crew" style={navButtonStyle}>
           Crew
         </Link>
-        <Link href="/profile" style={navButton}>
+        <Link href="/profile" style={navButtonStyle}>
           Profile
         </Link>
       </div>
     </main>
   );
 }
-
-const cardStyle: React.CSSProperties = {
-  background: "#111113",
-  border: "1px solid #232326",
-  borderRadius: 20,
-  padding: 18,
-  marginBottom: 18,
-};
-
-const navButton: React.CSSProperties = {
-  textDecoration: "none",
-  color: "white",
-  background: "#18181B",
-  border: "1px solid #27272A",
-  borderRadius: 12,
-  padding: "10px 14px",
-  fontSize: 14,
-  textAlign: "center",
-};
-
-const actionButton: React.CSSProperties = {
-  background: "#18181B",
-  color: "white",
-  border: "1px solid #27272A",
-  borderRadius: 14,
-  padding: "14px 16px",
-  fontWeight: 700,
-  cursor: "pointer",
-};
-
-const statusButton: React.CSSProperties = {
-  background: "#18181B",
-  color: "white",
-  borderRadius: 14,
-  padding: "14px 16px",
-  fontWeight: 700,
-  cursor: "pointer",
-};

@@ -3,6 +3,16 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { QRCodeCanvas } from "qrcode.react";
+import {
+  PageHeader,
+  cardStyle,
+  colors,
+  gridFourStyle,
+  navButtonStyle,
+  secondaryButtonStyle,
+  shellStyle,
+  sectionHeadingStyle,
+} from "@/components/twincore-ui";
 
 const PROFILE_STORAGE_KEY = "twincore_profile";
 const CREW_CODE_STORAGE_KEY = "twincore_crew_code";
@@ -37,14 +47,9 @@ export default function ContactCardPage() {
   }, []);
 
   useEffect(() => {
-    const base =
-      typeof window !== "undefined" && window.location.hostname
-        ? "https://twincore.co"
-        : "https://twincore.co";
-
     const nextUrl = crewCode
-      ? `${base}/join?code=${crewCode}`
-      : `${base}/join`;
+      ? `https://twincore.co/join?code=${crewCode}`
+      : `https://twincore.co/join`;
 
     setShareUrl(nextUrl);
   }, [crewCode]);
@@ -63,46 +68,22 @@ export default function ContactCardPage() {
   }
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "#0A0A0B",
-        color: "white",
-        padding: "24px 16px 120px",
-        maxWidth: 680,
-        margin: "0 auto",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 24,
-          gap: 12,
-        }}
-      >
-        <div>
-          <p style={{ fontSize: 12, color: "#A1A1AA", marginBottom: 6 }}>
-            TwinCore
-          </p>
-
-          <h1 style={{ fontSize: 30, fontWeight: 800, margin: 0 }}>
-            Contact Card
-          </h1>
-        </div>
-
-        <Link href="/profile" style={navButton}>
-          Profile
-        </Link>
-      </div>
+    <main style={shellStyle}>
+      <PageHeader
+        title="Contact Card"
+        action={
+          <Link href="/profile" style={navButtonStyle}>
+            Profile
+          </Link>
+        }
+      />
 
       <section style={cardStyle}>
         <h2 style={{ marginTop: 0, marginBottom: 6 }}>
           {profile.displayName || "Your Name"}
         </h2>
 
-        <p style={{ color: "#A1A1AA", marginTop: 0, marginBottom: 14 }}>
+        <p style={{ color: colors.muted, marginTop: 0, marginBottom: 14 }}>
           {profile.vibe || "Your vibe"}
         </p>
 
@@ -133,7 +114,7 @@ export default function ContactCardPage() {
       </section>
 
       <section style={cardStyle}>
-        <h3 style={{ marginTop: 0 }}>Join Link</h3>
+        <h3 style={sectionHeadingStyle}>Join Link</h3>
 
         <div
           style={{
@@ -142,7 +123,7 @@ export default function ContactCardPage() {
             borderRadius: 14,
             padding: 12,
             marginBottom: 14,
-            color: "#D4D4D8",
+            color: colors.soft,
             wordBreak: "break-all",
           }}
         >
@@ -150,20 +131,20 @@ export default function ContactCardPage() {
         </div>
 
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-          <button onClick={shareCard} style={buttonStyle}>
+          <button onClick={shareCard} style={secondaryButtonStyle}>
             Share Card
           </button>
 
-          <button onClick={copyJoinLink} style={buttonStyle}>
+          <button onClick={copyJoinLink} style={secondaryButtonStyle}>
             Copy Join Link
           </button>
         </div>
       </section>
 
       <section style={cardStyle}>
-        <h3 style={{ marginTop: 0 }}>Scan to Join</h3>
+        <h3 style={sectionHeadingStyle}>Scan to Join</h3>
 
-        <p style={{ color: "#A1A1AA", marginBottom: 12 }}>
+        <p style={{ color: colors.muted, marginBottom: 12 }}>
           This QR should open the exact URL shown below it.
         </p>
 
@@ -185,7 +166,7 @@ export default function ContactCardPage() {
             border: "1px solid #27272A",
             borderRadius: 14,
             padding: 12,
-            color: "#D4D4D8",
+            color: colors.soft,
             wordBreak: "break-all",
             fontSize: 13,
           }}
@@ -194,59 +175,23 @@ export default function ContactCardPage() {
         </div>
       </section>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr 1fr 1fr",
-          gap: 10,
-          marginTop: 20,
-        }}
-      >
-        <Link href="/" style={navButton}>
+      <div style={gridFourStyle}>
+        <Link href="/" style={navButtonStyle}>
           Home
         </Link>
 
-        <Link href="/crew" style={navButton}>
+        <Link href="/crew" style={navButtonStyle}>
           Crew
         </Link>
 
-        <Link href="/party" style={navButton}>
+        <Link href="/party" style={navButtonStyle}>
           Party
         </Link>
 
-        <Link href="/profile" style={navButton}>
+        <Link href="/profile" style={navButtonStyle}>
           Profile
         </Link>
       </div>
     </main>
   );
 }
-
-const cardStyle: React.CSSProperties = {
-  background: "#111113",
-  border: "1px solid #232326",
-  borderRadius: 20,
-  padding: 18,
-  marginBottom: 18,
-};
-
-const navButton: React.CSSProperties = {
-  textDecoration: "none",
-  color: "white",
-  background: "#18181B",
-  border: "1px solid #27272A",
-  borderRadius: 12,
-  padding: "10px 14px",
-  fontSize: 14,
-  textAlign: "center",
-};
-
-const buttonStyle: React.CSSProperties = {
-  background: "#18181B",
-  color: "white",
-  border: "1px solid #27272A",
-  borderRadius: 14,
-  padding: "14px",
-  fontWeight: 700,
-  cursor: "pointer",
-};

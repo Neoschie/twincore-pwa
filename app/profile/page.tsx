@@ -2,6 +2,16 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import {
+  PageHeader,
+  cardStyle,
+  inputStyle,
+  labelStyle,
+  navButtonStyle,
+  navGridThreeStyle,
+  primaryButtonStyle,
+  shellStyle,
+} from "@/components/twincore-ui";
 
 const STORAGE_KEY = "twincore_profile";
 
@@ -41,38 +51,15 @@ export default function ProfilePage() {
   }
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "#0A0A0B",
-        color: "white",
-        padding: "24px 16px",
-        maxWidth: 680,
-        margin: "0 auto",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 24,
-          gap: 12,
-        }}
-      >
-        <div>
-          <p style={{ fontSize: 12, color: "#A1A1AA", marginBottom: 6 }}>
-            TwinCore
-          </p>
-          <h1 style={{ fontSize: 30, fontWeight: 800, margin: 0 }}>
-            Profile
-          </h1>
-        </div>
-
-        <Link href="/" style={navButton}>
-          Home
-        </Link>
-      </div>
+    <main style={shellStyle}>
+      <PageHeader
+        title="Profile"
+        action={
+          <Link href="/" style={navButtonStyle}>
+            Home
+          </Link>
+        }
+      />
 
       <section style={cardStyle}>
         <label style={labelStyle}>Display Name</label>
@@ -98,7 +85,7 @@ export default function ProfilePage() {
           style={inputStyle}
         />
 
-        <button onClick={saveProfile} style={primaryButton}>
+        <button onClick={saveProfile} style={primaryButtonStyle}>
           Save Profile
         </button>
 
@@ -107,72 +94,17 @@ export default function ProfilePage() {
         )}
       </section>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr 1fr",
-          gap: 10,
-          marginTop: 20,
-        }}
-      >
-        <Link href="/" style={navButton}>
+      <div style={navGridThreeStyle}>
+        <Link href="/" style={navButtonStyle}>
           Home
         </Link>
-        <Link href="/crew" style={navButton}>
+        <Link href="/crew" style={navButtonStyle}>
           Crew
         </Link>
-        <Link href="/party" style={navButton}>
+        <Link href="/party" style={navButtonStyle}>
           Party
         </Link>
       </div>
     </main>
   );
 }
-
-const cardStyle: React.CSSProperties = {
-  background: "#111113",
-  border: "1px solid #232326",
-  borderRadius: 20,
-  padding: 18,
-};
-
-const labelStyle: React.CSSProperties = {
-  display: "block",
-  fontSize: 13,
-  color: "#A1A1AA",
-  marginBottom: 6,
-  marginTop: 12,
-};
-
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  background: "#18181B",
-  color: "white",
-  border: "1px solid #27272A",
-  borderRadius: 14,
-  padding: "14px",
-  fontSize: 14,
-  boxSizing: "border-box",
-};
-
-const navButton: React.CSSProperties = {
-  textDecoration: "none",
-  color: "white",
-  background: "#18181B",
-  border: "1px solid #27272A",
-  borderRadius: 12,
-  padding: "10px 14px",
-  fontSize: 14,
-  textAlign: "center",
-};
-
-const primaryButton: React.CSSProperties = {
-  marginTop: 18,
-  background: "white",
-  color: "black",
-  border: "none",
-  borderRadius: 14,
-  padding: "14px 18px",
-  fontWeight: 700,
-  cursor: "pointer",
-};

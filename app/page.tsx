@@ -2,6 +2,18 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import {
+  PageHeader,
+  cardStyle,
+  colors,
+  gridTwoStyle,
+  heroCardStyle,
+  heroTitleStyle,
+  labelStyle,
+  navButtonStyle,
+  pageSubtitleStyle,
+  shellStyle,
+} from "@/components/twincore-ui";
 
 const PROFILE_STORAGE_KEY = "twincore_profile";
 const PARTY_STATUS_STORAGE_KEY = "twincore_party_status";
@@ -51,45 +63,22 @@ export default function HomePage() {
     }
 
     loadPartyStatus();
-
     const interval = setInterval(loadPartyStatus, 1000);
     return () => clearInterval(interval);
   }, []);
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "#0A0A0B",
-        color: "white",
-        padding: "24px 16px 120px",
-        maxWidth: 680,
-        margin: "0 auto",
-      }}
-    >
+    <main style={shellStyle}>
       <section style={{ marginBottom: 24 }}>
-        <p style={{ fontSize: 12, color: "#A1A1AA", marginBottom: 6 }}>
+        <p style={{ fontSize: 12, color: colors.muted, marginBottom: 6 }}>
           TwinCore
         </p>
-
-        <h1 style={{ fontSize: 34, fontWeight: 800, margin: 0 }}>
-          Dashboard
-        </h1>
-
-        <p
-          style={{
-            color: "#A1A1AA",
-            marginTop: 10,
-            marginBottom: 0,
-            lineHeight: 1.6,
-          }}
-        >
-          Your social, safety, and identity hub.
-        </p>
+        <h1 style={heroTitleStyle}>Dashboard</h1>
+        <p style={pageSubtitleStyle}>Your social, safety, and identity hub.</p>
       </section>
 
-      <section style={heroCard}>
-        <p style={{ fontSize: 12, color: "#A1A1AA", marginBottom: 8 }}>
+      <section style={heroCardStyle}>
+        <p style={{ fontSize: 12, color: colors.muted, marginBottom: 8 }}>
           Live System
         </p>
 
@@ -99,7 +88,7 @@ export default function HomePage() {
 
         <p
           style={{
-            color: "#D4D4D8",
+            color: colors.soft,
             marginTop: 10,
             marginBottom: 12,
             lineHeight: 1.6,
@@ -109,7 +98,7 @@ export default function HomePage() {
           Card, Profile, and Join flow.
         </p>
 
-        <div style={{ lineHeight: 1.9, color: "#D4D4D8" }}>
+        <div style={{ lineHeight: 1.9, color: colors.soft }}>
           <div>
             <strong>Vibe:</strong> {vibe}
           </div>
@@ -127,45 +116,37 @@ export default function HomePage() {
         <h3 style={{ margin: 0, fontSize: 18 }}>Core Features</h3>
       </section>
 
-      <div style={gridStyle}>
-        <Link href="/crew" style={featureCard}>
-          <div>
-            <p style={labelStyle}>Social Layer</p>
-            <h3 style={cardTitle}>Crew Pulse</h3>
-            <p style={cardText}>
-              Invite crew, join with code, and view live crew activity.
-            </p>
-          </div>
+      <div style={gridTwoStyle}>
+        <Link href="/crew" style={{ ...cardStyle, textDecoration: "none", color: "white", minHeight: 170, display: "block" }}>
+          <p style={{ ...labelStyle, marginTop: 0 }}>Social Layer</p>
+          <h3 style={{ marginTop: 0, marginBottom: 8, fontSize: 20 }}>Crew Radar</h3>
+          <p style={{ margin: 0, color: colors.soft, lineHeight: 1.6 }}>
+            Invite crew, join with code, and view live crew activity.
+          </p>
         </Link>
 
-        <Link href="/party" style={featureCard}>
-          <div>
-            <p style={labelStyle}>Activity Layer</p>
-            <h3 style={cardTitle}>Party Mode</h3>
-            <p style={cardText}>
-              Broadcast statuses like Outside, At club, Safe, or Heading home.
-            </p>
-          </div>
+        <Link href="/party" style={{ ...cardStyle, textDecoration: "none", color: "white", minHeight: 170, display: "block" }}>
+          <p style={{ ...labelStyle, marginTop: 0 }}>Activity Layer</p>
+          <h3 style={{ marginTop: 0, marginBottom: 8, fontSize: 20 }}>Party Mode</h3>
+          <p style={{ margin: 0, color: colors.soft, lineHeight: 1.6 }}>
+            Broadcast statuses like Outside, At club, Safe, or Heading home.
+          </p>
         </Link>
 
-        <Link href="/contact-card" style={featureCard}>
-          <div>
-            <p style={labelStyle}>Sharing Layer</p>
-            <h3 style={cardTitle}>Contact Card</h3>
-            <p style={cardText}>
-              Share your identity, crew access, and QR join experience.
-            </p>
-          </div>
+        <Link href="/contact-card" style={{ ...cardStyle, textDecoration: "none", color: "white", minHeight: 170, display: "block" }}>
+          <p style={{ ...labelStyle, marginTop: 0 }}>Sharing Layer</p>
+          <h3 style={{ marginTop: 0, marginBottom: 8, fontSize: 20 }}>Contact Card</h3>
+          <p style={{ margin: 0, color: colors.soft, lineHeight: 1.6 }}>
+            Share your identity, crew access, and QR join experience.
+          </p>
         </Link>
 
-        <Link href="/profile" style={featureCard}>
-          <div>
-            <p style={labelStyle}>Identity Layer</p>
-            <h3 style={cardTitle}>Profile</h3>
-            <p style={cardText}>
-              Save your name, vibe, city, music, and emergency contact info.
-            </p>
-          </div>
+        <Link href="/profile" style={{ ...cardStyle, textDecoration: "none", color: "white", minHeight: 170, display: "block" }}>
+          <p style={{ ...labelStyle, marginTop: 0 }}>Identity Layer</p>
+          <h3 style={{ marginTop: 0, marginBottom: 8, fontSize: 20 }}>Profile</h3>
+          <p style={{ margin: 0, color: colors.soft, lineHeight: 1.6 }}>
+            Save your name, vibe, city, music, and emergency contact info.
+          </p>
         </Link>
       </div>
 
@@ -173,33 +154,24 @@ export default function HomePage() {
         <h3 style={{ margin: 0, fontSize: 18 }}>Quick Access</h3>
       </section>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: 12,
-        }}
-      >
-        <Link href="/join" style={quickButton}>
+      <div style={gridTwoStyle}>
+        <Link href="/join" style={navButtonStyle}>
           Join Crew
         </Link>
-
-        <Link href="/crew" style={quickButton}>
+        <Link href="/crew" style={navButtonStyle}>
           Open Crew
         </Link>
-
-        <Link href="/party" style={quickButton}>
+        <Link href="/party" style={navButtonStyle}>
           Open Party
         </Link>
-
-        <Link href="/profile" style={quickButton}>
+        <Link href="/profile" style={navButtonStyle}>
           Open Profile
         </Link>
       </div>
 
       <section style={{ marginTop: 28 }}>
-        <div style={statusCard}>
-          <p style={{ fontSize: 12, color: "#A1A1AA", marginBottom: 8 }}>
+        <div style={cardStyle}>
+          <p style={{ fontSize: 12, color: colors.muted, marginBottom: 8 }}>
             Safety Status
           </p>
 
@@ -207,7 +179,7 @@ export default function HomePage() {
             {liveStatus === "Safe" ? "Safe" : "Monitoring"}
           </h3>
 
-          <p style={{ margin: 0, color: "#D4D4D8", lineHeight: 1.6 }}>
+          <p style={{ margin: 0, color: colors.soft, lineHeight: 1.6 }}>
             Contact Card, Crew access, Party updates, and Join flow are all
             live in your MVP.
           </p>
@@ -216,64 +188,3 @@ export default function HomePage() {
     </main>
   );
 }
-
-const heroCard: React.CSSProperties = {
-  background: "linear-gradient(180deg, #151518 0%, #101012 100%)",
-  border: "1px solid #232326",
-  borderRadius: 24,
-  padding: 22,
-};
-
-const statusCard: React.CSSProperties = {
-  background: "#111113",
-  border: "1px solid #232326",
-  borderRadius: 20,
-  padding: 18,
-};
-
-const gridStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "1fr 1fr",
-  gap: 12,
-};
-
-const featureCard: React.CSSProperties = {
-  textDecoration: "none",
-  color: "white",
-  background: "#111113",
-  border: "1px solid #232326",
-  borderRadius: 20,
-  padding: 18,
-  minHeight: 170,
-  display: "block",
-};
-
-const quickButton: React.CSSProperties = {
-  textDecoration: "none",
-  color: "white",
-  background: "#18181B",
-  border: "1px solid #27272A",
-  borderRadius: 14,
-  padding: "14px 16px",
-  textAlign: "center",
-  fontWeight: 700,
-};
-
-const labelStyle: React.CSSProperties = {
-  fontSize: 12,
-  color: "#A1A1AA",
-  marginTop: 0,
-  marginBottom: 8,
-};
-
-const cardTitle: React.CSSProperties = {
-  marginTop: 0,
-  marginBottom: 8,
-  fontSize: 20,
-};
-
-const cardText: React.CSSProperties = {
-  margin: 0,
-  color: "#D4D4D8",
-  lineHeight: 1.6,
-};
