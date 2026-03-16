@@ -39,6 +39,7 @@ type SavedPartyStatus = {
 
 const PROFILE_STORAGE_KEY = "twincore_profile";
 const PARTY_STATUS_STORAGE_KEY = "twincore_party_status";
+const STALE_MINUTES = 45;
 
 function generateCrewCode() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -71,7 +72,7 @@ export default function CrewPage() {
     },
     {
       name: "Jade",
-      activity: "Not active",
+      activity: "Outside",
       updatedAt: new Date(Date.now() - 62 * 60000).toISOString(),
     },
   ]);
@@ -142,7 +143,7 @@ export default function CrewPage() {
   }, [crewCode]);
 
   const liveTone = getStatusTone(liveStatus);
-  const liveIsStale = isStaleCheckIn(liveUpdatedAt);
+  const liveIsStale = isStaleCheckIn(liveUpdatedAt, STALE_MINUTES);
 
   function handleInviteCrew() {
     setInviteOpen((prev) => !prev);
@@ -277,14 +278,14 @@ export default function CrewPage() {
         <div style={{ display: "grid", gap: 12 }}>
           {crew.map((member) => {
             const tone = getStatusTone(member.activity);
-            const stale = isStaleCheckIn(member.updatedAt);
+            const stale = isStaleCheckIn(member.updatedAt, STALE_MINUTES);
 
             return (
               <div
                 key={member.name}
                 style={{
                   background: "#18181B",
-                  border: "1px solid #27272A",
+                  border: stale ? "1px solid #7F1D1D" : "1px solid #27272A",
                   borderRadius: 14,
                   padding: 14,
                 }}
@@ -320,21 +321,50 @@ export default function CrewPage() {
                       {member.name}
                     </div>
 
-                    <div style={{ color: colors.muted, marginTop: 6 }}>
+                    <div
+                      style={{
+                        color: stale ? "#FCA5A5" : colors.muted,
+                        marginTop: 6,
+                        fontWeight: stale ? 700 : 400,
+                      }}
+                    >
                       {stale ? "No recent update" : tone.label}
                     </div>
                   </div>
 
                   <div
                     style={{
-                      color: stale ? "#FCA5A5" : colors.soft,
-                      fontSize: 13,
-                      whiteSpace: "nowrap",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "flex-end",
+                      gap: 6,
                     }}
                   >
-                    {stale
-                      ? `⚠ ${formatTimeAgo(member.updatedAt)}`
-                      : formatTimeAgo(member.updatedAt)}
+                    {stale && (
+                      <span
+                        style={{
+                          background: "#7F1D1D",
+                          color: "#FECACA",
+                          border: "1px solid #991B1B",
+                          borderRadius: 999,
+                          padding: "4px 8px",
+                          fontSize: 12,
+                          fontWeight: 700,
+                        }}
+                      >
+                        WARNING
+                      </span>
+                    )}
+
+                    <div
+                      style={{
+                        color: stale ? "#FCA5A5" : colors.soft,
+                        fontSize: 13,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {formatTimeAgo(member.updatedAt)}
+                    </div>
                   </div>
                 </div>
               </div>
