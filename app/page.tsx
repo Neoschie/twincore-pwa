@@ -56,14 +56,14 @@ const quickLinks = [
 
 function featureCardClass(tone: (typeof featureCards)[number]["tone"]) {
   if (tone === "blue") {
-    return "border border-blue-500/20 bg-[linear-gradient(180deg,#1a1f2e,#0c0f1a)] shadow-[0_18px_50px_rgba(59,130,246,0.18)]";
+    return "border border-blue-500/20 bg-[linear-gradient(180deg,#1a1f2e,#0c0f1a)] shadow-[0_18px_50px_rgba(59,130,246,0.18)] hover:shadow-[0_25px_65px_rgba(59,130,246,0.28)]";
   }
 
   if (tone === "warm") {
-    return "border border-orange-500/15 bg-[linear-gradient(180deg,#22160f,#120d09)] shadow-[0_18px_50px_rgba(249,115,22,0.16)]";
+    return "border border-orange-500/15 bg-[linear-gradient(180deg,#22160f,#120d09)] shadow-[0_18px_50px_rgba(249,115,22,0.16)] hover:shadow-[0_25px_65px_rgba(249,115,22,0.26)]";
   }
 
-  return "bg-[linear-gradient(180deg,#111113,#0c0c0f)] shadow-[0_16px_45px_rgba(0,0,0,0.42)]";
+  return "bg-[linear-gradient(180deg,#111113,#0c0c0f)] shadow-[0_16px_45px_rgba(0,0,0,0.42)] hover:shadow-[0_22px_55px_rgba(0,0,0,0.55)]";
 }
 
 export default function HomePage() {
@@ -73,10 +73,10 @@ export default function HomePage() {
 
       <div className="relative mx-auto w-full max-w-md px-4 py-8">
         <header className="mb-10">
-          <div className="mb-2 text-xs font-medium tracking-[0.3em] text-white/50">
+          <div className="mb-2 text-xs tracking-[0.3em] text-white/50">
             TWINCORE
           </div>
-          <h1 className="text-4xl font-semibold tracking-tight text-white">
+          <h1 className="text-4xl font-semibold tracking-tight">
             Dashboard
           </h1>
           <p className="mt-2 text-white/60">
@@ -84,11 +84,16 @@ export default function HomePage() {
           </p>
         </header>
 
+        {/* LIVE SYSTEM */}
         <section className="mb-10">
-          <div className="rounded-3xl border border-white/8 bg-[linear-gradient(180deg,#14141a,#0c0c10)] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.6),0_0_40px_rgba(255,255,255,0.03)]">
+          <div className="relative rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#14141a,#0c0c10)] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.6)]">
+            
+            {/* subtle pulse */}
+            <div className="pointer-events-none absolute inset-0 rounded-3xl bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.15),transparent_60%)] opacity-40 animate-pulse" />
+
             <div className="mb-3 text-sm text-white/50">Live System</div>
 
-            <h2 className="text-3xl font-semibold leading-tight text-white">
+            <h2 className="text-3xl font-semibold">
               Welcome back, Neo
             </h2>
 
@@ -98,38 +103,27 @@ export default function HomePage() {
             </p>
 
             <div className="mt-6 grid grid-cols-2 gap-3 text-sm text-white/80">
-              <div>
-                <span className="text-white/50">Vibe:</span> Calm but lit
-              </div>
-              <div>
-                <span className="text-white/50">City:</span> London, ON
-              </div>
-              <div>
-                <span className="text-white/50">Status:</span> Not active
-              </div>
-              <div>
-                <span className="text-white/50">TwinMe:</span> Ready
-              </div>
+              <div><span className="text-white/50">Vibe:</span> Calm but lit</div>
+              <div><span className="text-white/50">City:</span> London, ON</div>
+              <div><span className="text-white/50">Status:</span> Not active</div>
+              <div><span className="text-white/50">TwinMe:</span> Ready</div>
             </div>
           </div>
         </section>
 
+        {/* FEATURES */}
         <section className="mb-10">
-          <h3 className="mb-4 text-xl font-semibold text-white">Core Features</h3>
+          <h3 className="mb-4 text-xl font-semibold">Core Features</h3>
 
           <div className="grid grid-cols-2 gap-4">
             {featureCards.map((card) => (
               <Link
                 key={card.title}
                 href={card.href}
-                className={`rounded-3xl p-5 transition duration-200 hover:scale-[1.02] active:scale-[0.97] ${featureCardClass(
-                  card.tone
-                )}`}
+                className={`rounded-3xl p-5 transition duration-200 hover:scale-[1.02] active:scale-[0.97] ${featureCardClass(card.tone)}`}
               >
                 <div className="mb-2 text-xs text-white/50">{card.eyebrow}</div>
-                <div className="text-2xl font-semibold leading-tight text-white">
-                  {card.title}
-                </div>
+                <div className="text-2xl font-semibold">{card.title}</div>
                 <p className="mt-3 text-sm leading-7 text-white/65">
                   {card.description}
                 </p>
@@ -138,15 +132,16 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* QUICK ACCESS */}
         <section className="mb-10">
-          <h3 className="mb-4 text-xl font-semibold text-white">Quick Access</h3>
+          <h3 className="mb-4 text-xl font-semibold">Quick Access</h3>
 
           <div className="grid grid-cols-2 gap-3">
             {quickLinks.map((link) => (
               <Link
                 key={link.label}
                 href={link.href}
-                className="rounded-2xl bg-[linear-gradient(180deg,#1A1A1F,#141419)] px-4 py-4 text-center text-sm font-medium text-white shadow-[0_8px_24px_rgba(0,0,0,0.35)] transition duration-200 hover:scale-[1.02] hover:bg-[#1d1d24] active:scale-[0.97]"
+                className="rounded-2xl bg-[linear-gradient(180deg,#1A1A1F,#141419)] px-4 py-4 text-center text-sm font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_24px_rgba(0,0,0,0.35)] transition duration-200 hover:scale-[1.02] hover:bg-[#1d1d24] active:scale-[0.97]"
               >
                 {link.label}
               </Link>
@@ -154,17 +149,17 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* STATUS */}
         <section>
           <div className="rounded-3xl bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-6 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
             <div className="mb-2 text-sm text-white/50">Safety Status</div>
-            <div className="text-3xl font-semibold tracking-tight text-white">
-              Monitoring
-            </div>
+            <div className="text-3xl font-semibold">Monitoring</div>
             <p className="mt-3 text-sm leading-7 text-white/65">
               Crew, Party Mode, TwinMe guidance, and contact sharing are live.
             </p>
           </div>
         </section>
+
       </div>
     </main>
   );
