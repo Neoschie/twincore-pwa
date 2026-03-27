@@ -347,233 +347,272 @@ export default function CrewPage() {
   }, [crewRows, filter]);
 
   return (
-    <main className="min-h-screen overflow-hidden bg-black text-white">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.14),transparent_28%),radial-gradient(circle_at_bottom,rgba(249,115,22,0.12),transparent_34%)]" />
+    <main className="min-h-screen bg-black text-white">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.12),transparent_34%),radial-gradient(circle_at_bottom,rgba(249,115,22,0.10),transparent_34%)]" />
 
-      <div className="mx-auto flex min-h-screen max-w-6xl flex-col px-6 py-8 sm:py-10">
+      <div className="relative py-6 sm:py-8">
         <PageHeader
           title="Crew"
           subtitle="Your people, live and moving"
           rightSlot={<GlobalStatusBar />}
         />
 
-        {sharedLocation ? (
-          <AnimatedCard className="mb-6 border-blue-400/20 bg-blue-500/10 p-4" index={0}>
-            <div className="flex items-center gap-2 text-sm font-medium text-blue-100">
-              <MapPin className="h-4 w-4" />
-              Last Shared Location
+        <div className="space-y-4">
+          {sharedLocation ? (
+            <AnimatedCard
+              className="rounded-[1.75rem] border border-blue-400/20 bg-blue-500/10 p-4"
+              index={0}
+            >
+              <div className="flex items-center gap-2 text-sm font-medium text-blue-100">
+                <MapPin className="h-4 w-4" />
+                Last Shared Location
+              </div>
+
+              <a
+                href={sharedLocation}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-3 inline-flex text-sm text-blue-300 underline underline-offset-4"
+              >
+                Open in Maps
+              </a>
+            </AnimatedCard>
+          ) : null}
+
+          <section className="grid gap-4 sm:grid-cols-2">
+            <AnimatedCard
+              className="rounded-[1.75rem] border border-white/10 bg-white/5 p-4"
+              index={1}
+            >
+              <MetricCard
+                icon={Users}
+                label="Total Crew"
+                value={crewStats.total.toString()}
+                footer={crewMessage}
+              />
+            </AnimatedCard>
+
+            <AnimatedCard
+              className="rounded-[1.75rem] border border-white/10 bg-white/5 p-4"
+              index={2}
+            >
+              <EnergyCard value={crewEnergy} />
+            </AnimatedCard>
+
+            <AnimatedCard
+              className="rounded-[1.75rem] border border-white/10 bg-white/5 p-4"
+              index={3}
+            >
+              <SafetyCard state={safetyState} />
+            </AnimatedCard>
+
+            <AnimatedCard
+              className="rounded-[1.75rem] border border-white/10 bg-white/5 p-4"
+              index={4}
+            >
+              <MetricCard
+                icon={Activity}
+                label="Avg Heartbeat"
+                value={`${crewStats.avgHeartbeat} BPM`}
+                footer={`${crewStats.recent} recent live updates`}
+              />
+            </AnimatedCard>
+          </section>
+
+          <AnimatedCard
+            className="rounded-[1.75rem] border border-blue-400/20 bg-blue-500/10 p-5"
+            index={5}
+          >
+            <div className="mb-3 inline-flex items-center gap-2 text-sm font-medium text-blue-100">
+              <Brain className="h-4 w-4" />
+              TwinMe Live Insight
             </div>
 
-            <a
-              href={sharedLocation}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-2 block text-xs text-blue-300 underline underline-offset-4"
-            >
-              Open in Maps
-            </a>
-          </AnimatedCard>
-        ) : null}
+            <div className="text-base leading-7 text-white">{twinMeInsight}</div>
 
-        <section className="mb-6 grid gap-4 lg:grid-cols-4">
-          <AnimatedCard className="p-4" index={1}>
-            <MetricCard
-              icon={Users}
-              label="Total Crew"
-              value={crewStats.total.toString()}
-              footer={crewMessage}
-            />
-          </AnimatedCard>
-
-          <AnimatedCard className="p-4" index={2}>
-            <EnergyCard value={crewEnergy} />
+            <div className="mt-4 flex flex-wrap gap-2">
+              <StatusChip
+                label={
+                  twinMeTone === "red"
+                    ? "HIGH ATTENTION"
+                    : twinMeTone === "orange"
+                      ? "ACTIVE READ"
+                      : twinMeTone === "blue"
+                        ? "LOCATION AWARE"
+                        : "STABLE"
+                }
+                tone={twinMeTone}
+              />
+              <StatusChip label="LIVE CREW STREAM" tone="blue" />
+              {sharedLocation ? <StatusChip label="LOCATION ACTIVE" tone="blue" /> : null}
+              {crewStats.flagged > 0 ? (
+                <StatusChip label="ALERT PRIORITY" tone="red" />
+              ) : null}
+            </div>
           </AnimatedCard>
 
-          <AnimatedCard className="p-4" index={3}>
-            <SafetyCard state={safetyState} />
+          <AnimatedCard
+            className="rounded-[1.75rem] border border-white/10 bg-white/5 p-4"
+            index={6}
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              {(["all", "active", "heading-home"] as FilterMode[]).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setFilter(mode)}
+                  className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
+                    filter === mode
+                      ? "border-orange-400/20 bg-orange-500/15 text-orange-100"
+                      : "border-white/10 bg-white/5 text-white/75 hover:bg-white/10"
+                  }`}
+                >
+                  {mode === "all" ? "All" : mode === "active" ? "Active" : "Heading Home"}
+                </button>
+              ))}
+            </div>
           </AnimatedCard>
 
-          <AnimatedCard className="p-4" index={4}>
-            <MetricCard
-              icon={Activity}
-              label="Avg Heartbeat"
-              value={`${crewStats.avgHeartbeat} BPM`}
-              footer={`${crewStats.recent} recent live updates`}
-            />
-          </AnimatedCard>
-        </section>
+          <section className="grid gap-4">
+            {filteredRows.map((row, index) => {
+              const status = (row.status || "inactive").toLowerCase();
+              const heartbeat = row.heartbeat_bpm || 70;
+              const vibe = row.vibe_label || "No vibe set";
+              const name = row.name || `Crew Member ${index + 1}`;
+              const location = row.location_name || "Location unavailable";
 
-        <AnimatedCard className="mb-6 border-blue-400/20 bg-blue-500/10 p-5" index={5}>
-          <div className="mb-3 inline-flex items-center gap-2 text-sm font-medium text-blue-100">
-            <Brain className="h-4 w-4" />
-            TwinMe Live Insight
-          </div>
-          <div className="text-base leading-7 text-white">{twinMeInsight}</div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <StatusChip
-              label={
-                twinMeTone === "red"
-                  ? "HIGH ATTENTION"
-                  : twinMeTone === "orange"
-                    ? "ACTIVE READ"
-                    : twinMeTone === "blue"
-                      ? "LOCATION AWARE"
-                      : "STABLE"
-              }
-              tone={twinMeTone}
-            />
-            {sharedLocation ? <StatusChip label="LOCATION ACTIVE" tone="blue" /> : null}
-            {crewStats.flagged > 0 ? <StatusChip label="ALERT PRIORITY" tone="red" /> : null}
-          </div>
-        </AnimatedCard>
+              const isHeadingHome = status === "heading home";
+              const isInactive = status === "inactive" || status === "";
+              const isFlagged = isFlaggedRow(row);
 
-        <div className="mb-6 flex flex-wrap items-center justify-center gap-3">
-          <StatusChip label="LIVE CREW STREAM" tone="blue" />
-          {sharedLocation ? <StatusChip label="LOCATION ACTIVE" tone="blue" /> : null}
-          {crewStats.flagged > 0 ? <StatusChip label="ALERT PRIORITY" tone="red" /> : null}
-          {(["all", "active", "heading-home"] as FilterMode[]).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              onClick={() => setFilter(mode)}
-              className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                filter === mode
-                  ? "border border-orange-400/20 bg-orange-500/15 text-orange-100"
-                  : "border border-white/10 bg-white/5 text-white/75 hover:bg-white/10"
-              }`}
-            >
-              {mode === "all" ? "All" : mode === "active" ? "Active" : "Heading Home"}
-            </button>
-          ))}
-        </div>
-
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {filteredRows.map((row, index) => {
-            const status = (row.status || "inactive").toLowerCase();
-            const heartbeat = row.heartbeat_bpm || 70;
-            const vibe = row.vibe_label || "No vibe set";
-            const name = row.name || `Crew Member ${index + 1}`;
-            const location = row.location_name || "Location unavailable";
-
-            const isHeadingHome = status === "heading home";
-            const isInactive = status === "inactive" || status === "";
-            const isFlagged = isFlaggedRow(row);
-
-            const cardClass = isFlagged
-              ? "border-red-400/35 bg-red-500/12 shadow-[0_0_28px_rgba(239,68,68,0.16)]"
-              : isHeadingHome
-                ? "border-cyan-400/20 bg-cyan-500/10"
-                : isInactive
-                  ? "border-white/10 bg-white/5"
-                  : "border-orange-400/20 bg-orange-500/10";
-
-            const tone: "red" | "cyan" | "neutral" | "orange" =
-              isFlagged
-                ? "red"
+              const cardClass = isFlagged
+                ? "border-red-400/35 bg-red-500/12 shadow-[0_0_28px_rgba(239,68,68,0.16)]"
                 : isHeadingHome
-                  ? "cyan"
+                  ? "border-cyan-400/20 bg-cyan-500/10"
                   : isInactive
-                    ? "neutral"
-                    : "orange";
+                    ? "border-white/10 bg-white/5"
+                    : "border-orange-400/20 bg-orange-500/10";
 
-            const statusLabel = isFlagged
-              ? "Alert"
-              : isHeadingHome
-                ? "Heading Home"
-                : isInactive
-                  ? "Inactive"
-                  : "Active";
+              const tone: "red" | "cyan" | "neutral" | "orange" =
+                isFlagged
+                  ? "red"
+                  : isHeadingHome
+                    ? "cyan"
+                    : isInactive
+                      ? "neutral"
+                      : "orange";
 
-            const heartbeatWidth = Math.max(20, Math.min(100, heartbeat));
-            const hasLocation = location !== "Location unavailable";
-            const locationHref = hasLocation ? formatLocationLink(location) : null;
+              const statusLabel = isFlagged
+                ? "Alert"
+                : isHeadingHome
+                  ? "Heading Home"
+                  : isInactive
+                    ? "Inactive"
+                    : "Active";
 
-            return (
-              <AnimatedCard
-                key={row.id || `${name}-${index}`}
-                className={`p-5 ${cardClass} ${isFlagged ? "ring-1 ring-red-400/30" : ""}`}
-                index={index}
-              >
-                <div className="mb-3 flex items-start justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2 text-xl font-semibold text-white">
-                      {isFlagged ? <AlertTriangle className="h-5 w-5 text-red-400" /> : null}
-                      {name}
+              const heartbeatWidth = Math.max(20, Math.min(100, heartbeat));
+              const hasLocation = location !== "Location unavailable";
+              const locationHref = hasLocation ? formatLocationLink(location) : null;
+
+              return (
+                <AnimatedCard
+                  key={row.id || `${name}-${index}`}
+                  className={`rounded-[1.75rem] border p-5 ${cardClass} ${
+                    isFlagged ? "ring-1 ring-red-400/30" : ""
+                  }`}
+                  index={index + 7}
+                >
+                  <div className="mb-4 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 text-xl font-semibold text-white">
+                        {isFlagged ? (
+                          <AlertTriangle className="h-5 w-5 shrink-0 text-red-400" />
+                        ) : null}
+                        <span className="truncate">{name}</span>
+                      </div>
+
+                      <div className="mt-2 text-sm text-white/60">
+                        {locationHref ? (
+                          <a
+                            href={locationHref}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-blue-300 underline underline-offset-4"
+                          >
+                            View Location
+                          </a>
+                        ) : (
+                          location
+                        )}
+                      </div>
                     </div>
-                    <div className="mt-1 text-sm text-white/60">
-                      {locationHref ? (
-                        <a
-                          href={locationHref}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-blue-300 underline underline-offset-4"
-                        >
-                          View Location
-                        </a>
+
+                    <StatusChip label={statusLabel} tone={tone} />
+                  </div>
+
+                  {isFlagged ? (
+                    <div className="mb-4 rounded-2xl border border-red-400/20 bg-red-500/10 px-3 py-2 text-xs font-medium tracking-wide text-red-100">
+                      PRIORITY ALERT — crew attention needed
+                    </div>
+                  ) : null}
+
+                  <div className="space-y-4">
+                    <ProgressRow
+                      label="Heartbeat"
+                      right={`${heartbeat} BPM`}
+                      width={heartbeatWidth}
+                      barClass={
+                        isFlagged
+                          ? "bg-gradient-to-r from-red-500 via-orange-500 to-yellow-300"
+                          : isHeadingHome
+                            ? "bg-gradient-to-r from-cyan-300 via-blue-400 to-indigo-500"
+                            : isInactive
+                              ? "bg-gradient-to-r from-white/30 via-white/40 to-white/50"
+                              : "bg-gradient-to-r from-blue-500 via-orange-500 to-yellow-300"
+                      }
+                    />
+
+                    <ProgressRow
+                      label="Vibe"
+                      right={vibe}
+                      width={isFlagged ? 88 : isHeadingHome ? 68 : isInactive ? 30 : 80}
+                      barClass={
+                        isFlagged
+                          ? "bg-gradient-to-r from-red-500 via-pink-500 to-orange-400"
+                          : isHeadingHome
+                            ? "bg-gradient-to-r from-cyan-300 via-sky-400 to-blue-500"
+                            : isInactive
+                              ? "bg-gradient-to-r from-white/20 via-white/30 to-white/40"
+                              : "bg-gradient-to-r from-indigo-400 via-orange-400 to-yellow-300"
+                      }
+                    />
+                  </div>
+
+                  <div className="mt-5 flex items-center justify-between text-sm text-white/60">
+                    <div className="inline-flex items-center gap-2">
+                      {isHeadingHome ? (
+                        <Home className="h-4 w-4" />
                       ) : (
-                        location
+                        <RefreshCw className="h-4 w-4" />
                       )}
+                      {statusLabel}
                     </div>
+                    <div>{timeAgo(row.updated_at)}</div>
                   </div>
+                </AnimatedCard>
+              );
+            })}
+          </section>
 
-                  <StatusChip label={statusLabel} tone={tone} />
-                </div>
-
-                {isFlagged ? (
-                  <div className="mb-4 rounded-xl border border-red-400/20 bg-red-500/10 px-3 py-2 text-xs font-medium tracking-wide text-red-100">
-                    PRIORITY ALERT — crew attention needed
-                  </div>
-                ) : null}
-
-                <div className="mb-4 space-y-3">
-                  <ProgressRow
-                    label="Heartbeat"
-                    right={`${heartbeat} BPM`}
-                    width={heartbeatWidth}
-                    barClass={
-                      isFlagged
-                        ? "bg-gradient-to-r from-red-500 via-orange-500 to-yellow-300"
-                        : isHeadingHome
-                          ? "bg-gradient-to-r from-cyan-300 via-blue-400 to-indigo-500"
-                          : isInactive
-                            ? "bg-gradient-to-r from-white/30 via-white/40 to-white/50"
-                            : "bg-gradient-to-r from-blue-500 via-orange-500 to-yellow-300"
-                    }
-                  />
-
-                  <ProgressRow
-                    label="Vibe"
-                    right={vibe}
-                    width={isFlagged ? 88 : isHeadingHome ? 68 : isInactive ? 30 : 80}
-                    barClass={
-                      isFlagged
-                        ? "bg-gradient-to-r from-red-500 via-pink-500 to-orange-400"
-                        : isHeadingHome
-                          ? "bg-gradient-to-r from-cyan-300 via-sky-400 to-blue-500"
-                          : isInactive
-                            ? "bg-gradient-to-r from-white/20 via-white/30 to-white/40"
-                            : "bg-gradient-to-r from-indigo-400 via-orange-400 to-yellow-300"
-                    }
-                  />
-                </div>
-
-                <div className="flex items-center justify-between text-sm text-white/60">
-                  <div className="inline-flex items-center gap-2">
-                    {isHeadingHome ? <Home className="h-4 w-4" /> : <RefreshCw className="h-4 w-4" />}
-                    {statusLabel}
-                  </div>
-                  <div>{timeAgo(row.updated_at)}</div>
-                </div>
-              </AnimatedCard>
-            );
-          })}
-        </section>
-
-        {filteredRows.length === 0 ? (
-          <AnimatedCard className="mt-8 p-6 text-center" index={0}>
-            <div className="text-white/60">No crew members matched that filter.</div>
-          </AnimatedCard>
-        ) : null}
+          {filteredRows.length === 0 ? (
+            <AnimatedCard
+              className="rounded-[1.75rem] border border-white/10 bg-white/5 p-6 text-center"
+              index={20}
+            >
+              <div className="text-white/60">No crew members matched that filter.</div>
+            </AnimatedCard>
+          ) : null}
+        </div>
       </div>
     </main>
   );
@@ -592,12 +631,12 @@ function MetricCard({
 }) {
   return (
     <div>
-      <div className="mb-2 flex items-center gap-2 text-sm text-white/70">
+      <div className="mb-3 flex items-center gap-2 text-sm text-white/65">
         <Icon className="h-4 w-4" />
         {label}
       </div>
-      <div className="text-2xl font-semibold text-white">{value}</div>
-      {footer ? <div className="mt-1 text-xs text-white/50">{footer}</div> : null}
+      <div className="text-4xl font-semibold tracking-tight text-white">{value}</div>
+      {footer ? <div className="mt-2 text-sm text-white/55">{footer}</div> : null}
     </div>
   );
 }
@@ -605,12 +644,14 @@ function MetricCard({
 function EnergyCard({ value }: { value: number }) {
   return (
     <div>
-      <div className="mb-2 flex items-center gap-2 text-sm text-white/70">
+      <div className="mb-3 flex items-center gap-2 text-sm text-white/65">
         <Flame className="h-4 w-4" />
         Crew Energy
       </div>
-      <div className="text-2xl font-semibold text-white">{value}/100</div>
-      <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-white/10">
+
+      <div className="text-4xl font-semibold tracking-tight text-white">{value}/100</div>
+
+      <div className="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-white/10">
         <div
           className="h-full rounded-full bg-gradient-to-r from-blue-500 via-orange-500 to-yellow-300 transition-all duration-200"
           style={{ width: `${value}%` }}
@@ -629,14 +670,16 @@ function SafetyCard({ state }: { state: SafetyState }) {
 
   return (
     <div>
-      <div className="mb-2 flex items-center gap-2 text-sm text-white/70">
+      <div className="mb-3 flex items-center gap-2 text-sm text-white/65">
         <Shield className="h-4 w-4" />
         Safety Layer
       </div>
+
       <div className="text-lg font-semibold text-white">
         <StatusChip label={label} tone={tone} />
       </div>
-      <div className="mt-2 text-xs text-white/50">
+
+      <div className="mt-3 text-sm text-white/55">
         Based on live crew signals and flagged statuses.
       </div>
     </div>
@@ -656,11 +699,12 @@ function ProgressRow({
 }) {
   return (
     <div>
-      <div className="mb-1 flex items-center justify-between text-xs text-white/55">
+      <div className="mb-2 flex items-center justify-between gap-3 text-sm text-white/60">
         <span>{label}</span>
-        <span>{right}</span>
+        <span className="truncate text-right">{right}</span>
       </div>
-      <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+
+      <div className="h-2.5 w-full overflow-hidden rounded-full bg-white/10">
         <div
           className={`h-full rounded-full transition-all duration-200 ${barClass}`}
           style={{ width: `${width}%` }}
