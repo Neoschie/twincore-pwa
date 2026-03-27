@@ -347,10 +347,10 @@ export default function CrewPage() {
   }, [crewRows, filter]);
 
   return (
-    <main className="min-h-screen bg-black text-white">
+    <main className="min-h-screen bg-[#0A0A0B] text-white">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.10),transparent_34%),radial-gradient(circle_at_bottom,rgba(249,115,22,0.08),transparent_34%)]" />
 
-      <div className="relative py-6 sm:py-8">
+      <div className="relative py-6">
         <PageHeader
           title="Crew"
           subtitle="Your people, live and moving"
@@ -360,7 +360,7 @@ export default function CrewPage() {
         <div className="space-y-5">
           {sharedLocation ? (
             <AnimatedCard
-              className="rounded-2xl bg-blue-500/10 p-4 shadow-[0_8px_30px_rgba(59,130,246,0.15)]"
+              className="rounded-3xl border border-blue-500/15 bg-[linear-gradient(180deg,#162033,#0f1624)] p-5 shadow-[0_20px_50px_rgba(59,130,246,0.16)] transition duration-200 hover:scale-[1.01]"
               index={0}
             >
               <div className="flex items-center gap-2 text-sm font-medium text-blue-100">
@@ -381,7 +381,7 @@ export default function CrewPage() {
 
           <section className="grid gap-4 sm:grid-cols-2">
             <AnimatedCard
-              className="rounded-2xl bg-[#111113] p-4 shadow-[0_8px_30px_rgba(0,0,0,0.35)]"
+              className="rounded-3xl bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)] transition duration-200 hover:scale-[1.01]"
               index={1}
             >
               <MetricCard
@@ -393,21 +393,21 @@ export default function CrewPage() {
             </AnimatedCard>
 
             <AnimatedCard
-              className="rounded-2xl bg-[#111113] p-4 shadow-[0_8px_30px_rgba(0,0,0,0.35)]"
+              className="rounded-3xl bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)] transition duration-200 hover:scale-[1.01]"
               index={2}
             >
               <EnergyCard value={crewEnergy} />
             </AnimatedCard>
 
             <AnimatedCard
-              className="rounded-2xl bg-[#111113] p-4 shadow-[0_8px_30px_rgba(0,0,0,0.35)]"
+              className="rounded-3xl bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)] transition duration-200 hover:scale-[1.01]"
               index={3}
             >
               <SafetyCard state={safetyState} />
             </AnimatedCard>
 
             <AnimatedCard
-              className="rounded-2xl bg-[#111113] p-4 shadow-[0_8px_30px_rgba(0,0,0,0.35)]"
+              className="rounded-3xl bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)] transition duration-200 hover:scale-[1.01]"
               index={4}
             >
               <MetricCard
@@ -420,7 +420,7 @@ export default function CrewPage() {
           </section>
 
           <AnimatedCard
-            className="rounded-2xl bg-blue-500/10 p-5 shadow-[0_8px_30px_rgba(59,130,246,0.15)]"
+            className="rounded-3xl border border-blue-500/20 bg-[linear-gradient(180deg,#1a1f2e,#0c0f1a)] p-5 shadow-[0_20px_55px_rgba(59,130,246,0.18)] transition duration-200 hover:scale-[1.01]"
             index={5}
           >
             <div className="mb-3 inline-flex items-center gap-2 text-sm font-medium text-blue-100">
@@ -452,7 +452,7 @@ export default function CrewPage() {
           </AnimatedCard>
 
           <AnimatedCard
-            className="rounded-2xl bg-[#111113] p-4 shadow-[0_8px_30px_rgba(0,0,0,0.35)]"
+            className="rounded-3xl bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-4 shadow-[0_16px_45px_rgba(0,0,0,0.42)]"
             index={6}
           >
             <div className="flex flex-wrap items-center gap-2">
@@ -461,7 +461,7 @@ export default function CrewPage() {
                   key={mode}
                   type="button"
                   onClick={() => setFilter(mode)}
-                  className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                  className={`rounded-full px-4 py-2 text-sm font-medium transition duration-200 hover:scale-[1.02] active:scale-[0.97] ${
                     filter === mode
                       ? "bg-orange-500/15 text-orange-100 shadow-[0_6px_20px_rgba(249,115,22,0.18)]"
                       : "bg-white/8 text-white/75 hover:bg-white/12"
@@ -486,12 +486,12 @@ export default function CrewPage() {
               const isFlagged = isFlaggedRow(row);
 
               const cardClass = isFlagged
-                ? "bg-red-500/15 shadow-[0_8px_30px_rgba(239,68,68,0.20)]"
+                ? "bg-[linear-gradient(180deg,#341416,#180b0c)] shadow-[0_18px_50px_rgba(239,68,68,0.22)]"
                 : isHeadingHome
-                  ? "bg-cyan-500/10 shadow-[0_8px_30px_rgba(34,211,238,0.14)]"
+                  ? "bg-[linear-gradient(180deg,#102129,#0b1418)] shadow-[0_18px_50px_rgba(34,211,238,0.14)]"
                   : isInactive
-                    ? "bg-[#111113] shadow-[0_8px_30px_rgba(0,0,0,0.35)]"
-                    : "bg-orange-500/10 shadow-[0_8px_30px_rgba(249,115,22,0.15)]";
+                    ? "bg-[linear-gradient(180deg,#111113,#0c0c0f)] shadow-[0_16px_45px_rgba(0,0,0,0.42)]"
+                    : "bg-[linear-gradient(180deg,#241912,#110d09)] shadow-[0_18px_50px_rgba(249,115,22,0.18)]";
 
               const tone: "red" | "cyan" | "neutral" | "orange" =
                 isFlagged
@@ -517,7 +517,7 @@ export default function CrewPage() {
               return (
                 <AnimatedCard
                   key={row.id || `${name}-${index}`}
-                  className={`rounded-2xl p-5 ${cardClass}`}
+                  className={`rounded-3xl p-5 transition duration-200 hover:scale-[1.01] ${cardClass}`}
                   index={index + 7}
                 >
                   <div className="mb-4 flex items-start justify-between gap-3">
@@ -604,7 +604,7 @@ export default function CrewPage() {
 
           {filteredRows.length === 0 ? (
             <AnimatedCard
-              className="rounded-2xl bg-[#111113] p-6 text-center shadow-[0_8px_30px_rgba(0,0,0,0.35)]"
+              className="rounded-3xl bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-6 text-center shadow-[0_16px_45px_rgba(0,0,0,0.42)]"
               index={20}
             >
               <div className="text-white/60">No crew members matched that filter.</div>
