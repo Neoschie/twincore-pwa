@@ -16,7 +16,7 @@ const featureCards = [
   {
     eyebrow: "Guidance Layer",
     title: "TwinMe",
-    description: "Get live social insight, grounding cues, and smarter next-step support.",
+    description: "Live insight, grounding cues, and smarter next-step decisions.",
     href: "/twinme",
   },
   {
@@ -28,13 +28,13 @@ const featureCards = [
   {
     eyebrow: "Identity Layer",
     title: "Profile",
-    description: "Save your name, vibe, city, music, and emergency contact info.",
+    description: "Save your info, vibe, city, and emergency contacts.",
     href: "/profile",
   },
   {
-    eyebrow: "Onboarding Layer",
+    eyebrow: "Onboarding",
     title: "Join Flow",
-    description: "Bring people into your TwinCore experience with a simple invite path.",
+    description: "Bring people into your TwinCore experience instantly.",
     href: "/join",
   },
 ];
@@ -45,84 +45,85 @@ const quickLinks = [
   { label: "Open Party", href: "/party" },
   { label: "Open TwinMe", href: "/twinme" },
   { label: "Open Profile", href: "/profile" },
-  { label: "Open Contact Card", href: "/contact-card" },
+  { label: "Contact Card", href: "/contact-card" },
 ];
 
 export default function HomePage() {
   return (
     <main className="min-h-screen bg-[#0A0A0B] text-white">
-      <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6 sm:py-10">
-        <header className="mb-8 sm:mb-10">
-          <div className="mb-2 text-sm font-medium text-white/55">TwinCore</div>
-          <h1 className="text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-            Dashboard
-          </h1>
-          <p className="mt-3 text-lg text-white/65">
+      <div className="mx-auto w-full max-w-md px-4 py-8">
+
+        {/* HEADER */}
+        <header className="mb-10">
+          <div className="text-xs tracking-[0.3em] text-white/50 mb-2">
+            TWINCORE
+          </div>
+          <h1 className="text-4xl font-semibold">Dashboard</h1>
+          <p className="text-white/60 mt-2">
             Your social, safety, and identity hub.
           </p>
         </header>
 
-        <section className="mb-8">
-          <div className="rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(20,20,25,0.96),rgba(10,10,14,0.98))] p-6 shadow-[0_16px_50px_rgba(0,0,0,0.45)] sm:p-8">
-            <div className="mb-3 text-sm font-medium text-white/55">Live System</div>
-            <h2 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+        {/* HERO */}
+        <section className="mb-10">
+          <div className="rounded-3xl bg-[#111113] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.5)]">
+            <div className="text-sm text-white/50 mb-2">Live System</div>
+
+            <h2 className="text-3xl font-semibold leading-tight">
               Welcome back, Neo
             </h2>
-            <p className="mt-4 max-w-3xl text-lg leading-8 text-white/80">
-              TwinCore is active and connected across Crew, Party Mode, TwinMe,
+
+            <p className="mt-4 text-white/70 leading-relaxed">
+              TwinCore is active across Crew, Party Mode, TwinMe,
               Contact Card, Profile, and Join flow.
             </p>
 
-            <div className="mt-6 grid gap-3 text-base text-white/85 sm:grid-cols-2">
-              <div>
-                <span className="font-semibold text-white">Vibe:</span> Calm but lit
-              </div>
-              <div>
-                <span className="font-semibold text-white">City:</span> London, ON
-              </div>
-              <div>
-                <span className="font-semibold text-white">Live status:</span> Not active
-              </div>
-              <div>
-                <span className="font-semibold text-white">TwinMe:</span> Ready
-              </div>
+            <div className="mt-6 grid grid-cols-2 gap-3 text-sm text-white/80">
+              <div><span className="text-white/50">Vibe:</span> Calm but lit</div>
+              <div><span className="text-white/50">City:</span> London, ON</div>
+              <div><span className="text-white/50">Status:</span> Not active</div>
+              <div><span className="text-white/50">TwinMe:</span> Ready</div>
             </div>
           </div>
         </section>
 
-        <section className="mb-8">
-          <h3 className="mb-4 text-2xl font-semibold tracking-tight text-white">
-            Core Features
-          </h3>
+        {/* FEATURES */}
+        <section className="mb-10">
+          <h3 className="text-xl font-semibold mb-4">Core Features</h3>
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-2 gap-4">
             {featureCards.map((card) => (
               <Link
                 key={card.title}
                 href={card.href}
-                className="group rounded-[1.75rem] border border-white/10 bg-[#111113] p-5 shadow-[0_10px_30px_rgba(0,0,0,0.32)] transition duration-200 hover:-translate-y-[2px] hover:bg-[#151519]"
+                className="rounded-2xl bg-[#111113] p-5 shadow-[0_10px_30px_rgba(0,0,0,0.35)] active:scale-[0.98]"
               >
-                <div className="mb-3 text-sm font-medium text-white/50">{card.eyebrow}</div>
-                <div className="text-2xl font-semibold tracking-tight text-white">
+                <div className="text-xs text-white/50 mb-2">
+                  {card.eyebrow}
+                </div>
+
+                <div className="text-lg font-semibold">
                   {card.title}
                 </div>
-                <p className="mt-3 text-lg leading-8 text-white/75">{card.description}</p>
+
+                <p className="mt-2 text-sm text-white/60 leading-relaxed">
+                  {card.description}
+                </p>
               </Link>
             ))}
           </div>
         </section>
 
-        <section className="mb-8">
-          <h3 className="mb-4 text-2xl font-semibold tracking-tight text-white">
-            Quick Access
-          </h3>
+        {/* QUICK ACCESS */}
+        <section className="mb-10">
+          <h3 className="text-xl font-semibold mb-4">Quick Access</h3>
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3">
             {quickLinks.map((link) => (
               <Link
                 key={link.label}
                 href={link.href}
-                className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-[#151519] px-5 py-4 text-lg font-medium text-white transition duration-200 hover:bg-[#1b1b21]"
+                className="rounded-xl bg-[#1A1A1F] py-4 text-center text-sm font-medium text-white shadow-[0_6px_20px_rgba(0,0,0,0.35)] active:scale-[0.97]"
               >
                 {link.label}
               </Link>
@@ -130,18 +131,18 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* STATUS */}
         <section>
-          <div className="rounded-[1.75rem] border border-white/10 bg-[#111113] p-6 shadow-[0_10px_30px_rgba(0,0,0,0.32)]">
-            <div className="mb-3 text-sm font-medium text-white/55">Safety Status</div>
-            <div className="text-3xl font-semibold tracking-tight text-white">
-              Monitoring
-            </div>
-            <p className="mt-3 text-lg leading-8 text-white/75">
-              Contact Card, Crew access, Party updates, TwinMe guidance, and Join flow
-              are all live in your MVP.
+          <div className="rounded-2xl bg-[#111113] p-6 shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+            <div className="text-sm text-white/50 mb-2">Safety Status</div>
+            <div className="text-2xl font-semibold">Monitoring</div>
+
+            <p className="mt-3 text-sm text-white/65 leading-relaxed">
+              Crew, Party Mode, TwinMe guidance, and contact sharing are live.
             </p>
           </div>
         </section>
+
       </div>
     </main>
   );
