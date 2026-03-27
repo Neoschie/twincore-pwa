@@ -1,37 +1,23 @@
+import type { Metadata } from "next";
 import "./globals.css";
-import type { Metadata, Viewport } from "next";
 
 export const metadata: Metadata = {
   title: "TwinCore",
-  description: "Stay connected with your crew.",
-  applicationName: "TwinCore",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "black-translucent",
-    title: "TwinCore",
-  },
-  formatDetection: {
-    telephone: false,
-  },
-};
-
-export const viewport: Viewport = {
-  themeColor: "#0A0A0B",
+  description: "Your social, safety, and identity hub.",
 };
 
 export default function RootLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <html lang="en">
-      <head>
-        <link rel="manifest" href="/manifest.json" />
-        <link rel="apple-touch-icon" href="/icon-192.png" />
-        <meta name="mobile-web-app-capable" content="yes" />
-      </head>
-      <body>{children}</body>
+      <body className="bg-[#0A0A0B] text-white">
+        <div className="mx-auto min-h-screen w-full max-w-md px-4 pb-24">
+          {children}
+        </div>
+      </body>
     </html>
   );
 }
