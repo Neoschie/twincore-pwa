@@ -15,13 +15,13 @@ export default function AnimatedCard({
   index = 0,
   delayClass = "",
 }: AnimatedCardProps) {
-  const [isVisible, setIsVisible] = useState(false);
+  const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    const delay = 60 + index * 60;
+    const delay = 80 + index * 80;
 
     const timer = window.setTimeout(() => {
-      setIsVisible(true);
+      setVisible(true);
     }, delay);
 
     return () => window.clearTimeout(timer);
@@ -29,9 +29,14 @@ export default function AnimatedCard({
 
   return (
     <div
-      className={`rounded-[1.75rem] border border-white/10 bg-white/5 shadow-xl backdrop-blur-sm transition-all duration-500 hover:-translate-y-[1px] hover:bg-white/[0.07] ${
-        isVisible ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"
-      } ${delayClass} ${className}`}
+      className={[
+        "transform transition-all duration-700 ease-out",
+        visible
+          ? "translate-y-0 scale-100 opacity-100"
+          : "translate-y-6 scale-[0.98] opacity-0",
+        className,
+        delayClass,
+      ].join(" ")}
     >
       {children}
     </div>

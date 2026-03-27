@@ -360,7 +360,7 @@ export default function CrewPage() {
         <div className="space-y-5">
           {sharedLocation ? (
             <AnimatedCard
-              className="rounded-3xl border border-blue-500/15 bg-[linear-gradient(180deg,#162033,#0f1624)] p-5 shadow-[0_20px_50px_rgba(59,130,246,0.16)] transition duration-200 hover:scale-[1.01]"
+              className="rounded-3xl border border-blue-500/15 bg-[linear-gradient(180deg,#162033,#0f1624)] p-5 shadow-[0_20px_50px_rgba(59,130,246,0.16)] transition duration-200 hover:scale-[1.01] active:scale-[0.98]"
               index={0}
             >
               <div className="flex items-center gap-2 text-sm font-medium text-blue-100">
@@ -381,7 +381,7 @@ export default function CrewPage() {
 
           <section className="grid gap-4 sm:grid-cols-2">
             <AnimatedCard
-              className="rounded-3xl bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)] transition duration-200 hover:scale-[1.01]"
+              className="rounded-3xl bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)] transition duration-200 hover:scale-[1.01] active:scale-[0.98]"
               index={1}
             >
               <MetricCard
@@ -393,21 +393,21 @@ export default function CrewPage() {
             </AnimatedCard>
 
             <AnimatedCard
-              className="rounded-3xl bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)] transition duration-200 hover:scale-[1.01]"
+              className="rounded-3xl bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)] transition duration-200 hover:scale-[1.01] active:scale-[0.98]"
               index={2}
             >
               <EnergyCard value={crewEnergy} />
             </AnimatedCard>
 
             <AnimatedCard
-              className="rounded-3xl bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)] transition duration-200 hover:scale-[1.01]"
+              className="rounded-3xl bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)] transition duration-200 hover:scale-[1.01] active:scale-[0.98]"
               index={3}
             >
               <SafetyCard state={safetyState} />
             </AnimatedCard>
 
             <AnimatedCard
-              className="rounded-3xl bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)] transition duration-200 hover:scale-[1.01]"
+              className="rounded-3xl bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)] transition duration-200 hover:scale-[1.01] active:scale-[0.98]"
               index={4}
             >
               <MetricCard
@@ -420,7 +420,7 @@ export default function CrewPage() {
           </section>
 
           <AnimatedCard
-            className="rounded-3xl border border-blue-500/20 bg-[linear-gradient(180deg,#1a1f2e,#0c0f1a)] p-5 shadow-[0_20px_55px_rgba(59,130,246,0.18)] transition duration-200 hover:scale-[1.01]"
+            className="animate-glow rounded-3xl border border-blue-500/20 bg-[linear-gradient(180deg,#1a1f2e,#0c0f1a)] p-5 shadow-[0_20px_55px_rgba(59,130,246,0.18)] transition duration-200 hover:scale-[1.01] active:scale-[0.98]"
             index={5}
           >
             <div className="mb-3 inline-flex items-center gap-2 text-sm font-medium text-blue-100">
@@ -517,7 +517,7 @@ export default function CrewPage() {
               return (
                 <AnimatedCard
                   key={row.id || `${name}-${index}`}
-                  className={`rounded-3xl p-5 transition duration-200 hover:scale-[1.01] ${cardClass}`}
+                  className={`rounded-3xl p-5 transition duration-200 hover:scale-[1.02] active:scale-[0.98] ${cardClass}`}
                   index={index + 7}
                 >
                   <div className="mb-4 flex items-start justify-between gap-3">
@@ -651,7 +651,7 @@ function EnergyCard({ value }: { value: number }) {
 
       <div className="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-white/10">
         <div
-          className="h-full rounded-full bg-gradient-to-r from-blue-500 via-orange-500 to-yellow-300 transition-all duration-200"
+          className="animate-pulse-soft h-full rounded-full bg-gradient-to-r from-blue-500 via-orange-500 to-yellow-300 transition-all duration-200"
           style={{ width: `${value}%` }}
         />
       </div>
