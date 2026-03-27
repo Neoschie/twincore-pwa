@@ -152,7 +152,7 @@ export default function CrewPage() {
         }
       }
     } catch {
-      // fall through to fallback
+      // fallback below
     }
 
     const fallbackRows = buildLocalFallbackCrew();
@@ -348,7 +348,7 @@ export default function CrewPage() {
 
   return (
     <main className="min-h-screen bg-black text-white">
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.12),transparent_34%),radial-gradient(circle_at_bottom,rgba(249,115,22,0.10),transparent_34%)]" />
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.10),transparent_34%),radial-gradient(circle_at_bottom,rgba(249,115,22,0.08),transparent_34%)]" />
 
       <div className="relative py-6 sm:py-8">
         <PageHeader
@@ -357,10 +357,10 @@ export default function CrewPage() {
           rightSlot={<GlobalStatusBar />}
         />
 
-        <div className="space-y-4">
+        <div className="space-y-5">
           {sharedLocation ? (
             <AnimatedCard
-              className="rounded-[1.75rem] border border-blue-400/20 bg-blue-500/10 p-4"
+              className="rounded-2xl bg-blue-500/10 p-4 shadow-[0_8px_30px_rgba(59,130,246,0.15)]"
               index={0}
             >
               <div className="flex items-center gap-2 text-sm font-medium text-blue-100">
@@ -381,7 +381,7 @@ export default function CrewPage() {
 
           <section className="grid gap-4 sm:grid-cols-2">
             <AnimatedCard
-              className="rounded-[1.75rem] border border-white/10 bg-white/5 p-4"
+              className="rounded-2xl bg-[#111113] p-4 shadow-[0_8px_30px_rgba(0,0,0,0.35)]"
               index={1}
             >
               <MetricCard
@@ -393,21 +393,21 @@ export default function CrewPage() {
             </AnimatedCard>
 
             <AnimatedCard
-              className="rounded-[1.75rem] border border-white/10 bg-white/5 p-4"
+              className="rounded-2xl bg-[#111113] p-4 shadow-[0_8px_30px_rgba(0,0,0,0.35)]"
               index={2}
             >
               <EnergyCard value={crewEnergy} />
             </AnimatedCard>
 
             <AnimatedCard
-              className="rounded-[1.75rem] border border-white/10 bg-white/5 p-4"
+              className="rounded-2xl bg-[#111113] p-4 shadow-[0_8px_30px_rgba(0,0,0,0.35)]"
               index={3}
             >
               <SafetyCard state={safetyState} />
             </AnimatedCard>
 
             <AnimatedCard
-              className="rounded-[1.75rem] border border-white/10 bg-white/5 p-4"
+              className="rounded-2xl bg-[#111113] p-4 shadow-[0_8px_30px_rgba(0,0,0,0.35)]"
               index={4}
             >
               <MetricCard
@@ -420,7 +420,7 @@ export default function CrewPage() {
           </section>
 
           <AnimatedCard
-            className="rounded-[1.75rem] border border-blue-400/20 bg-blue-500/10 p-5"
+            className="rounded-2xl bg-blue-500/10 p-5 shadow-[0_8px_30px_rgba(59,130,246,0.15)]"
             index={5}
           >
             <div className="mb-3 inline-flex items-center gap-2 text-sm font-medium text-blue-100">
@@ -452,7 +452,7 @@ export default function CrewPage() {
           </AnimatedCard>
 
           <AnimatedCard
-            className="rounded-[1.75rem] border border-white/10 bg-white/5 p-4"
+            className="rounded-2xl bg-[#111113] p-4 shadow-[0_8px_30px_rgba(0,0,0,0.35)]"
             index={6}
           >
             <div className="flex flex-wrap items-center gap-2">
@@ -461,10 +461,10 @@ export default function CrewPage() {
                   key={mode}
                   type="button"
                   onClick={() => setFilter(mode)}
-                  className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
+                  className={`rounded-full px-4 py-2 text-sm font-medium transition ${
                     filter === mode
-                      ? "border-orange-400/20 bg-orange-500/15 text-orange-100"
-                      : "border-white/10 bg-white/5 text-white/75 hover:bg-white/10"
+                      ? "bg-orange-500/15 text-orange-100 shadow-[0_6px_20px_rgba(249,115,22,0.18)]"
+                      : "bg-white/8 text-white/75 hover:bg-white/12"
                   }`}
                 >
                   {mode === "all" ? "All" : mode === "active" ? "Active" : "Heading Home"}
@@ -486,12 +486,12 @@ export default function CrewPage() {
               const isFlagged = isFlaggedRow(row);
 
               const cardClass = isFlagged
-                ? "border-red-400/35 bg-red-500/12 shadow-[0_0_28px_rgba(239,68,68,0.16)]"
+                ? "bg-red-500/15 shadow-[0_8px_30px_rgba(239,68,68,0.20)]"
                 : isHeadingHome
-                  ? "border-cyan-400/20 bg-cyan-500/10"
+                  ? "bg-cyan-500/10 shadow-[0_8px_30px_rgba(34,211,238,0.14)]"
                   : isInactive
-                    ? "border-white/10 bg-white/5"
-                    : "border-orange-400/20 bg-orange-500/10";
+                    ? "bg-[#111113] shadow-[0_8px_30px_rgba(0,0,0,0.35)]"
+                    : "bg-orange-500/10 shadow-[0_8px_30px_rgba(249,115,22,0.15)]";
 
               const tone: "red" | "cyan" | "neutral" | "orange" =
                 isFlagged
@@ -517,9 +517,7 @@ export default function CrewPage() {
               return (
                 <AnimatedCard
                   key={row.id || `${name}-${index}`}
-                  className={`rounded-[1.75rem] border p-5 ${cardClass} ${
-                    isFlagged ? "ring-1 ring-red-400/30" : ""
-                  }`}
+                  className={`rounded-2xl p-5 ${cardClass}`}
                   index={index + 7}
                 >
                   <div className="mb-4 flex items-start justify-between gap-3">
@@ -551,7 +549,7 @@ export default function CrewPage() {
                   </div>
 
                   {isFlagged ? (
-                    <div className="mb-4 rounded-2xl border border-red-400/20 bg-red-500/10 px-3 py-2 text-xs font-medium tracking-wide text-red-100">
+                    <div className="mb-4 rounded-2xl bg-red-500/10 px-3 py-2 text-xs font-medium tracking-wide text-red-100">
                       PRIORITY ALERT — crew attention needed
                     </div>
                   ) : null}
@@ -606,7 +604,7 @@ export default function CrewPage() {
 
           {filteredRows.length === 0 ? (
             <AnimatedCard
-              className="rounded-[1.75rem] border border-white/10 bg-white/5 p-6 text-center"
+              className="rounded-2xl bg-[#111113] p-6 text-center shadow-[0_8px_30px_rgba(0,0,0,0.35)]"
               index={20}
             >
               <div className="text-white/60">No crew members matched that filter.</div>

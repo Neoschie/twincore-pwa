@@ -14,16 +14,16 @@ export default function PageHeader({
   rightSlot,
 }: PageHeaderProps) {
   return (
-    <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+    <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
       <div>
-        <div className="mb-1 text-xs font-semibold uppercase tracking-[0.24em] text-white/45">
+        <div className="mb-2 text-xs font-semibold uppercase tracking-[0.32em] text-white/60">
           TwinCore
         </div>
-        <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+        <h1 className="text-5xl font-semibold tracking-tight text-white sm:text-6xl">
           {title}
         </h1>
         {subtitle ? (
-          <p className="mt-2 max-w-2xl text-sm text-white/65 sm:text-base">
+          <p className="mt-4 max-w-2xl text-lg text-white/75 sm:text-xl">
             {subtitle}
           </p>
         ) : null}
