@@ -7,13 +7,13 @@ type StatusChipProps = {
 };
 
 const toneClasses: Record<Tone, string> = {
-  red: "border-red-400/25 bg-red-500/15 text-red-100",
-  orange: "border-orange-400/25 bg-orange-500/15 text-orange-100",
-  blue: "border-blue-400/25 bg-blue-500/15 text-blue-100",
-  green: "border-emerald-400/25 bg-emerald-500/15 text-emerald-100",
-  emerald: "border-emerald-400/25 bg-emerald-500/15 text-emerald-100",
-  cyan: "border-cyan-400/25 bg-cyan-500/15 text-cyan-100",
-  neutral: "border-white/10 bg-white/5 text-white/75",
+  red: "bg-red-500/15 text-red-100 shadow-[0_6px_20px_rgba(239,68,68,0.18)]",
+  orange: "bg-orange-500/15 text-orange-100 shadow-[0_6px_20px_rgba(249,115,22,0.16)]",
+  blue: "bg-blue-500/15 text-blue-100 shadow-[0_6px_20px_rgba(59,130,246,0.16)]",
+  green: "bg-emerald-500/15 text-emerald-100 shadow-[0_6px_20px_rgba(16,185,129,0.16)]",
+  emerald: "bg-emerald-500/15 text-emerald-100 shadow-[0_6px_20px_rgba(16,185,129,0.16)]",
+  cyan: "bg-cyan-500/15 text-cyan-100 shadow-[0_6px_20px_rgba(34,211,238,0.16)]",
+  neutral: "bg-white/10 text-white/80 shadow-[0_6px_20px_rgba(255,255,255,0.05)]",
 };
 
 export default function StatusChip({
@@ -24,7 +24,7 @@ export default function StatusChip({
   return (
     <span
       className={[
-        "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold tracking-wide",
+        "inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold tracking-wide",
         toneClasses[tone],
         className,
       ].join(" ")}
