@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import TwinMeGlobal from "./twinme/global";
 
 export const metadata: Metadata = {
   title: "TwinCore",
@@ -14,9 +15,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="bg-[#0A0A0B] text-white">
-        <div className="mx-auto min-h-screen w-full max-w-md px-4 pb-24">
+        <div className="mx-auto min-h-screen w-full max-w-md px-4 pb-40">
           {children}
         </div>
+        <TwinMeGlobal />
       </body>
     </html>
   );
