@@ -32,11 +32,17 @@ function getStatusVisual(status: PartyStatus | null) {
     case "Drinking":
     case "At club":
       return {
+        mode: "fire",
         title: "Fire Mode",
         subtitle: "Energy is up. Keep your choices slower than the room.",
-        glow: "from-orange-500/35 via-red-500/20 to-transparent",
-        ring: "shadow-[0_0_80px_rgba(249,115,22,0.28)]",
-        badgeTone:
+        heroGlow:
+          "bg-[radial-gradient(circle,rgba(249,115,22,0.45)_0%,rgba(239,68,68,0.22)_35%,rgba(0,0,0,0)_72%)]",
+        orbGlow:
+          "bg-[radial-gradient(circle,rgba(249,115,22,0.35)_0%,rgba(239,68,68,0.18)_35%,rgba(0,0,0,0)_72%)]",
+        ring: "shadow-[0_0_100px_rgba(249,115,22,0.30)]",
+        card:
+          "border border-orange-500/20 bg-[linear-gradient(180deg,#24150f,#110c08)]",
+        badge:
           "bg-orange-500/15 text-orange-100 shadow-[0_6px_20px_rgba(249,115,22,0.18)]",
       };
 
@@ -44,31 +50,49 @@ function getStatusVisual(status: PartyStatus | null) {
     case "Safe":
     case "Watching Netflix":
       return {
+        mode: "ice",
         title: "Ice Mode",
         subtitle: "You’re cooling down. Keep it simple, clean, and safe.",
-        glow: "from-cyan-400/30 via-blue-500/15 to-transparent",
-        ring: "shadow-[0_0_80px_rgba(59,130,246,0.22)]",
-        badgeTone:
+        heroGlow:
+          "bg-[radial-gradient(circle,rgba(56,189,248,0.40)_0%,rgba(59,130,246,0.20)_35%,rgba(0,0,0,0)_72%)]",
+        orbGlow:
+          "bg-[radial-gradient(circle,rgba(56,189,248,0.28)_0%,rgba(59,130,246,0.14)_35%,rgba(0,0,0,0)_72%)]",
+        ring: "shadow-[0_0_100px_rgba(56,189,248,0.24)]",
+        card:
+          "border border-cyan-400/20 bg-[linear-gradient(180deg,#0f1b24,#081017)]",
+        badge:
           "bg-blue-500/15 text-blue-100 shadow-[0_6px_20px_rgba(59,130,246,0.18)]",
       };
 
     case "Listening to music":
       return {
+        mode: "sound",
         title: "Sound Mode",
         subtitle: "Stay in rhythm, but keep awareness higher than the vibe.",
-        glow: "from-fuchsia-500/25 via-blue-500/15 to-transparent",
-        ring: "shadow-[0_0_80px_rgba(168,85,247,0.20)]",
-        badgeTone:
+        heroGlow:
+          "bg-[radial-gradient(circle,rgba(168,85,247,0.34)_0%,rgba(59,130,246,0.18)_35%,rgba(0,0,0,0)_72%)]",
+        orbGlow:
+          "bg-[radial-gradient(circle,rgba(168,85,247,0.24)_0%,rgba(59,130,246,0.12)_35%,rgba(0,0,0,0)_72%)]",
+        ring: "shadow-[0_0_100px_rgba(168,85,247,0.22)]",
+        card:
+          "border border-fuchsia-500/20 bg-[linear-gradient(180deg,#1b1326,#0d0b16)]",
+        badge:
           "bg-fuchsia-500/15 text-fuchsia-100 shadow-[0_6px_20px_rgba(168,85,247,0.18)]",
       };
 
     default:
       return {
+        mode: "balanced",
         title: "Balanced Mode",
         subtitle: "Party Mode is on. Keep your signals current and your exits easy.",
-        glow: "from-white/10 via-blue-500/10 to-transparent",
-        ring: "shadow-[0_0_60px_rgba(255,255,255,0.06)]",
-        badgeTone:
+        heroGlow:
+          "bg-[radial-gradient(circle,rgba(255,255,255,0.10)_0%,rgba(59,130,246,0.10)_35%,rgba(0,0,0,0)_72%)]",
+        orbGlow:
+          "bg-[radial-gradient(circle,rgba(255,255,255,0.08)_0%,rgba(59,130,246,0.08)_35%,rgba(0,0,0,0)_72%)]",
+        ring: "shadow-[0_0_70px_rgba(255,255,255,0.08)]",
+        card:
+          "border border-white/10 bg-[linear-gradient(180deg,#14141a,#0c0c10)]",
+        badge:
           "bg-white/10 text-white/85 shadow-[0_6px_20px_rgba(255,255,255,0.05)]",
       };
   }
@@ -90,10 +114,7 @@ export default function PartyPage() {
 
     if (savedName) setDisplayName(savedName);
 
-    if (
-      savedStatus &&
-      PARTY_STATUSES.includes(savedStatus as PartyStatus)
-    ) {
+    if (savedStatus && PARTY_STATUSES.includes(savedStatus as PartyStatus)) {
       setSelectedStatus(savedStatus as PartyStatus);
     } else {
       setSelectedStatus("Listening to music");
@@ -106,10 +127,7 @@ export default function PartyPage() {
     window.localStorage.setItem("twincore_party_status", selectedStatus);
   }, [selectedStatus]);
 
-  const visual = useMemo(
-    () => getStatusVisual(selectedStatus),
-    [selectedStatus]
-  );
+  const visual = useMemo(() => getStatusVisual(selectedStatus), [selectedStatus]);
 
   async function handleToggleAudio() {
     const audio = audioRef.current;
@@ -135,7 +153,7 @@ export default function PartyPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#0A0A0B] text-white">
+    <main className="min-h-screen overflow-hidden bg-[#0A0A0B] text-white">
       <audio
         ref={audioRef}
         src={PARTY_AUDIO_SRC}
@@ -151,14 +169,16 @@ export default function PartyPage() {
       />
 
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.12),transparent_34%),radial-gradient(circle_at_bottom,rgba(249,115,22,0.10),transparent_34%)]" />
+
         <div
-          className={`absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.12),transparent_34%),radial-gradient(circle_at_bottom,rgba(249,115,22,0.10),transparent_34%)]`}
+          className={`absolute left-1/2 top-20 h-[24rem] w-[24rem] -translate-x-1/2 rounded-full blur-3xl ${visual.heroGlow} ${visual.ring} animate-pulse`}
         />
         <div
-          className={`absolute inset-x-0 top-20 mx-auto h-72 w-72 rounded-full blur-3xl bg-gradient-to-br ${visual.glow} ${visual.ring}`}
+          className={`absolute bottom-24 right-[-10%] h-64 w-64 rounded-full blur-3xl ${visual.orbGlow}`}
         />
         <div
-          className={`absolute bottom-24 right-[-10%] h-56 w-56 rounded-full blur-3xl bg-gradient-to-br ${visual.glow}`}
+          className={`absolute bottom-40 left-[-10%] h-56 w-56 rounded-full blur-3xl ${visual.orbGlow}`}
         />
       </div>
 
@@ -181,7 +201,7 @@ export default function PartyPage() {
           </Link>
         </header>
 
-        <section className="mb-6 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#14141a,#0c0c10)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
+        <section className={`mb-6 rounded-3xl p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)] ${visual.card}`}>
           <div className="mb-2 text-4xl leading-none">
             {selectedStatus === "Drinking" || selectedStatus === "At club" ? (
               <Flame className="h-10 w-10 text-orange-400" />
@@ -209,7 +229,7 @@ export default function PartyPage() {
 
           <div className="mt-4 flex flex-wrap gap-2">
             <span
-              className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold tracking-wide ${visual.badgeTone}`}
+              className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold tracking-wide ${visual.badge}`}
             >
               {visual.title}
             </span>
