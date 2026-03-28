@@ -47,14 +47,20 @@ function getTwinMeSurface(pathname: string): TwinMeSurface {
   };
 }
 
-function toneStyles(tone: TwinMeSurface["tone"]) {
+function toneGlow(tone: TwinMeSurface["tone"]) {
+  if (tone === "orange") return "shadow-[0_0_30px_rgba(249,115,22,0.25)]";
+  if (tone === "emerald") return "shadow-[0_0_30px_rgba(16,185,129,0.25)]";
+  return "shadow-[0_0_30px_rgba(59,130,246,0.25)]";
+}
+
+function toneBg(tone: TwinMeSurface["tone"]) {
   if (tone === "orange") {
-    return "border-orange-500/20 bg-[linear-gradient(180deg,rgba(249,115,22,0.18),rgba(20,12,8,0.96))]";
+    return "bg-[linear-gradient(180deg,rgba(249,115,22,0.18),rgba(20,12,8,0.96))]";
   }
   if (tone === "emerald") {
-    return "border-emerald-500/20 bg-[linear-gradient(180deg,rgba(16,185,129,0.18),rgba(8,18,14,0.96))]";
+    return "bg-[linear-gradient(180deg,rgba(16,185,129,0.18),rgba(8,18,14,0.96))]";
   }
-  return "border-blue-500/20 bg-[linear-gradient(180deg,rgba(59,130,246,0.18),rgba(10,14,26,0.96))]";
+  return "bg-[linear-gradient(180deg,rgba(59,130,246,0.18),rgba(10,14,26,0.96))]";
 }
 
 export default function TwinMeGlobal() {
@@ -64,14 +70,14 @@ export default function TwinMeGlobal() {
   const surface = useMemo(() => getTwinMeSurface(pathname), [pathname]);
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 px-4 pb-4">
+    <div className="fixed inset-x-0 bottom-4 z-50 px-4">
       <div className="mx-auto max-w-md">
 
-        {/* COLLAPSED STATE */}
+        {/* COLLAPSED */}
         {!expanded && (
           <button
             onClick={() => setExpanded(true)}
-            className={`w-full rounded-2xl border px-4 py-3 flex items-center justify-between text-left backdrop-blur-xl shadow-lg ${toneStyles(surface.tone)}`}
+            className={`w-full rounded-2xl border border-white/10 px-4 py-3 flex items-center justify-between backdrop-blur-xl transition-all duration-300 ${toneBg(surface.tone)} ${toneGlow(surface.tone)} animate-pulse`}
           >
             <div className="flex items-center gap-2">
               <Brain className="h-4 w-4 text-white" />
@@ -90,7 +96,7 @@ export default function TwinMeGlobal() {
         {/* EXPANDED */}
         {expanded && (
           <div
-            className={`rounded-3xl border p-4 backdrop-blur-xl shadow-xl transition-all ${toneStyles(surface.tone)}`}
+            className={`rounded-3xl border border-white/10 p-4 backdrop-blur-xl transition-all duration-300 ${toneBg(surface.tone)} ${toneGlow(surface.tone)}`}
           >
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
@@ -117,24 +123,15 @@ export default function TwinMeGlobal() {
             </p>
 
             <div className="flex gap-2 flex-wrap">
-              <Link
-                href="/twinme"
-                className="px-3 py-2 rounded-full bg-white/10 text-sm"
-              >
+              <Link href="/twinme" className="px-3 py-2 rounded-full bg-white/10 text-sm">
                 Open TwinMe
               </Link>
 
-              <Link
-                href="/crew"
-                className="px-3 py-2 rounded-full bg-white/10 text-sm"
-              >
+              <Link href="/crew" className="px-3 py-2 rounded-full bg-white/10 text-sm">
                 Crew
               </Link>
 
-              <Link
-                href="/party"
-                className="px-3 py-2 rounded-full bg-white/10 text-sm"
-              >
+              <Link href="/party" className="px-3 py-2 rounded-full bg-white/10 text-sm">
                 Party
               </Link>
             </div>
