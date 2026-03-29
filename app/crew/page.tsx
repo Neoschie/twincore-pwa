@@ -1,22 +1,25 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ComponentType } from "react";
 import {
   Activity,
   AlertTriangle,
   Brain,
-  Flame,
-  Home,
   MapPin,
-  RefreshCw,
-  Shield,
+  Radio,
+  Route,
+  Siren,
   Users,
+  EyeOff,
+  Ghost,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import StatusChip from "../_components/status-chip";
 import PageHeader from "../_components/page-header";
 import GlobalStatusBar from "../_components/global-status-bar";
 import AnimatedCard from "../_components/animated-card";
+
+const STORAGE_KEY = "twincore_profile";
 
 type CrewStatusRow = {
   id?: string;
@@ -26,11 +29,29 @@ type CrewStatusRow = {
   vibe_label?: string | null;
   location_name?: string | null;
   updated_at?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
-type SafetyState = "safe" | "active" | "alert";
 type FilterMode = "all" | "active" | "heading-home";
-type TwinMeTone = "red" | "orange" | "blue" | "green";
+
+type PrivacySettings = {
+  displayName: string;
+  ghostMode: boolean;
+  ghostLabel: string;
+  blurPresence: boolean;
+  trustedOnly: boolean;
+  trustedList: string[];
+};
+
+const defaultPrivacy: PrivacySettings = {
+  displayName: "Neo",
+  ghostMode: false,
+  ghostLabel: "Low Visibility",
+  blurPresence: true,
+  trustedOnly: false,
+  trustedList: [],
+};
 
 function timeAgo(input?: string | null) {
   if (!input) return "No update";
@@ -45,416 +66,348 @@ function timeAgo(input?: string | null) {
   return `${days} d ago`;
 }
 
-function formatLocationLink(location: string) {
-  const trimmed = location.trim();
-  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
-    return trimmed;
-  }
-  return `https://maps.google.com/?q=${encodeURIComponent(trimmed)}`;
-}
-
-function buildLocalFallbackCrew(): CrewStatusRow[] {
-  if (typeof window === "undefined") return [];
-
-  const displayName = window.localStorage.getItem("twincore_display_name") || "Neo";
-  const partyStatus = window.localStorage.getItem("twincore_party_status");
-  const afterStatus = window.localStorage.getItem("twincore_exit_crew_status");
-  const savedLocationRaw = window.localStorage.getItem("twincore_last_shared_location");
-
-  let location_name = "Location unavailable";
-  if (savedLocationRaw) {
-    try {
-      const parsed = JSON.parse(savedLocationRaw) as {
-        latitude?: number;
-        longitude?: number;
-        mapsUrl?: string;
-      };
-      if (
-        typeof parsed.latitude === "number" &&
-        typeof parsed.longitude === "number"
-      ) {
-        location_name = `${parsed.latitude},${parsed.longitude}`;
-      } else if (parsed.mapsUrl) {
-        location_name = parsed.mapsUrl;
-      }
-    } catch {
-      location_name = "Location unavailable";
-    }
-  }
-
-  let status = "active";
-  let vibe_label = "Party active";
-  let heartbeat_bpm = 72;
-
-  if (partyStatus === "need-help") {
-    status = "alert";
-    vibe_label = "Needs help";
-    heartbeat_bpm = 110;
-  } else if (partyStatus === "im-good") {
-    status = "active";
-    vibe_label = "I’m good";
-    heartbeat_bpm = 72;
-  } else if (afterStatus) {
-    status = "heading home";
-    vibe_label = "After active";
-    heartbeat_bpm = 72;
-  }
-
-  return [
-    {
-      id: "local-self",
-      name: displayName,
-      status,
-      heartbeat_bpm,
-      vibe_label,
-      location_name,
-      updated_at: new Date().toISOString(),
-    },
-  ];
-}
-
 function isFlaggedRow(row: CrewStatusRow) {
-  const status = (row.status || "").toLowerCase();
-  const vibe = (row.vibe_label || "").toLowerCase();
+  const s = (row.status || "").toLowerCase();
+  const v = (row.vibe_label || "").toLowerCase();
 
   return (
-    status.includes("help") ||
-    status.includes("alert") ||
-    status.includes("danger") ||
-    status.includes("unsafe") ||
-    vibe.includes("help") ||
-    vibe.includes("alert") ||
-    vibe.includes("danger") ||
-    vibe.includes("unsafe")
+    s.includes("alert") ||
+    s.includes("danger") ||
+    s.includes("help") ||
+    v.includes("alert") ||
+    v.includes("danger") ||
+    v.includes("help")
   );
+}
+
+function getRowTone(row: CrewStatusRow): "red" | "cyan" | "orange" | "neutral" {
+  const status = (row.status || "").toLowerCase();
+
+  if (isFlaggedRow(row)) return "red";
+  if (status === "heading home") return "cyan";
+  if (!status || status === "inactive") return "neutral";
+  return "orange";
+}
+
+function getRadarPointClass(row: CrewStatusRow) {
+  const tone = getRowTone(row);
+
+  if (tone === "red") {
+    return {
+      dot: "bg-red-400 shadow-[0_0_18px_rgba(248,113,113,0.85)]",
+      ring: "border-red-400/40",
+      pulse: "animate-ping",
+      label: "text-red-100",
+    };
+  }
+
+  if (tone === "cyan") {
+    return {
+      dot: "bg-cyan-300 shadow-[0_0_18px_rgba(103,232,249,0.8)]",
+      ring: "border-cyan-300/40",
+      pulse: "animate-pulse",
+      label: "text-cyan-100",
+    };
+  }
+
+  if (tone === "orange") {
+    return {
+      dot: "bg-orange-400 shadow-[0_0_18px_rgba(251,146,60,0.8)]",
+      ring: "border-orange-400/40",
+      pulse: "animate-pulse",
+      label: "text-orange-100",
+    };
+  }
+
+  return {
+    dot: "bg-white/70 shadow-[0_0_14px_rgba(255,255,255,0.4)]",
+    ring: "border-white/20",
+    pulse: "",
+    label: "text-white/80",
+  };
+}
+
+function getMockRadarPosition(index: number, total: number) {
+  const presets = [
+    { x: 50, y: 50 },
+    { x: 34, y: 38 },
+    { x: 68, y: 32 },
+    { x: 28, y: 68 },
+    { x: 74, y: 64 },
+    { x: 52, y: 24 },
+  ];
+
+  if (index < presets.length) return presets[index];
+
+  const angle = (index / Math.max(total, 1)) * Math.PI * 2;
+  return {
+    x: 50 + Math.cos(angle) * 26,
+    y: 50 + Math.sin(angle) * 26,
+  };
+}
+
+function getPrivacySettings(): PrivacySettings {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return defaultPrivacy;
+
+    const parsed = JSON.parse(raw) as Partial<PrivacySettings>;
+    return {
+      displayName: parsed.displayName || "Neo",
+      ghostMode: parsed.ghostMode ?? false,
+      ghostLabel: parsed.ghostLabel || "Low Visibility",
+      blurPresence: parsed.blurPresence ?? true,
+      trustedOnly: parsed.trustedOnly ?? false,
+      trustedList: Array.isArray(parsed.trustedList) ? parsed.trustedList : [],
+    };
+  } catch {
+    return defaultPrivacy;
+  }
+}
+
+function canSeeFull(row: CrewStatusRow, privacy: PrivacySettings) {
+  if (!privacy.trustedOnly) return true;
+
+  const rowName = (row.name || "").trim().toLowerCase();
+  const selfName = privacy.displayName.trim().toLowerCase();
+
+  if (rowName && rowName === selfName) return true;
+
+  return privacy.trustedList.some(
+    (name) => name.trim().toLowerCase() === rowName
+  );
+}
+
+function getDisplayRow(row: CrewStatusRow, privacy: PrivacySettings): CrewStatusRow {
+  if (canSeeFull(row, privacy)) return row;
+
+  return {
+    ...row,
+    status: "Trusted Only",
+    vibe_label: privacy.ghostLabel || "Low Visibility",
+    location_name: "Hidden",
+  };
 }
 
 export default function CrewPage() {
   const [crewRows, setCrewRows] = useState<CrewStatusRow[]>([]);
   const [crewMessage, setCrewMessage] = useState("Checking crew pulse...");
-  const [realtimePulse, setRealtimePulse] = useState(false);
   const [filter, setFilter] = useState<FilterMode>("all");
-  const [sharedLocation, setSharedLocation] = useState<string | null>(null);
+  const [liveTick, setLiveTick] = useState(false);
+  const [privacy, setPrivacy] = useState<PrivacySettings>(defaultPrivacy);
 
   async function loadCrewSignals() {
-    try {
-      if (supabase) {
-        const { data, error } = await supabase
-          .from("crew_status")
-          .select("*")
-          .order("updated_at", { ascending: false })
-          .limit(50);
+    const { data, error } = await supabase
+      .from("crew_status")
+      .select("*")
+      .order("updated_at", { ascending: false });
 
-        if (!error && data && data.length > 0) {
-          setCrewRows(data as CrewStatusRow[]);
-          setCrewMessage("Crew pulse connected");
-          return;
-        }
-      }
-    } catch {
-      // fallback below
-    }
-
-    const fallbackRows = buildLocalFallbackCrew();
-    if (fallbackRows.length > 0) {
-      setCrewRows(fallbackRows);
-      setCrewMessage("Using local crew fallback");
+    if (!error && data && data.length > 0) {
+      setCrewRows(data as CrewStatusRow[]);
+      setCrewMessage("Crew pulse connected");
       return;
     }
 
     setCrewRows([]);
-    setCrewMessage(supabase ? "Crew energy unavailable" : "Supabase not configured");
+    setCrewMessage("Crew energy unavailable");
   }
 
   useEffect(() => {
+    setPrivacy(getPrivacySettings());
     void loadCrewSignals();
 
-    if (typeof window !== "undefined") {
-      const saved = window.localStorage.getItem("twincore_last_shared_location");
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved) as { mapsUrl?: string };
-          setSharedLocation(parsed.mapsUrl || null);
-        } catch {
-          setSharedLocation(null);
-        }
-      }
-    }
-
-    const refreshInterval = window.setInterval(() => {
+    const interval = window.setInterval(() => {
       void loadCrewSignals();
-    }, 10000);
+      setLiveTick((prev) => !prev);
+    }, 8000);
 
-    let channel: ReturnType<NonNullable<typeof supabase>["channel"]> | null = null;
-
-    if (supabase) {
-      channel = supabase
-        .channel("crew-page-status-live")
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "crew_status" },
-          async () => {
-            await loadCrewSignals();
-            setCrewMessage("Crew pulse updated live");
-            setRealtimePulse(true);
-            window.setTimeout(() => setRealtimePulse(false), 260);
-          }
-        )
-        .subscribe();
-    }
+    const pulseInterval = window.setInterval(() => {
+      setLiveTick((prev) => !prev);
+    }, 1800);
 
     const onStorage = () => {
-      void loadCrewSignals();
-      const saved = window.localStorage.getItem("twincore_last_shared_location");
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved) as { mapsUrl?: string };
-          setSharedLocation(parsed.mapsUrl || null);
-        } catch {
-          setSharedLocation(null);
-        }
-      } else {
-        setSharedLocation(null);
-      }
+      setPrivacy(getPrivacySettings());
     };
 
-    if (typeof window !== "undefined") {
-      window.addEventListener("storage", onStorage);
-    }
+    window.addEventListener("storage", onStorage);
 
     return () => {
-      window.clearInterval(refreshInterval);
-      if (supabase && channel) {
-        void supabase.removeChannel(channel);
-      }
-      if (typeof window !== "undefined") {
-        window.removeEventListener("storage", onStorage);
-      }
+      window.clearInterval(interval);
+      window.clearInterval(pulseInterval);
+      window.removeEventListener("storage", onStorage);
     };
   }, []);
 
+  const displayRows = useMemo(
+    () => crewRows.map((row) => getDisplayRow(row, privacy)),
+    [crewRows, privacy]
+  );
+
   const crewStats = useMemo(() => {
-    const active = crewRows.filter((row) => {
-      const status = (row.status || "").toLowerCase();
-      return !["heading home", "inactive", ""].includes(status);
-    }).length;
+    const headingHome = displayRows.filter(
+      (r) => (r.status || "").toLowerCase() === "heading home"
+    ).length;
 
-    const headingHome = crewRows.filter((row) => {
-      const status = (row.status || "").toLowerCase();
-      return status === "heading home";
-    }).length;
-
-    const inactive = crewRows.filter((row) => {
-      const status = (row.status || "").toLowerCase();
-      return status === "inactive" || status === "";
-    }).length;
-
-    const avgHeartbeat =
-      crewRows.length > 0
-        ? Math.round(
-            crewRows.reduce((sum, row) => sum + (row.heartbeat_bpm || 70), 0) /
-              crewRows.length
-          )
-        : 70;
-
-    const flagged = crewRows.filter((row) => isFlaggedRow(row)).length;
-
-    const recent = crewRows.filter((row) => {
-      if (!row.updated_at) return false;
-      const updatedAt = new Date(row.updated_at).getTime();
-      return Date.now() - updatedAt < 1000 * 60 * 10;
-    }).length;
+    const flagged = displayRows.filter(isFlaggedRow).length;
 
     return {
-      total: crewRows.length,
-      active,
+      total: displayRows.length,
       headingHome,
-      inactive,
-      avgHeartbeat,
       flagged,
-      recent,
     };
-  }, [crewRows]);
-
-  const crewEnergy = useMemo(() => {
-    const calculated =
-      56 +
-      crewStats.active * 10 +
-      crewStats.recent * 2 +
-      Math.max(-4, Math.min(10, Math.round((crewStats.avgHeartbeat - 72) / 2))) -
-      crewStats.headingHome * 4 -
-      crewStats.inactive * 2 +
-      (realtimePulse ? 4 : 0);
-
-    return Math.max(38, Math.min(100, calculated));
-  }, [crewStats, realtimePulse]);
-
-  const safetyState = useMemo<SafetyState>(() => {
-    if (crewStats.flagged > 0) return "alert";
-    if (crewStats.active >= 2 || crewEnergy > 70) return "active";
-    return "safe";
-  }, [crewStats.flagged, crewStats.active, crewEnergy]);
-
-  const twinMeInsight = useMemo(() => {
-    if (crewStats.flagged > 0) {
-      return "TwinMe: someone in your crew may need help. Check in immediately and reduce distractions.";
-    }
-
-    if (crewStats.headingHome > 0 && crewStats.active <= 1) {
-      return "TwinMe: your group is starting to split. Decide whether you’re staying or leaving before you get isolated.";
-    }
-
-    if (crewStats.avgHeartbeat > 100) {
-      return "TwinMe: group energy is high right now. Keep decisions slower than the pace around you.";
-    }
-
-    if (crewStats.avgHeartbeat < 65 && crewStats.total > 0) {
-      return "TwinMe: your crew looks like it’s winding down. This may be a good moment to head home cleanly.";
-    }
-
-    if (crewStats.total === 0) {
-      return "TwinMe: no crew is connected right now. Move with extra awareness and keep your exits simple.";
-    }
-
-    return "TwinMe: your crew looks stable right now. Stay connected, stay aware, and enjoy the moment.";
-  }, [crewStats]);
-
-  const twinMeTone: TwinMeTone = useMemo(() => {
-    if (crewStats.flagged > 0) return "red";
-    if (crewStats.headingHome > 0 || crewStats.avgHeartbeat > 100) return "orange";
-    if (sharedLocation) return "blue";
-    return "green";
-  }, [crewStats, sharedLocation]);
+  }, [displayRows]);
 
   const filteredRows = useMemo(() => {
-    const base = crewRows.filter((row) => {
-      const status = (row.status || "").toLowerCase();
-      if (filter === "active") return !["heading home", "inactive", ""].includes(status);
-      if (filter === "heading-home") return status === "heading home";
-      return true;
-    });
+    if (filter === "heading-home") {
+      return displayRows.filter(
+        (r) => (r.status || "").toLowerCase() === "heading home"
+      );
+    }
 
-    return [...base].sort((a, b) => {
-      const aFlagged = isFlaggedRow(a) ? 1 : 0;
-      const bFlagged = isFlaggedRow(b) ? 1 : 0;
+    if (filter === "active") {
+      return displayRows.filter(
+        (r) => (r.status || "").toLowerCase() !== "heading home"
+      );
+    }
 
-      if (aFlagged !== bFlagged) return bFlagged - aFlagged;
+    return displayRows;
+  }, [displayRows, filter]);
 
-      const aUpdated = new Date(a.updated_at || 0).getTime();
-      const bUpdated = new Date(b.updated_at || 0).getTime();
-      return bUpdated - aUpdated;
-    });
-  }, [crewRows, filter]);
+  const radarRows = filteredRows.slice(0, 6);
 
   return (
-    <main className="min-h-screen bg-[#0A0A0B] text-white">
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.10),transparent_34%),radial-gradient(circle_at_bottom,rgba(249,115,22,0.08),transparent_34%)]" />
+    <main className="min-h-screen overflow-hidden bg-[#0A0A0B] text-white">
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.12),transparent_34%),radial-gradient(circle_at_bottom,rgba(34,197,94,0.08),transparent_34%)]" />
+        <div className="absolute left-1/2 top-16 h-[26rem] w-[26rem] -translate-x-1/2 rounded-full bg-blue-500/10 blur-3xl animate-orb-drift" />
+        <div className="absolute inset-0 opacity-[0.08] [background-image:linear-gradient(rgba(255,255,255,0.55)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.55)_1px,transparent_1px)] [background-size:26px_26px]" />
+      </div>
 
       <div className="relative py-6">
         <PageHeader
           title="Crew"
-          subtitle="Your people, live and moving"
+          subtitle="Live crew awareness"
           rightSlot={<GlobalStatusBar />}
         />
 
         <div className="space-y-5">
-          {sharedLocation ? (
-            <AnimatedCard
-              className="rounded-3xl border border-blue-500/15 bg-[linear-gradient(180deg,#162033,#0f1624)] p-5 shadow-[0_20px_50px_rgba(59,130,246,0.16)] transition duration-200 hover:scale-[1.01] active:scale-[0.98]"
-              index={0}
-            >
-              <div className="flex items-center gap-2 text-sm font-medium text-blue-100">
-                <MapPin className="h-4 w-4" />
-                Last Shared Location
+          <AnimatedCard className="rounded-3xl p-6 bg-[linear-gradient(180deg,#142033,#0d1624)] border border-blue-500/15 shadow-[0_20px_55px_rgba(0,0,0,0.35)]">
+            <div className="mb-4">
+              <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold tracking-[0.22em] text-white/80">
+                <Radio className="h-3.5 w-3.5" />
+                LIVE CREW STREAM
               </div>
 
-              <a
-                href={sharedLocation}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-3 inline-flex text-sm text-blue-300 underline underline-offset-4"
-              >
-                Open in Maps
-              </a>
-            </AnimatedCard>
-          ) : null}
+              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white">
+                Crew looks steady
+              </h2>
 
-          <section className="grid gap-4 sm:grid-cols-2">
-            <AnimatedCard
-              className="rounded-3xl bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)] transition duration-200 hover:scale-[1.01] active:scale-[0.98]"
-              index={1}
-            >
-              <MetricCard
-                icon={Users}
-                label="Total Crew"
-                value={crewStats.total.toString()}
-                footer={crewMessage}
-              />
-            </AnimatedCard>
-
-            <AnimatedCard
-              className="rounded-3xl bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)] transition duration-200 hover:scale-[1.01] active:scale-[0.98]"
-              index={2}
-            >
-              <EnergyCard value={crewEnergy} />
-            </AnimatedCard>
-
-            <AnimatedCard
-              className="rounded-3xl bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)] transition duration-200 hover:scale-[1.01] active:scale-[0.98]"
-              index={3}
-            >
-              <SafetyCard state={safetyState} />
-            </AnimatedCard>
-
-            <AnimatedCard
-              className="rounded-3xl bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)] transition duration-200 hover:scale-[1.01] active:scale-[0.98]"
-              index={4}
-            >
-              <MetricCard
-                icon={Activity}
-                label="Avg Heartbeat"
-                value={`${crewStats.avgHeartbeat} BPM`}
-                footer={`${crewStats.recent} recent live updates`}
-              />
-            </AnimatedCard>
-          </section>
-
-          <AnimatedCard
-            className="animate-glow rounded-3xl border border-blue-500/20 bg-[linear-gradient(180deg,#1a1f2e,#0c0f1a)] p-5 shadow-[0_20px_55px_rgba(59,130,246,0.18)] transition duration-200 hover:scale-[1.01] active:scale-[0.98]"
-            index={5}
-          >
-            <div className="mb-3 inline-flex items-center gap-2 text-sm font-medium text-blue-100">
-              <Brain className="h-4 w-4" />
-              TwinMe Live Insight
+              <p className="mt-3 max-w-md text-sm leading-6 text-white/70">
+                {crewMessage}. Trusted-only visibility is{" "}
+                {privacy.trustedOnly ? "active" : "off"} on this device.
+              </p>
             </div>
 
-            <div className="text-base leading-7 text-white">{twinMeInsight}</div>
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              <StatusChip
-                label={
-                  twinMeTone === "red"
-                    ? "HIGH ATTENTION"
-                    : twinMeTone === "orange"
-                      ? "ACTIVE READ"
-                      : twinMeTone === "blue"
-                        ? "LOCATION AWARE"
-                        : "STABLE"
-                }
-                tone={twinMeTone}
-              />
-              <StatusChip label="LIVE CREW STREAM" tone="blue" />
-              {sharedLocation ? <StatusChip label="LOCATION ACTIVE" tone="blue" /> : null}
-              {crewStats.flagged > 0 ? (
-                <StatusChip label="ALERT PRIORITY" tone="red" />
-              ) : null}
+            <div className="grid grid-cols-3 gap-3">
+              <StatPill icon={Users} value={crewStats.total} label="Connected" />
+              <StatPill icon={Route} value={crewStats.headingHome} label="Home" />
+              <StatPill icon={Siren} value={crewStats.flagged} label="Alerts" />
             </div>
           </AnimatedCard>
 
-          <AnimatedCard
-            className="rounded-3xl bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-4 shadow-[0_16px_45px_rgba(0,0,0,0.42)]"
-            index={6}
-          >
+          <AnimatedCard className="rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,#101216,#090A0D)] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.42)]">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <div className="inline-flex items-center gap-2 text-sm font-medium text-blue-100">
+                  <Activity className="h-4 w-4" />
+                  Crew Radar
+                </div>
+                <p className="mt-1 text-sm text-white/55">
+                  Live pulse around your crew layer
+                </p>
+              </div>
+
+              <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/80">
+                {radarRows.length} visible
+              </span>
+            </div>
+
+            <div className="relative aspect-square overflow-hidden rounded-[1.6rem] border border-white/10 bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.10),rgba(0,0,0,0.45)_52%,rgba(0,0,0,0.9)_100%)]">
+              <div className="absolute inset-6 rounded-full border border-white/10" />
+              <div className="absolute inset-12 rounded-full border border-white/10" />
+              <div className="absolute inset-20 rounded-full border border-white/10" />
+              <div className="absolute inset-28 rounded-full border border-white/10" />
+
+              <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-white/10" />
+              <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-white/10" />
+
+              <div className="pointer-events-none absolute inset-0">
+                <div className="absolute left-1/2 top-1/2 h-[48%] w-[48%] -translate-x-1/2 -translate-y-1/2 origin-bottom-right rounded-tl-full bg-[conic-gradient(from_0deg,rgba(96,165,250,0.0)_0deg,rgba(96,165,250,0.0)_280deg,rgba(96,165,250,0.25)_340deg,rgba(96,165,250,0.0)_360deg)] animate-[spin_4s_linear_infinite]" />
+              </div>
+
+              <div className="absolute left-1/2 top-1/2 z-20 flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-white/15 backdrop-blur">
+                <div className="h-2.5 w-2.5 rounded-full bg-white shadow-[0_0_14px_rgba(255,255,255,0.8)]" />
+              </div>
+
+              {radarRows.map((row, index) => {
+                const pos = getMockRadarPosition(index, radarRows.length);
+                const tone = getRadarPointClass(row);
+                const shift = liveTick && index !== 0 ? 0.8 : -0.8;
+                const x = index % 2 === 0 ? pos.x + shift : pos.x;
+                const y = index % 2 !== 0 ? pos.y + shift : pos.y;
+
+                return (
+                  <div
+                    key={row.id || `${row.name || "crew"}-${index}`}
+                    className="absolute z-20 -translate-x-1/2 -translate-y-1/2"
+                    style={{ left: `${x}%`, top: `${y}%` }}
+                  >
+                    <span
+                      className={`absolute inset-0 rounded-full ${tone.dot} opacity-50 blur-md ${tone.pulse}`}
+                    />
+                    <span
+                      className={`relative flex h-10 w-10 items-center justify-center rounded-full border bg-black/50 backdrop-blur ${tone.ring}`}
+                    >
+                      <span className={`h-3.5 w-3.5 rounded-full ${tone.dot}`} />
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {radarRows.map((row, index) => {
+                const tone = getRadarPointClass(row);
+                const trusted = canSeeFull(crewRows[index] || row, privacy);
+
+                return (
+                  <div
+                    key={row.id || `legend-${index}`}
+                    className="rounded-2xl border border-white/10 bg-white/5 px-3 py-3"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`h-2.5 w-2.5 rounded-full ${tone.dot}`} />
+                      <span className={`truncate text-sm font-medium ${tone.label}`}>
+                        {row.name || `Crew ${index + 1}`}
+                      </span>
+                    </div>
+                    <div className="mt-1 flex items-center gap-2 text-xs text-white/55">
+                      {!trusted && privacy.trustedOnly ? (
+                        <>
+                          <EyeOff className="h-3.5 w-3.5" />
+                          Trusted Only
+                        </>
+                      ) : (
+                        row.status || "active"
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </AnimatedCard>
+
+          <AnimatedCard className="rounded-3xl bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-4 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
             <div className="flex flex-wrap items-center gap-2">
               {(["all", "active", "heading-home"] as FilterMode[]).map((mode) => (
                 <button
@@ -473,241 +426,148 @@ export default function CrewPage() {
             </div>
           </AnimatedCard>
 
-          <section className="grid gap-4">
-            {filteredRows.map((row, index) => {
-              const status = (row.status || "inactive").toLowerCase();
-              const heartbeat = row.heartbeat_bpm || 70;
-              const vibe = row.vibe_label || "No vibe set";
-              const name = row.name || `Crew Member ${index + 1}`;
-              const location = row.location_name || "Location unavailable";
+          <AnimatedCard className="animate-glow rounded-3xl border border-blue-500/20 bg-[linear-gradient(180deg,#1a1f2e,#0c0f1a)] p-5 shadow-[0_20px_55px_rgba(59,130,246,0.18)]">
+            <div className="mb-3 inline-flex items-center gap-2 text-sm font-medium text-blue-100">
+              <Brain className="h-4 w-4" />
+              TwinMe Live Insight
+            </div>
 
-              const isHeadingHome = status === "heading home";
-              const isInactive = status === "inactive" || status === "";
-              const isFlagged = isFlaggedRow(row);
+            <div className="text-base leading-7 text-white">
+              {privacy.trustedOnly
+                ? "TwinMe: trusted-only visibility is active. Non-trusted crew members are masked on this device."
+                : crewStats.flagged > 0
+                ? "TwinMe: one or more crew signals need attention. Reduce drift and check in now."
+                : crewStats.headingHome > 0
+                ? "TwinMe: your crew is starting to split. Keep tabs on who is heading home."
+                : "TwinMe: your crew looks stable right now. Stay connected and enjoy the moment."}
+            </div>
 
-              const cardClass = isFlagged
-                ? "bg-[linear-gradient(180deg,#341416,#180b0c)] shadow-[0_18px_50px_rgba(239,68,68,0.22)]"
-                : isHeadingHome
-                  ? "bg-[linear-gradient(180deg,#102129,#0b1418)] shadow-[0_18px_50px_rgba(34,211,238,0.14)]"
-                  : isInactive
-                    ? "bg-[linear-gradient(180deg,#111113,#0c0c0f)] shadow-[0_16px_45px_rgba(0,0,0,0.42)]"
-                    : "bg-[linear-gradient(180deg,#241912,#110d09)] shadow-[0_18px_50px_rgba(249,115,22,0.18)]";
+            <div className="mt-4 flex flex-wrap gap-2">
+              <StatusChip
+                label={crewStats.flagged > 0 ? "HIGH ATTENTION" : "LIVE CREW STREAM"}
+                tone={crewStats.flagged > 0 ? "red" : "blue"}
+              />
+              {privacy.trustedOnly ? (
+                <StatusChip label="TRUSTED ONLY" tone="orange" />
+              ) : null}
+              {privacy.ghostMode ? <StatusChip label="GHOST MODE" tone="blue" /> : null}
+            </div>
+          </AnimatedCard>
 
-              const tone: "red" | "cyan" | "neutral" | "orange" =
-                isFlagged
-                  ? "red"
-                  : isHeadingHome
-                    ? "cyan"
-                    : isInactive
-                      ? "neutral"
-                      : "orange";
-
-              const statusLabel = isFlagged
-                ? "Alert"
-                : isHeadingHome
-                  ? "Heading Home"
-                  : isInactive
-                    ? "Inactive"
-                    : "Active";
-
-              const heartbeatWidth = Math.max(20, Math.min(100, heartbeat));
-              const hasLocation = location !== "Location unavailable";
-              const locationHref = hasLocation ? formatLocationLink(location) : null;
+          <div className="space-y-4">
+            {filteredRows.map((row, i) => {
+              const original = crewRows[i] || row;
+              const name = row.name || `Crew ${i + 1}`;
+              const status = row.status || "active";
+              const location = row.location_name || "Unknown";
+              const tone = getRowTone(row);
+              const trusted = canSeeFull(original, privacy);
 
               return (
                 <AnimatedCard
-                  key={row.id || `${name}-${index}`}
-                  className={`rounded-3xl p-5 transition duration-200 hover:scale-[1.02] active:scale-[0.98] ${cardClass}`}
-                  index={index + 7}
+                  key={row.id || `${name}-${i}`}
+                  className="p-5 rounded-3xl bg-[linear-gradient(180deg,#111113,#0c0c0f)] shadow-[0_16px_45px_rgba(0,0,0,0.42)]"
                 >
-                  <div className="mb-4 flex items-start justify-between gap-3">
+                  <div className="flex items-start justify-between gap-3 mb-2">
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2 text-xl font-semibold text-white">
-                        {isFlagged ? (
-                          <AlertTriangle className="h-5 w-5 shrink-0 text-red-400" />
+                      <div className="flex items-center gap-2 text-lg font-semibold text-white">
+                        {tone === "red" ? (
+                          <AlertTriangle className="h-4 w-4 shrink-0 text-red-400" />
+                        ) : null}
+                        {!trusted && privacy.trustedOnly ? (
+                          <Ghost className="h-4 w-4 shrink-0 text-white/60" />
                         ) : null}
                         <span className="truncate">{name}</span>
                       </div>
 
-                      <div className="mt-2 text-sm text-white/60">
-                        {locationHref ? (
-                          <a
-                            href={locationHref}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-blue-300 underline underline-offset-4"
-                          >
-                            View Location
-                          </a>
-                        ) : (
-                          location
-                        )}
+                      <div className="mt-2 inline-flex items-center gap-2 text-sm text-white/60">
+                        <MapPin className="h-4 w-4" />
+                        <span className="truncate">{location}</span>
                       </div>
                     </div>
 
-                    <StatusChip label={statusLabel} tone={tone} />
+                    <StatusChip
+                      label={status}
+                      tone={
+                        tone === "red"
+                          ? "red"
+                          : tone === "cyan"
+                          ? "cyan"
+                          : tone === "orange"
+                          ? "orange"
+                          : "neutral"
+                      }
+                    />
                   </div>
 
-                  {isFlagged ? (
-                    <div className="mb-4 rounded-2xl bg-red-500/10 px-3 py-2 text-xs font-medium tracking-wide text-red-100">
-                      PRIORITY ALERT — crew attention needed
-                    </div>
-                  ) : null}
-
-                  <div className="space-y-4">
-                    <ProgressRow
+                  <div className="mt-3 grid grid-cols-2 gap-3">
+                    <MiniInfo
+                      icon={Activity}
                       label="Heartbeat"
-                      right={`${heartbeat} BPM`}
-                      width={heartbeatWidth}
-                      barClass={
-                        isFlagged
-                          ? "bg-gradient-to-r from-red-500 via-orange-500 to-yellow-300"
-                          : isHeadingHome
-                            ? "bg-gradient-to-r from-cyan-300 via-blue-400 to-indigo-500"
-                            : isInactive
-                              ? "bg-gradient-to-r from-white/30 via-white/40 to-white/50"
-                              : "bg-gradient-to-r from-blue-500 via-orange-500 to-yellow-300"
+                      value={
+                        trusted || !privacy.trustedOnly
+                          ? `${row.heartbeat_bpm || 70} BPM`
+                          : "Masked"
                       }
                     />
-
-                    <ProgressRow
+                    <MiniInfo
+                      icon={Users}
                       label="Vibe"
-                      right={vibe}
-                      width={isFlagged ? 88 : isHeadingHome ? 68 : isInactive ? 30 : 80}
-                      barClass={
-                        isFlagged
-                          ? "bg-gradient-to-r from-red-500 via-pink-500 to-orange-400"
-                          : isHeadingHome
-                            ? "bg-gradient-to-r from-cyan-300 via-sky-400 to-blue-500"
-                            : isInactive
-                              ? "bg-gradient-to-r from-white/20 via-white/30 to-white/40"
-                              : "bg-gradient-to-r from-indigo-400 via-orange-400 to-yellow-300"
-                      }
+                      value={row.vibe_label || "No vibe"}
                     />
                   </div>
 
-                  <div className="mt-5 flex items-center justify-between text-sm text-white/60">
-                    <div className="inline-flex items-center gap-2">
-                      {isHeadingHome ? (
-                        <Home className="h-4 w-4" />
-                      ) : (
-                        <RefreshCw className="h-4 w-4" />
-                      )}
-                      {statusLabel}
-                    </div>
-                    <div>{timeAgo(row.updated_at)}</div>
+                  <div className="mt-4 text-xs text-white/50">
+                    {timeAgo(row.updated_at)}
                   </div>
                 </AnimatedCard>
               );
             })}
-          </section>
-
-          {filteredRows.length === 0 ? (
-            <AnimatedCard
-              className="rounded-3xl bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-6 text-center shadow-[0_16px_45px_rgba(0,0,0,0.42)]"
-              index={20}
-            >
-              <div className="text-white/60">No crew members matched that filter.</div>
-            </AnimatedCard>
-          ) : null}
+          </div>
         </div>
       </div>
     </main>
   );
 }
 
-function MetricCard({
+function StatPill({
+  icon: Icon,
+  value,
+  label,
+}: {
+  icon: ComponentType<{ className?: string }>;
+  value: number;
+  label: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-center">
+      <div className="mb-2 flex items-center justify-center">
+        <Icon className="h-4 w-4 text-white/70" />
+      </div>
+      <div className="text-2xl font-semibold text-white">{value}</div>
+      <div className="mt-1 text-[10px] uppercase tracking-[0.24em] text-white/50">
+        {label}
+      </div>
+    </div>
+  );
+}
+
+function MiniInfo({
   icon: Icon,
   label,
   value,
-  footer,
 }: {
-  icon: React.ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string }>;
   label: string;
   value: string;
-  footer?: string;
 }) {
   return (
-    <div>
-      <div className="mb-3 flex items-center gap-2 text-sm text-white/65">
-        <Icon className="h-4 w-4" />
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+      <div className="mb-1 flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-white/45">
+        <Icon className="h-3.5 w-3.5" />
         {label}
       </div>
-      <div className="text-4xl font-semibold tracking-tight text-white">{value}</div>
-      {footer ? <div className="mt-2 text-sm text-white/55">{footer}</div> : null}
-    </div>
-  );
-}
-
-function EnergyCard({ value }: { value: number }) {
-  return (
-    <div>
-      <div className="mb-3 flex items-center gap-2 text-sm text-white/65">
-        <Flame className="h-4 w-4" />
-        Crew Energy
-      </div>
-
-      <div className="text-4xl font-semibold tracking-tight text-white">{value}/100</div>
-
-      <div className="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-white/10">
-        <div
-          className="animate-pulse-soft h-full rounded-full bg-gradient-to-r from-blue-500 via-orange-500 to-yellow-300 transition-all duration-200"
-          style={{ width: `${value}%` }}
-        />
-      </div>
-    </div>
-  );
-}
-
-function SafetyCard({ state }: { state: SafetyState }) {
-  const tone: "red" | "orange" | "blue" =
-    state === "alert" ? "red" : state === "active" ? "orange" : "blue";
-
-  const label =
-    state === "alert" ? "ALERT STATE" : state === "active" ? "ACTIVE STATE" : "SAFE STATE";
-
-  return (
-    <div>
-      <div className="mb-3 flex items-center gap-2 text-sm text-white/65">
-        <Shield className="h-4 w-4" />
-        Safety Layer
-      </div>
-
-      <div className="text-lg font-semibold text-white">
-        <StatusChip label={label} tone={tone} />
-      </div>
-
-      <div className="mt-3 text-sm text-white/55">
-        Based on live crew signals and flagged statuses.
-      </div>
-    </div>
-  );
-}
-
-function ProgressRow({
-  label,
-  right,
-  width,
-  barClass,
-}: {
-  label: string;
-  right: string;
-  width: number;
-  barClass: string;
-}) {
-  return (
-    <div>
-      <div className="mb-2 flex items-center justify-between gap-3 text-sm text-white/60">
-        <span>{label}</span>
-        <span className="truncate text-right">{right}</span>
-      </div>
-
-      <div className="h-2.5 w-full overflow-hidden rounded-full bg-white/10">
-        <div
-          className={`h-full rounded-full transition-all duration-200 ${barClass}`}
-          style={{ width: `${width}%` }}
-        />
-      </div>
+      <div className="truncate text-sm font-medium text-white/85">{value}</div>
     </div>
   );
 }
