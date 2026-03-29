@@ -1,12 +1,21 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
 type Message = {
   id: number;
   role: "user" | "twin";
   text: string;
+};
+
+type PartyLive = {
+  active: boolean;
+  status: string;
+  mood: string;
+  heartbeatBpm: number;
+  ghostMode: boolean;
+  trustedOnly: boolean;
 };
 
 const STARTER_PROMPTS = [
@@ -16,66 +25,94 @@ const STARTER_PROMPTS = [
   "What fits my mood today?",
 ];
 
-function buildTwinReply(input: string) {
+function getLiveContext(): PartyLive | null {
+  try {
+    const raw = localStorage.getItem("twincore_party_live");
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function buildTwinReply(input: string, live: PartyLive | null) {
   const text = input.toLowerCase();
 
-  if (text.includes("tonight") || text.includes("go out") || text.includes("event")) {
-    return `You sound like you're weighing your energy against what could be a good experience tonight.
+  if (live?.active) {
+    if (live.status === "Drinking" || live.status === "At club") {
+      return `You are currently in a high-energy environment (${live.status}).
 
-Your strongest options could be:
+Your awareness matters more than the vibe right now.
 
-• Choose a lighter social plan if you want connection without draining yourself
-• Pick the event that matches your mood, not just the loudest option
-• Stay in tonight and protect your energy if your body is asking for rest
+• Stay close to people you trust
+• Slow your decisions, especially around movement and new people
+• Keep track of your exit plan before you need it
 
-Which option feels most aligned with how you want to feel by the end of the night?`;
+Right now matters more than the plan. Stay in control of the moment.`;
+    }
+
+    if (live.status === "Heading home") {
+      return `You are in transition mode (${live.status}).
+
+This is where risk usually drops if you stay focused.
+
+• Stick to your route
+• Keep your phone accessible
+• Confirm your arrival once you are in
+
+Finish the night clean.`;
+    }
+
+    if (live.status === "Safe") {
+      return `You are in a stable state right now.
+
+This is the best time to reset.
+
+• Check in with your crew
+• Hydrate and recover
+• Lock in anything you need for tomorrow
+
+You handled the night. Close it properly.`;
+    }
+  }
+
+  if (text.includes("tonight") || text.includes("go out")) {
+    return `You are deciding how to spend your energy tonight.
+
+• Choose based on how you want to feel after
+• Do not follow noise, follow alignment
+• Rest is also a strong decision
+
+What version of tonight actually benefits you?`;
   }
 
   if (text.includes("friend") || text.includes("crew")) {
-    return `It sounds like this situation may need both clarity and care.
+    return `This situation may need both clarity and care.
 
-Your strongest options could be:
+• Keep communication simple
+• Do not react too quickly
+• Protect your peace while staying respectful
 
-• Check in directly and keep the conversation simple
-• Give the moment some space if emotions feel elevated
-• Protect your peace while still being respectful
-
-Which approach would best protect both the relationship and your own well-being?`;
+What outcome do you actually want here?`;
   }
 
-  if (text.includes("tired") || text.includes("overwhelmed") || text.includes("stress")) {
-    return `You sound like you may need relief, not more pressure.
+  if (text.includes("tired") || text.includes("stress")) {
+    return `You do not need more pressure right now.
 
-Your strongest options could be:
+• Choose rest or low-energy connection
+• Delay big decisions
+• Reduce noise around you
 
-• Choose rest and remove unnecessary pressure from tonight
-• Do something low-energy that still gives you a sense of connection
-• Delay any major decisions until you feel more grounded
-
-What would leave you feeling most restored tomorrow?`;
+What would help you feel better tomorrow?`;
   }
 
-  if (text.includes("relationship") || text.includes("ex") || text.includes("dating")) {
-    return `This sounds like a moment where your emotions and your long-term peace may not want the same thing.
+  return `I hear you thinking this through.
 
-Your strongest options could be:
+• Choose what protects your peace
+• Align with your current energy
+• Slow down if things feel emotional
 
-• Pause before responding and give yourself more room to think
-• Re-engage only if your intentions are clear
-• Protect your peace if this interaction risks reopening confusion
-
-What outcome are you actually hoping for from this situation?`;
-  }
-
-  return `I hear that you're trying to think this through carefully.
-
-Your strongest options could be:
-
-• Choose the path that best protects your peace
-• Go with the option that aligns most with your current goals and energy
-• Slow the moment down before acting if the situation feels emotionally charged
-
-Which option feels most in your best interest right now?`;
+What feels right for you right now?`;
 }
 
 export default function TwinMePage() {
@@ -83,14 +120,25 @@ export default function TwinMePage() {
     {
       id: 1,
       role: "twin",
-      text: "Talk it through with your twin. I’ll help you think through social events, personal situations, and everyday decisions with thoughtful suggestions — you decide.",
+      text: "LIVE TWINME IS ACTIVE. I’m synced with your live state and can respond based on where you are and how you're moving.",
     },
   ]);
   const [input, setInput] = useState("");
   const [promptCount, setPromptCount] = useState(0);
+  const [liveState, setLiveState] = useState<PartyLive | null>(null);
 
   const freeLimit = 10;
   const remaining = useMemo(() => Math.max(0, freeLimit - promptCount), [promptCount]);
+
+  useEffect(() => {
+    const load = () => {
+      setLiveState(getLiveContext());
+    };
+
+    load();
+    const interval = window.setInterval(load, 3000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   function sendMessage(customText?: string) {
     const finalText = (customText ?? input).trim();
@@ -106,7 +154,7 @@ export default function TwinMePage() {
     const twinMessage: Message = {
       id: Date.now() + 1,
       role: "twin",
-      text: buildTwinReply(finalText),
+      text: buildTwinReply(finalText, liveState),
     };
 
     setMessages((prev) => [...prev, userMessage, twinMessage]);
@@ -125,13 +173,7 @@ export default function TwinMePage() {
         fontFamily: "Inter, Arial, sans-serif",
       }}
     >
-      <div
-        style={{
-          maxWidth: 760,
-          margin: "0 auto",
-        }}
-      >
-        {/* Header */}
+      <div style={{ maxWidth: 760, margin: "0 auto" }}>
         <section style={{ marginBottom: 16 }}>
           <div
             style={{
@@ -176,9 +218,7 @@ export default function TwinMePage() {
                   maxWidth: 620,
                 }}
               >
-                Talk it through with your twin. TwinMe helps users think through
-                social events, personal situations, and everyday life with
-                suggestions in their best interest.
+                Live-aware TwinMe is connected to Party Mode.
               </p>
             </div>
 
@@ -188,64 +228,31 @@ export default function TwinMePage() {
           </div>
         </section>
 
-        {/* Limit card */}
+        {liveState?.active && (
+          <section style={liveCard}>
+            <div style={sectionLabel}>LIVE STATE</div>
+            <div style={{ marginTop: 10, fontSize: 18, fontWeight: 800 }}>
+              {liveState.status} • {liveState.mood} • {liveState.heartbeatBpm} BPM
+            </div>
+            <div style={{ marginTop: 8, color: "#d4d4d8", fontSize: 14 }}>
+              Ghost: {liveState.ghostMode ? "On" : "Off"} • Trusted only:{" "}
+              {liveState.trustedOnly ? "On" : "Off"}
+            </div>
+          </section>
+        )}
+
         <section style={limitCard}>
           <div>
             <div style={sectionLabel}>FREE TIER</div>
-            <div
-              style={{
-                marginTop: 8,
-                fontSize: 24,
-                fontWeight: 900,
-              }}
-            >
+            <div style={{ marginTop: 8, fontSize: 24, fontWeight: 900 }}>
               {remaining} prompts left today
-            </div>
-            <div
-              style={{
-                marginTop: 8,
-                color: "#d4d4d8",
-                fontSize: 14,
-                lineHeight: 1.5,
-              }}
-            >
-              Upgrade to TwinCore Premium for unlimited TwinMe conversations.
-            </div>
-          </div>
-
-          <div
-            style={{
-              minWidth: 140,
-            }}
-          >
-            <div
-              style={{
-                borderRadius: 18,
-                padding: "14px 16px",
-                background: "rgba(168,85,247,0.16)",
-                border: "1px solid rgba(216,180,254,0.3)",
-                textAlign: "center",
-                fontWeight: 900,
-                fontSize: 16,
-              }}
-            >
-              Premium $23.99
             </div>
           </div>
         </section>
 
-        {/* Prompt chips */}
         <section style={{ ...card, marginTop: 16 }}>
           <div style={sectionLabel}>QUICK STARTERS</div>
-
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: 10,
-              marginTop: 14,
-            }}
-          >
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 14 }}>
             {STARTER_PROMPTS.map((prompt) => (
               <button
                 key={prompt}
@@ -263,23 +270,10 @@ export default function TwinMePage() {
           </div>
         </section>
 
-        {/* Chat area */}
-        <section
-          style={{
-            ...card,
-            marginTop: 16,
-            paddingBottom: 20,
-          }}
-        >
+        <section style={{ ...card, marginTop: 16, paddingBottom: 20 }}>
           <div style={sectionLabel}>CONVERSATION</div>
 
-          <div
-            style={{
-              marginTop: 16,
-              display: "grid",
-              gap: 12,
-            }}
-          >
+          <div style={{ marginTop: 16, display: "grid", gap: 12 }}>
             {messages.map((message) => {
               const isUser = message.role === "user";
 
@@ -302,13 +296,8 @@ export default function TwinMePage() {
                       background: isUser
                         ? "linear-gradient(90deg, #a855f7, #3b82f6)"
                         : "rgba(17,24,39,0.95)",
-                      border: isUser
-                        ? "none"
-                        : "1px solid rgba(63,63,70,0.8)",
+                      border: isUser ? "none" : "1px solid rgba(63,63,70,0.8)",
                       color: "white",
-                      boxShadow: isUser
-                        ? "0 0 20px rgba(168,85,247,0.22)"
-                        : "none",
                     }}
                   >
                     {!isUser && (
@@ -325,54 +314,15 @@ export default function TwinMePage() {
                         TwinMe
                       </div>
                     )}
-
                     {message.text}
                   </div>
                 </div>
               );
             })}
           </div>
-
-          {promptCount >= freeLimit && (
-            <div
-              style={{
-                marginTop: 16,
-                borderRadius: 18,
-                padding: "16px 18px",
-                background: "rgba(88,28,135,0.22)",
-                border: "1px solid rgba(216,180,254,0.28)",
-              }}
-            >
-              <div
-                style={{
-                  fontWeight: 900,
-                  fontSize: 18,
-                }}
-              >
-                You’ve reached today’s TwinMe limit.
-              </div>
-              <div
-                style={{
-                  marginTop: 8,
-                  color: "#e4e4e7",
-                  lineHeight: 1.5,
-                  fontSize: 14,
-                }}
-              >
-                Upgrade to TwinCore Premium for unlimited guidance and deeper
-                conversations.
-              </div>
-            </div>
-          )}
         </section>
 
-        {/* Input area */}
-        <section
-          style={{
-            ...card,
-            marginTop: 16,
-          }}
-        >
+        <section style={{ ...card, marginTop: 16 }}>
           <div style={sectionLabel}>ASK TWINME ANYTHING</div>
 
           <div
@@ -386,7 +336,7 @@ export default function TwinMePage() {
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="What should I do tonight? Help me think this through. What fits my mood today?"
+              placeholder="What should I do tonight?"
               rows={4}
               style={{
                 width: "100%",
@@ -422,10 +372,6 @@ export default function TwinMePage() {
                     ? "not-allowed"
                     : "pointer",
                 minWidth: 120,
-                boxShadow:
-                  !input.trim() || promptCount >= freeLimit
-                    ? "none"
-                    : "0 0 20px rgba(168,85,247,0.28)",
               }}
             >
               Send
@@ -434,7 +380,6 @@ export default function TwinMePage() {
         </section>
       </div>
 
-      {/* Bottom nav */}
       <nav
         style={{
           position: "fixed",
@@ -480,6 +425,14 @@ const card: React.CSSProperties = {
   padding: 18,
 };
 
+const liveCard: React.CSSProperties = {
+  border: "1px solid rgba(168,85,247,0.3)",
+  background: "linear-gradient(135deg, rgba(88,28,135,0.28), rgba(17,24,39,0.86))",
+  borderRadius: 24,
+  padding: 18,
+  marginTop: 16,
+};
+
 const limitCard: React.CSSProperties = {
   border: "1px solid rgba(168,85,247,0.3)",
   background: "linear-gradient(135deg, rgba(88,28,135,0.28), rgba(17,24,39,0.86))",
@@ -491,6 +444,7 @@ const limitCard: React.CSSProperties = {
   alignItems: "center",
   flexWrap: "wrap",
   boxShadow: "0 0 26px rgba(168,85,247,0.14)",
+  marginTop: 16,
 };
 
 const sectionLabel: React.CSSProperties = {
