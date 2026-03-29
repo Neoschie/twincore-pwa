@@ -14,6 +14,9 @@ import {
   AlertTriangle,
   Snowflake,
   Music4,
+  Sparkles,
+  EyeOff,
+  Lock,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -43,6 +46,12 @@ const featureCards = [
     tone: "warm",
   },
   {
+    title: "Spots",
+    description: "Safe places, hotspots, and live map signals",
+    href: "/spots",
+    tone: "ice",
+  },
+  {
     title: "TwinMe",
     description: "Real-time awareness and guidance",
     href: "/twinme",
@@ -66,6 +75,10 @@ function getToneClass(tone: string) {
 
   if (tone === "warm") {
     return "border border-orange-500/20 bg-[linear-gradient(180deg,#22160f,#120d09)] shadow-[0_18px_45px_rgba(249,115,22,0.14)]";
+  }
+
+  if (tone === "ice") {
+    return "border border-cyan-400/20 bg-[linear-gradient(180deg,#10202a,#091218)] shadow-[0_18px_45px_rgba(34,211,238,0.14)]";
   }
 
   return "border border-white/10 bg-[linear-gradient(180deg,#111113,#0c0c0f)] shadow-[0_16px_40px_rgba(0,0,0,0.34)]";
@@ -120,6 +133,12 @@ function minutesSince(input?: string | null) {
   return Math.floor((Date.now() - then) / 60000);
 }
 
+function parseStoredBoolean(raw: string | null) {
+  if (!raw) return false;
+  const value = raw.trim().toLowerCase();
+  return value === "true" || value === "1" || value === "yes" || value === "on";
+}
+
 /* =========================
    MAIN
 ========================= */
@@ -129,15 +148,25 @@ export default function HomePage() {
   const [location, setLocation] = useState(false);
   const [crewRows, setCrewRows] = useState<CrewRow[]>([]);
   const [pulse, setPulse] = useState(false);
+  const [ghostMode, setGhostMode] = useState(false);
+  const [trustedOnly, setTrustedOnly] = useState(false);
 
   useEffect(() => {
     const n = localStorage.getItem("twincore_display_name");
     const s = localStorage.getItem("twincore_party_status");
     const l = localStorage.getItem("twincore_last_shared_location");
+    const g =
+      localStorage.getItem("twincore_ghost_mode") ||
+      localStorage.getItem("ghost_mode");
+    const t =
+      localStorage.getItem("twincore_trusted_only") ||
+      localStorage.getItem("trusted_crew_only");
 
     if (n) setName(n);
     if (s) setStatus(s);
     if (l) setLocation(true);
+    setGhostMode(parseStoredBoolean(g));
+    setTrustedOnly(parseStoredBoolean(t));
 
     async function loadCrew() {
       const { data } = await supabase
@@ -292,8 +321,27 @@ export default function HomePage() {
     return "TwinMe: the system is ready. Activate Party Mode when your night begins moving.";
   }, [predictiveSignals, systemState]);
 
+  const spotsStatusText = useMemo(() => {
+    if (ghostMode && trustedOnly) {
+      return "Ghost on • Trusted only";
+    }
+    if (ghostMode) {
+      return "Ghost protected";
+    }
+    if (trustedOnly) {
+      return "Trusted layer active";
+    }
+    if (crewStats.alerts > 0) {
+      return "Risk-aware";
+    }
+    if (systemState === "active") {
+      return "Live map active";
+    }
+    return "Ready";
+  }, [ghostMode, trustedOnly, crewStats.alerts, systemState]);
+
   return (
-    <main className="min-h-screen bg-[#0A0A0B] text-white overflow-hidden">
+    <main className="min-h-screen overflow-hidden bg-[#0A0A0B] text-white">
       <div className={`fixed inset-0 pointer-events-none ${ambient}`} />
       <div
         className={`pointer-events-none fixed left-1/2 top-24 h-[22rem] w-[22rem] -translate-x-1/2 rounded-full blur-3xl transition-all duration-700 ${
@@ -308,13 +356,13 @@ export default function HomePage() {
       <div className="relative mx-auto max-w-md px-4 py-8">
         <header className="mb-8">
           <div className="text-xs tracking-[0.3em] text-white/50">TWINCORE</div>
-          <h1 className="text-4xl font-semibold mt-2">Dashboard</h1>
+          <h1 className="mt-2 text-4xl font-semibold">Dashboard</h1>
           <p className="mt-2 text-white/60">Your live social awareness system</p>
         </header>
 
         <section className="mb-8">
-          <div className="rounded-3xl p-6 bg-[linear-gradient(180deg,#14141a,#0c0c10)] border border-white/10 shadow-[0_20px_55px_rgba(0,0,0,0.34)]">
-            <div className="flex items-center gap-2 text-sm text-white/50 mb-2">
+          <div className="rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#14141a,#0c0c10)] p-6 shadow-[0_20px_55px_rgba(0,0,0,0.34)]">
+            <div className="mb-2 flex items-center gap-2 text-sm text-white/50">
               <Activity className="h-4 w-4" />
               LIVE SYSTEM
             </div>
@@ -422,8 +470,52 @@ export default function HomePage() {
         </section>
 
         <section className="mb-8">
-          <div className="rounded-3xl p-5 border border-blue-500/20 bg-[linear-gradient(180deg,#1a1f2e,#0c0f1a)] shadow-[0_18px_45px_rgba(59,130,246,0.14)]">
-            <div className="flex items-center gap-2 text-sm text-blue-100 mb-3">
+          <Link
+            href="/spots"
+            className="block rounded-3xl border border-cyan-400/20 bg-[linear-gradient(180deg,#10202a,#091218)] p-5 shadow-[0_18px_45px_rgba(34,211,238,0.14)] transition hover:scale-[1.01] active:scale-[0.99]"
+          >
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div>
+                <div className="inline-flex items-center gap-2 text-sm font-medium text-cyan-100">
+                  <Sparkles className="h-4 w-4" />
+                  SPOTS
+                </div>
+                <h3 className="mt-2 text-2xl font-semibold text-white">
+                  Live map awareness
+                </h3>
+              </div>
+
+              <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
+                {spotsStatusText}
+              </span>
+            </div>
+
+            <p className="text-sm leading-6 text-white/75">
+              Safe places, hotspots, crew-linked areas, and movement-aware map signals in one layer.
+            </p>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
+                <MapPin className="h-3.5 w-3.5" />
+                Live spots
+              </span>
+
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
+                <EyeOff className="h-3.5 w-3.5" />
+                {ghostMode ? "Ghost protected" : "Ghost available"}
+              </span>
+
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
+                <Lock className="h-3.5 w-3.5" />
+                {trustedOnly ? "Trusted only on" : "Trusted layer ready"}
+              </span>
+            </div>
+          </Link>
+        </section>
+
+        <section className="mb-8">
+          <div className="rounded-3xl border border-blue-500/20 bg-[linear-gradient(180deg,#1a1f2e,#0c0f1a)] p-5 shadow-[0_18px_45px_rgba(59,130,246,0.14)]">
+            <div className="mb-3 flex items-center gap-2 text-sm text-blue-100">
               <Brain className="h-4 w-4" />
               TWINME SNAPSHOT
             </div>
@@ -508,8 +600,8 @@ export default function HomePage() {
         </section>
 
         <section>
-          <div className="rounded-3xl p-6 bg-[linear-gradient(180deg,#111113,#0c0c0f)] border border-white/10 shadow-[0_16px_40px_rgba(0,0,0,0.34)]">
-            <div className="flex items-center gap-2 text-sm text-white/50 mb-2">
+          <div className="rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-6 shadow-[0_16px_40px_rgba(0,0,0,0.34)]">
+            <div className="mb-2 flex items-center gap-2 text-sm text-white/50">
               <Shield className="h-4 w-4" />
               SAFETY STATE
             </div>
