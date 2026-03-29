@@ -39,7 +39,6 @@ const PARTY_STATUSES = [
 type PartyStatus = (typeof PARTY_STATUSES)[number];
 
 type VisualMode = {
-  mode: "fire" | "ice" | "sound" | "balanced";
   title: string;
   subtitle: string;
   heroGlow: string;
@@ -81,7 +80,6 @@ function getStatusVisual(status: PartyStatus | null): VisualMode {
     case "Drinking":
     case "At club":
       return {
-        mode: "fire",
         title: "Fire Mode",
         subtitle: "Energy is up. Keep your choices slower than the room.",
         heroGlow:
@@ -104,7 +102,6 @@ function getStatusVisual(status: PartyStatus | null): VisualMode {
     case "Safe":
     case "Watching Netflix":
       return {
-        mode: "ice",
         title: "Ice Mode",
         subtitle: "You’re cooling down. Keep it simple, clean, and safe.",
         heroGlow:
@@ -125,7 +122,6 @@ function getStatusVisual(status: PartyStatus | null): VisualMode {
 
     case "Listening to music":
       return {
-        mode: "sound",
         title: "Sound Mode",
         subtitle: "Stay in rhythm, but keep awareness higher than the vibe.",
         heroGlow:
@@ -146,7 +142,6 @@ function getStatusVisual(status: PartyStatus | null): VisualMode {
 
     default:
       return {
-        mode: "balanced",
         title: "Balanced Mode",
         subtitle: "Party Mode is on. Keep your signals current and your exits easy.",
         heroGlow:
@@ -283,10 +278,7 @@ function getCrewStatusId() {
 }
 
 function normalizeErrorMessage(error: unknown) {
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-
+  if (error instanceof Error && error.message) return error.message;
   if (
     typeof error === "object" &&
     error !== null &&
@@ -295,11 +287,7 @@ function normalizeErrorMessage(error: unknown) {
   ) {
     return (error as { message: string }).message;
   }
-
-  if (typeof error === "string" && error.trim()) {
-    return error;
-  }
-
+  if (typeof error === "string" && error.trim()) return error;
   return "Live sync failed. Check location access and Supabase permissions.";
 }
 
@@ -364,11 +352,10 @@ async function getCurrentCoordinates(): Promise<Coordinates> {
 
 export default function PartyPage() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const firstSyncSkippedRef = useRef(false);
   const trackingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [displayName, setDisplayName] = useState("Neo");
-  const [selectedStatus, setSelectedStatus] = useState<PartyStatus | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<PartyStatus>("Listening to music");
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioReady, setAudioReady] = useState(true);
   const [pulse, setPulse] = useState(false);
@@ -389,15 +376,9 @@ export default function PartyPage() {
     const savedPartyActive =
       window.localStorage.getItem("twincore_party_active") === "true";
 
-    if (savedName) {
-      setDisplayName(savedName);
-    }
-
+    if (savedName) setDisplayName(savedName);
     if (savedStatus && PARTY_STATUSES.includes(savedStatus as PartyStatus)) {
       setSelectedStatus(savedStatus as PartyStatus);
-    } else {
-      setSelectedStatus("Listening to music");
-      window.localStorage.setItem("twincore_party_status", "Listening to music");
     }
 
     if (savedLocation) {
@@ -406,7 +387,6 @@ export default function PartyPage() {
           latitude?: number;
           longitude?: number;
         };
-
         if (
           typeof parsed.latitude === "number" &&
           typeof parsed.longitude === "number"
@@ -416,19 +396,11 @@ export default function PartyPage() {
             longitude: parsed.longitude,
           });
         }
-      } catch {
-        // ignore bad cache
-      }
+      } catch {}
     }
 
-    if (savedAutoTracking) {
-      setAutoTracking(true);
-    }
-
-    if (savedPartyActive) {
-      setPartyActive(true);
-    }
-
+    setAutoTracking(savedAutoTracking);
+    setPartyActive(savedPartyActive);
     setPrivacy(getPrivacySettings());
 
     const onStorage = () => {
@@ -442,9 +414,10 @@ export default function PartyPage() {
         setSelectedStatus(nextStatus as PartyStatus);
       }
 
-      const nextPartyActive =
-        window.localStorage.getItem("twincore_party_active") === "true";
-      setPartyActive(nextPartyActive);
+      setPartyActive(window.localStorage.getItem("twincore_party_active") === "true");
+      setAutoTracking(
+        window.localStorage.getItem("twincore_party_auto_tracking") === "true"
+      );
     };
 
     window.addEventListener("storage", onStorage);
@@ -452,7 +425,6 @@ export default function PartyPage() {
   }, []);
 
   useEffect(() => {
-    if (!selectedStatus) return;
     window.localStorage.setItem("twincore_party_status", selectedStatus);
   }, [selectedStatus]);
 
@@ -480,19 +452,15 @@ export default function PartyPage() {
       setPulse((prev) => !prev);
     }, 900);
 
-    return () => {
-      window.clearInterval(interval);
-    };
+    return () => window.clearInterval(interval);
   }, [isPlaying]);
 
   function writePartyLiveState(
     status: PartyStatus,
     coords: Coordinates | null,
     source: "status" | "checkin" | "tracking" | "toggle" | "bootstrap",
-    activeOverride?: boolean
+    active: boolean
   ) {
-    const active = activeOverride ?? partyActive;
-
     const liveState = {
       active,
       status,
@@ -515,13 +483,15 @@ export default function PartyPage() {
     window.localStorage.setItem("twincore_party_active", active ? "true" : "false");
   }
 
+  useEffect(() => {
+    writePartyLiveState(selectedStatus, lastCoords, "bootstrap", partyActive);
+  }, [selectedStatus, lastCoords, partyActive, autoTracking, privacy]);
+
   async function syncCrewStatus(
     status: PartyStatus,
     trigger: "status" | "checkin" | "tracking" | "toggle",
-    activeOverride?: boolean
+    active: boolean
   ) {
-    const active = activeOverride ?? partyActive;
-
     try {
       setSyncState("syncing");
       setSyncMessage(
@@ -577,12 +547,6 @@ export default function PartyPage() {
           ? null
           : exactMapsUrl;
 
-      const payloadVibe = privacy.ghostMode
-        ? privacy.ghostLabel || "Low Visibility"
-        : getVibeLabelForStatus(status);
-
-      const payloadMood = privacy.ghostMode ? "ghost" : getMoodForStatus(status);
-
       const payload = {
         id: rowId,
         name: displayName,
@@ -592,31 +556,35 @@ export default function PartyPage() {
         location_name: payloadLocationName,
         location: payloadLocation,
         heartbeat_bpm: active ? getHeartbeatForStatus(status) : 68,
-        vibe_label: active ? payloadVibe : "Party off",
-        mood: active ? payloadMood : "safe",
+        vibe_label: active
+          ? privacy.ghostMode
+            ? privacy.ghostLabel || "Low Visibility"
+            : getVibeLabelForStatus(status)
+          : "Party off",
+        mood: active
+          ? privacy.ghostMode
+            ? "ghost"
+            : getMoodForStatus(status)
+          : "safe",
       };
 
       const { error } = await supabase
         .from("crew_status")
         .upsert(payload, { onConflict: "id" });
 
-      if (error) {
-        throw new Error(error.message || "Supabase write failed.");
-      }
-
-      const checkInPayload = {
-        active,
-        status,
-        timestamp: new Date().toISOString(),
-        source: trigger === "tracking" ? "party-auto-tracking" : "party-mode",
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-        mapsUrl: exactMapsUrl,
-      };
+      if (error) throw new Error(error.message || "Supabase write failed.");
 
       window.localStorage.setItem(
         "twincore_party_checkin",
-        JSON.stringify(checkInPayload)
+        JSON.stringify({
+          active,
+          status,
+          timestamp: new Date().toISOString(),
+          source: trigger === "tracking" ? "party-auto-tracking" : "party-mode",
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          mapsUrl: exactMapsUrl,
+        })
       );
 
       setSyncState("synced");
@@ -644,18 +612,16 @@ export default function PartyPage() {
 
   function stopAutoTracking() {
     setAutoTracking(false);
-
     if (trackingRef.current) {
       clearInterval(trackingRef.current);
       trackingRef.current = null;
     }
-
     setSyncState("idle");
     setSyncMessage("Auto tracking stopped");
   }
 
   function startAutoTracking() {
-    if (!selectedStatus || !partyActive) return;
+    if (!partyActive) return;
 
     if (trackingRef.current) {
       clearInterval(trackingRef.current);
@@ -665,64 +631,21 @@ export default function PartyPage() {
     setAutoTracking(true);
     setSyncState("syncing");
     setSyncMessage("Starting auto tracking...");
-
     void syncCrewStatus(selectedStatus, "tracking", true);
 
     trackingRef.current = setInterval(() => {
-      if (!selectedStatus) return;
       void syncCrewStatus(selectedStatus, "tracking", true);
     }, 12000);
   }
 
   useEffect(() => {
-    if (!selectedStatus) return;
-
-    writePartyLiveState(
-      selectedStatus,
-      lastCoords,
-      firstSyncSkippedRef.current ? "status" : "bootstrap",
-      partyActive
-    );
-
-    if (!firstSyncSkippedRef.current) {
-      firstSyncSkippedRef.current = true;
-      return;
-    }
-
-    if (!partyActive) {
-      return;
-    }
-
+    if (!partyActive) return;
     void syncCrewStatus(selectedStatus, "status", true);
   }, [selectedStatus]);
 
   useEffect(() => {
-    if (!selectedStatus) return;
-
-    writePartyLiveState(selectedStatus, lastCoords, "toggle", partyActive);
-
-    if (!partyActive) {
-      stopAutoTracking();
-      return;
-    }
-
-    void syncCrewStatus(selectedStatus, "toggle", true);
-  }, [partyActive]);
-
-  useEffect(() => {
-    if (!selectedStatus) return;
-
-    writePartyLiveState(selectedStatus, lastCoords, "bootstrap", partyActive);
-  }, [privacy, autoTracking, lastCoords, selectedStatus, partyActive]);
-
-  useEffect(() => {
-    if (!selectedStatus) return;
-
     if (autoTracking && partyActive) {
-      if (trackingRef.current) {
-        clearInterval(trackingRef.current);
-        trackingRef.current = null;
-      }
+      if (trackingRef.current) clearInterval(trackingRef.current);
 
       trackingRef.current = setInterval(() => {
         void syncCrewStatus(selectedStatus, "tracking", true);
@@ -738,16 +661,7 @@ export default function PartyPage() {
         trackingRef.current = null;
       }
     };
-  }, [autoTracking, selectedStatus, privacy, partyActive]);
-
-  useEffect(() => {
-    return () => {
-      if (trackingRef.current) {
-        clearInterval(trackingRef.current);
-        trackingRef.current = null;
-      }
-    };
-  }, []);
+  }, [autoTracking, partyActive, selectedStatus, privacy]);
 
   const visual = useMemo(() => getStatusVisual(selectedStatus), [selectedStatus]);
 
@@ -771,21 +685,16 @@ export default function PartyPage() {
     }
   }
 
-  function handleStatusClick(status: PartyStatus) {
-    setSelectedStatus(status);
-  }
-
   async function handleSendCheckIn() {
-    const currentStatus = selectedStatus ?? "Listening to music";
     setCheckInSent(true);
 
     if (!partyActive) {
       setPartyActive(true);
-      writePartyLiveState(currentStatus, lastCoords, "checkin", true);
-      await syncCrewStatus(currentStatus, "checkin", true);
+      writePartyLiveState(selectedStatus, lastCoords, "checkin", true);
+      await syncCrewStatus(selectedStatus, "checkin", true);
     } else {
-      writePartyLiveState(currentStatus, lastCoords, "checkin", true);
-      await syncCrewStatus(currentStatus, "checkin", true);
+      writePartyLiveState(selectedStatus, lastCoords, "checkin", true);
+      await syncCrewStatus(selectedStatus, "checkin", true);
     }
 
     window.setTimeout(() => {
@@ -794,11 +703,16 @@ export default function PartyPage() {
   }
 
   function handleTogglePartyMode() {
-    if (!selectedStatus) return;
-
     const nextActive = !partyActive;
     setPartyActive(nextActive);
     writePartyLiveState(selectedStatus, lastCoords, "toggle", nextActive);
+
+    if (!nextActive) {
+      stopAutoTracking();
+      void syncCrewStatus(selectedStatus, "toggle", false);
+    } else {
+      void syncCrewStatus(selectedStatus, "toggle", true);
+    }
   }
 
   const liveSystemLabel = useMemo(() => {
@@ -807,23 +721,19 @@ export default function PartyPage() {
     return "Party Mode live";
   }, [partyActive, autoTracking]);
 
-  const spotsBridgeText = useMemo(() => {
+  const bridgeText = useMemo(() => {
     if (!partyActive) {
       return "Spots and TwinMe are on standby until Party Mode goes live.";
     }
-
     if (privacy.ghostMode && privacy.trustedOnly) {
       return "Spots and TwinMe receive live status, but your layer is protected and restricted to trusted visibility.";
     }
-
     if (privacy.ghostMode) {
       return "Spots and TwinMe receive live status with softened location detail.";
     }
-
     if (privacy.trustedOnly) {
       return "Spots and TwinMe receive live status inside a trusted-only layer.";
     }
-
     return "Spots and TwinMe receive your live status, mood, heartbeat, and movement as you update.";
   }, [partyActive, privacy.ghostMode, privacy.trustedOnly]);
 
@@ -845,13 +755,11 @@ export default function PartyPage() {
 
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.12),transparent_34%),radial-gradient(circle_at_bottom,rgba(249,115,22,0.10),transparent_34%)]" />
-
         <div
           className={`absolute left-1/2 top-20 h-[24rem] w-[24rem] -translate-x-1/2 rounded-full blur-3xl ${visual.heroGlow} ${visual.ring} transition-all duration-500 ${
             pulse ? "scale-110 opacity-100" : "scale-100 opacity-85"
           }`}
         />
-
         <div
           className={`absolute bottom-24 right-[-10%] h-64 w-64 rounded-full blur-3xl ${visual.orbGlow} ${
             pulse ? "animate-pulse" : ""
@@ -862,7 +770,6 @@ export default function PartyPage() {
             pulse ? "animate-pulse" : ""
           }`}
         />
-
         <div className="absolute inset-0 opacity-[0.08] [background-image:linear-gradient(rgba(255,255,255,0.5)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.5)_1px,transparent_1px)] [background-size:26px_26px]" />
       </div>
 
@@ -892,21 +799,15 @@ export default function PartyPage() {
           className={`relative mb-6 overflow-hidden rounded-3xl p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)] ${visual.card}`}
         >
           <div className="absolute right-0 top-0 h-28 w-28 rounded-full bg-white/5 blur-3xl" />
-
           <div className="relative">
             <div className="mb-2 text-4xl leading-none">{getModeIcon(selectedStatus)}</div>
-
             <div className="mb-3 text-4xl font-semibold tracking-tight text-white">
               Tonight
             </div>
-
             <div className="text-2xl font-semibold text-white">{displayName}</div>
-
             <div className="mt-3 text-lg text-white/80">
               Current status:{" "}
-              <span className="font-medium text-white">
-                {selectedStatus || "Not set"}
-              </span>
+              <span className="font-medium text-white">{selectedStatus}</span>
             </div>
 
             <div className="mt-4 flex flex-wrap gap-2">
@@ -979,11 +880,8 @@ export default function PartyPage() {
             <button
               type="button"
               onClick={() => {
-                if (autoTracking) {
-                  stopAutoTracking();
-                } else {
-                  startAutoTracking();
-                }
+                if (autoTracking) stopAutoTracking();
+                else startAutoTracking();
               }}
               disabled={!partyActive}
               className={`rounded-2xl px-4 py-5 text-center text-lg font-semibold transition duration-200 active:scale-[0.97] ${
@@ -1001,7 +899,7 @@ export default function PartyPage() {
               <MapPin className="h-4 w-4" />
               Spots + TwinMe bridge
             </div>
-            <p className="text-sm leading-6 text-white/70">{spotsBridgeText}</p>
+            <p className="text-sm leading-6 text-white/70">{bridgeText}</p>
           </div>
         </section>
 
@@ -1082,7 +980,7 @@ export default function PartyPage() {
                 <button
                   key={status}
                   type="button"
-                  onClick={() => handleStatusClick(status)}
+                  onClick={() => setSelectedStatus(status)}
                   className={`rounded-2xl px-4 py-5 text-center text-lg font-semibold transition duration-200 active:scale-[0.97] ${
                     active
                       ? "border border-white/80 bg-[linear-gradient(180deg,#24242b,#17171d)] text-white shadow-[0_12px_28px_rgba(255,255,255,0.06)]"
