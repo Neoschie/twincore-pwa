@@ -10,22 +10,22 @@ import {
   Play,
   Send,
   IdCard,
-  Sparkles,
-  ShieldAlert,
-  Waves,
   Users,
   LocateFixed,
   CheckCircle2,
   AlertTriangle,
   Loader2,
   Radar,
-  Square,
   Ghost,
   EyeOff,
+  MapPin,
+  Sparkles,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 const STORAGE_KEY = "twincore_profile";
+const PARTY_AUDIO_SRC = "/party-mode.mp3";
+
 const PARTY_STATUSES = [
   "Outside",
   "Drinking",
@@ -37,8 +37,6 @@ const PARTY_STATUSES = [
 ] as const;
 
 type PartyStatus = (typeof PARTY_STATUSES)[number];
-
-const PARTY_AUDIO_SRC = "/party-mode.mp3";
 
 type VisualMode = {
   mode: "fire" | "ice" | "sound" | "balanced";
@@ -380,6 +378,7 @@ export default function PartyPage() {
   const [lastCoords, setLastCoords] = useState<Coordinates | null>(null);
   const [autoTracking, setAutoTracking] = useState(false);
   const [privacy, setPrivacy] = useState<PrivacySettings>(defaultPrivacy);
+  const [partyActive, setPartyActive] = useState(false);
 
   useEffect(() => {
     const savedName = window.localStorage.getItem("twincore_display_name");
@@ -387,6 +386,8 @@ export default function PartyPage() {
     const savedLocation = window.localStorage.getItem("twincore_last_shared_location");
     const savedAutoTracking =
       window.localStorage.getItem("twincore_party_auto_tracking") === "true";
+    const savedPartyActive =
+      window.localStorage.getItem("twincore_party_active") === "true";
 
     if (savedName) {
       setDisplayName(savedName);
@@ -416,7 +417,7 @@ export default function PartyPage() {
           });
         }
       } catch {
-        // ignore bad local cache
+        // ignore bad cache
       }
     }
 
@@ -424,12 +425,26 @@ export default function PartyPage() {
       setAutoTracking(true);
     }
 
+    if (savedPartyActive) {
+      setPartyActive(true);
+    }
+
     setPrivacy(getPrivacySettings());
 
     const onStorage = () => {
       setPrivacy(getPrivacySettings());
+
       const nextName = window.localStorage.getItem("twincore_display_name");
       if (nextName) setDisplayName(nextName);
+
+      const nextStatus = window.localStorage.getItem("twincore_party_status");
+      if (nextStatus && PARTY_STATUSES.includes(nextStatus as PartyStatus)) {
+        setSelectedStatus(nextStatus as PartyStatus);
+      }
+
+      const nextPartyActive =
+        window.localStorage.getItem("twincore_party_active") === "true";
+      setPartyActive(nextPartyActive);
     };
 
     window.addEventListener("storage", onStorage);
@@ -449,6 +464,13 @@ export default function PartyPage() {
   }, [autoTracking]);
 
   useEffect(() => {
+    window.localStorage.setItem(
+      "twincore_party_active",
+      partyActive ? "true" : "false"
+    );
+  }, [partyActive]);
+
+  useEffect(() => {
     if (!isPlaying) {
       setPulse(false);
       return;
@@ -463,10 +485,43 @@ export default function PartyPage() {
     };
   }, [isPlaying]);
 
+  function writePartyLiveState(
+    status: PartyStatus,
+    coords: Coordinates | null,
+    source: "status" | "checkin" | "tracking" | "toggle" | "bootstrap",
+    activeOverride?: boolean
+  ) {
+    const active = activeOverride ?? partyActive;
+
+    const liveState = {
+      active,
+      status,
+      source,
+      timestamp: new Date().toISOString(),
+      autoTracking,
+      ghostMode: privacy.ghostMode,
+      trustedOnly: privacy.trustedOnly,
+      vibeLabel: privacy.ghostMode
+        ? privacy.ghostLabel || "Low Visibility"
+        : getVibeLabelForStatus(status),
+      mood: privacy.ghostMode ? "ghost" : getMoodForStatus(status),
+      heartbeatBpm: getHeartbeatForStatus(status),
+      latitude: coords?.latitude ?? null,
+      longitude: coords?.longitude ?? null,
+    };
+
+    window.localStorage.setItem("twincore_party_live", JSON.stringify(liveState));
+    window.localStorage.setItem("twincore_party_status", status);
+    window.localStorage.setItem("twincore_party_active", active ? "true" : "false");
+  }
+
   async function syncCrewStatus(
     status: PartyStatus,
-    trigger: "status" | "checkin" | "tracking"
+    trigger: "status" | "checkin" | "tracking" | "toggle",
+    activeOverride?: boolean
   ) {
+    const active = activeOverride ?? partyActive;
+
     try {
       setSyncState("syncing");
       setSyncMessage(
@@ -474,6 +529,10 @@ export default function PartyPage() {
           ? "Sending live check-in..."
           : trigger === "tracking"
           ? "Tracking live movement..."
+          : trigger === "toggle"
+          ? active
+            ? "Turning Party Mode on..."
+            : "Turning Party Mode off..."
           : "Syncing live status..."
       );
 
@@ -492,6 +551,8 @@ export default function PartyPage() {
           mapsUrl: exactMapsUrl,
         })
       );
+
+      writePartyLiveState(status, coords, trigger, active);
 
       const rowId = getCrewStatusId();
 
@@ -525,14 +586,14 @@ export default function PartyPage() {
       const payload = {
         id: rowId,
         name: displayName,
-        status,
+        status: active ? status : "Safe",
         latitude: payloadLatitude,
         longitude: payloadLongitude,
         location_name: payloadLocationName,
         location: payloadLocation,
-        heartbeat_bpm: getHeartbeatForStatus(status),
-        vibe_label: payloadVibe,
-        mood: payloadMood,
+        heartbeat_bpm: active ? getHeartbeatForStatus(status) : 68,
+        vibe_label: active ? payloadVibe : "Party off",
+        mood: active ? payloadMood : "safe",
       };
 
       const { error } = await supabase
@@ -544,6 +605,7 @@ export default function PartyPage() {
       }
 
       const checkInPayload = {
+        active,
         status,
         timestamp: new Date().toISOString(),
         source: trigger === "tracking" ? "party-auto-tracking" : "party-mode",
@@ -563,6 +625,10 @@ export default function PartyPage() {
           ? "Check-in sent live to crew"
           : trigger === "tracking"
           ? "Live tracking updated"
+          : trigger === "toggle"
+          ? active
+            ? "Party Mode is live"
+            : "Party Mode powered down"
           : "Party status synced live"
       );
 
@@ -589,7 +655,7 @@ export default function PartyPage() {
   }
 
   function startAutoTracking() {
-    if (!selectedStatus) return;
+    if (!selectedStatus || !partyActive) return;
 
     if (trackingRef.current) {
       clearInterval(trackingRef.current);
@@ -600,39 +666,69 @@ export default function PartyPage() {
     setSyncState("syncing");
     setSyncMessage("Starting auto tracking...");
 
-    void syncCrewStatus(selectedStatus, "tracking");
+    void syncCrewStatus(selectedStatus, "tracking", true);
 
     trackingRef.current = setInterval(() => {
       if (!selectedStatus) return;
-      void syncCrewStatus(selectedStatus, "tracking");
+      void syncCrewStatus(selectedStatus, "tracking", true);
     }, 12000);
   }
 
   useEffect(() => {
     if (!selectedStatus) return;
 
+    writePartyLiveState(
+      selectedStatus,
+      lastCoords,
+      firstSyncSkippedRef.current ? "status" : "bootstrap",
+      partyActive
+    );
+
     if (!firstSyncSkippedRef.current) {
       firstSyncSkippedRef.current = true;
       return;
     }
 
-    void syncCrewStatus(selectedStatus, "status");
+    if (!partyActive) {
+      return;
+    }
+
+    void syncCrewStatus(selectedStatus, "status", true);
   }, [selectedStatus]);
 
   useEffect(() => {
     if (!selectedStatus) return;
 
-    if (autoTracking) {
+    writePartyLiveState(selectedStatus, lastCoords, "toggle", partyActive);
+
+    if (!partyActive) {
+      stopAutoTracking();
+      return;
+    }
+
+    void syncCrewStatus(selectedStatus, "toggle", true);
+  }, [partyActive]);
+
+  useEffect(() => {
+    if (!selectedStatus) return;
+
+    writePartyLiveState(selectedStatus, lastCoords, "bootstrap", partyActive);
+  }, [privacy, autoTracking, lastCoords, selectedStatus, partyActive]);
+
+  useEffect(() => {
+    if (!selectedStatus) return;
+
+    if (autoTracking && partyActive) {
       if (trackingRef.current) {
         clearInterval(trackingRef.current);
         trackingRef.current = null;
       }
 
       trackingRef.current = setInterval(() => {
-        void syncCrewStatus(selectedStatus, "tracking");
+        void syncCrewStatus(selectedStatus, "tracking", true);
       }, 12000);
 
-      void syncCrewStatus(selectedStatus, "tracking");
+      void syncCrewStatus(selectedStatus, "tracking", true);
       setSyncMessage("Auto tracking active");
     }
 
@@ -642,7 +738,7 @@ export default function PartyPage() {
         trackingRef.current = null;
       }
     };
-  }, [autoTracking, selectedStatus, privacy]);
+  }, [autoTracking, selectedStatus, privacy, partyActive]);
 
   useEffect(() => {
     return () => {
@@ -682,12 +778,54 @@ export default function PartyPage() {
   async function handleSendCheckIn() {
     const currentStatus = selectedStatus ?? "Listening to music";
     setCheckInSent(true);
-    await syncCrewStatus(currentStatus, "checkin");
+
+    if (!partyActive) {
+      setPartyActive(true);
+      writePartyLiveState(currentStatus, lastCoords, "checkin", true);
+      await syncCrewStatus(currentStatus, "checkin", true);
+    } else {
+      writePartyLiveState(currentStatus, lastCoords, "checkin", true);
+      await syncCrewStatus(currentStatus, "checkin", true);
+    }
 
     window.setTimeout(() => {
       setCheckInSent(false);
     }, 2200);
   }
+
+  function handleTogglePartyMode() {
+    if (!selectedStatus) return;
+
+    const nextActive = !partyActive;
+    setPartyActive(nextActive);
+    writePartyLiveState(selectedStatus, lastCoords, "toggle", nextActive);
+  }
+
+  const liveSystemLabel = useMemo(() => {
+    if (!partyActive) return "Party Mode off";
+    if (autoTracking) return "Party Mode live + tracking";
+    return "Party Mode live";
+  }, [partyActive, autoTracking]);
+
+  const spotsBridgeText = useMemo(() => {
+    if (!partyActive) {
+      return "Spots and TwinMe are on standby until Party Mode goes live.";
+    }
+
+    if (privacy.ghostMode && privacy.trustedOnly) {
+      return "Spots and TwinMe receive live status, but your layer is protected and restricted to trusted visibility.";
+    }
+
+    if (privacy.ghostMode) {
+      return "Spots and TwinMe receive live status with softened location detail.";
+    }
+
+    if (privacy.trustedOnly) {
+      return "Spots and TwinMe receive live status inside a trusted-only layer.";
+    }
+
+    return "Spots and TwinMe receive your live status, mood, heartbeat, and movement as you update.";
+  }, [partyActive, privacy.ghostMode, privacy.trustedOnly]);
 
   return (
     <main className="min-h-screen overflow-hidden bg-[#0A0A0B] text-white">
@@ -778,6 +916,11 @@ export default function PartyPage() {
                 {visual.title}
               </span>
 
+              <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold tracking-wide text-white/85">
+                <Sparkles className="mr-1 h-3 w-3" />
+                {liveSystemLabel.toUpperCase()}
+              </span>
+
               {privacy.ghostMode ? (
                 <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold tracking-wide text-white/85">
                   <Ghost className="mr-1 h-3 w-3" />
@@ -813,9 +956,61 @@ export default function PartyPage() {
         <section className="mb-6 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
+              <h2 className="text-2xl font-semibold text-white">Party Engine</h2>
+              <p className="mt-1 text-sm text-white/60">
+                This is the switch that feeds your live awareness system.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={handleTogglePartyMode}
+              className={`rounded-2xl px-4 py-5 text-center text-lg font-semibold transition duration-200 active:scale-[0.97] ${
+                partyActive
+                  ? "border border-white/80 bg-[linear-gradient(180deg,#24242b,#17171d)] text-white shadow-[0_12px_28px_rgba(255,255,255,0.06)]"
+                  : "bg-[linear-gradient(180deg,#17171d,#121218)] text-white/92 shadow-[0_8px_24px_rgba(0,0,0,0.32)] hover:scale-[1.02]"
+              }`}
+            >
+              {partyActive ? "Party On" : "Party Off"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (autoTracking) {
+                  stopAutoTracking();
+                } else {
+                  startAutoTracking();
+                }
+              }}
+              disabled={!partyActive}
+              className={`rounded-2xl px-4 py-5 text-center text-lg font-semibold transition duration-200 active:scale-[0.97] ${
+                !partyActive
+                  ? "cursor-not-allowed bg-white/5 text-white/35"
+                  : "bg-[linear-gradient(180deg,#17171d,#121218)] text-white/92 shadow-[0_8px_24px_rgba(0,0,0,0.32)] hover:scale-[1.02]"
+              }`}
+            >
+              {autoTracking ? "Stop Tracking" : "Start Tracking"}
+            </button>
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+            <div className="mb-2 flex items-center gap-2 text-sm font-medium text-white/85">
+              <MapPin className="h-4 w-4" />
+              Spots + TwinMe bridge
+            </div>
+            <p className="text-sm leading-6 text-white/70">{spotsBridgeText}</p>
+          </div>
+        </section>
+
+        <section className="mb-6 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div>
               <h2 className="text-2xl font-semibold text-white">Live Crew Sync</h2>
               <p className="mt-1 text-sm text-white/60">
-                Privacy settings now affect what gets written to the live layer.
+                Privacy settings affect what gets written to the live layer.
               </p>
             </div>
           </div>
@@ -843,6 +1038,7 @@ export default function PartyPage() {
             </div>
 
             <div className="space-y-1 text-sm text-white/70">
+              <p>Party Mode: {partyActive ? "Live" : "Off"}</p>
               <p>
                 Last live point:{" "}
                 {lastCoords
@@ -913,29 +1109,13 @@ export default function PartyPage() {
               {checkInSent ? "Check-In Sent" : "Send Check-In"}
             </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                if (autoTracking) {
-                  stopAutoTracking();
-                } else {
-                  startAutoTracking();
-                }
-              }}
+            <Link
+              href="/spots"
               className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(180deg,#1A1A1F,#141419)] px-4 py-5 text-center text-lg font-semibold text-white shadow-[0_8px_24px_rgba(0,0,0,0.35)] transition duration-200 hover:scale-[1.02] active:scale-[0.97]"
             >
-              {autoTracking ? (
-                <>
-                  <Square className="h-5 w-5" />
-                  Stop Tracking
-                </>
-              ) : (
-                <>
-                  <Radar className="h-5 w-5" />
-                  Start Tracking
-                </>
-              )}
-            </button>
+              <LocateFixed className="h-5 w-5" />
+              Open Spots
+            </Link>
 
             <Link
               href="/contact-card"
@@ -945,6 +1125,15 @@ export default function PartyPage() {
               Share Contact Card
             </Link>
           </div>
+        </section>
+
+        <section className="mb-6 rounded-3xl border border-blue-500/20 bg-[linear-gradient(180deg,#1a1f2e,#0c0f1a)] p-5 shadow-[0_18px_45px_rgba(59,130,246,0.14)]">
+          <div className="mb-3 flex items-center gap-2 text-sm text-blue-100">
+            <Sparkles className="h-4 w-4" />
+            TWINME SNAPSHOT
+          </div>
+
+          <p className="text-sm leading-6 text-white/80">{visual.twinTip}</p>
         </section>
 
         <nav className="grid grid-cols-3 gap-3">
