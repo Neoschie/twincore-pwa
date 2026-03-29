@@ -141,7 +141,10 @@ function getLiveNudge(
     return "You’re drifting across positions. Pause and re-orient before your next move.";
   }
 
-  if (movementLevel === "moving" && (live.status === "Drinking" || live.status === "At club")) {
+  if (
+    movementLevel === "moving" &&
+    (live.status === "Drinking" || live.status === "At club")
+  ) {
     return "You’re moving while in a high-energy state. Slow the pace down and stay with your people.";
   }
 
@@ -185,7 +188,10 @@ function getAlert(
     return "⚠️ You are moving alone in an active state. Reduce movement and reassess.";
   }
 
-  if (movementLevel === "drifting" && (live.status === "Drinking" || live.status === "At club")) {
+  if (
+    movementLevel === "drifting" &&
+    (live.status === "Drinking" || live.status === "At club")
+  ) {
     return "⚠️ You are drifting in a high-energy state. Pause before your next move.";
   }
 
@@ -212,6 +218,8 @@ function buildReply(
   live: PartyLive | null,
   movementLevel: string
 ) {
+  const text = input.toLowerCase();
+
   if (movementLevel === "drifting") {
     return `You’ve been drifting across positions.
 
@@ -242,6 +250,16 @@ Control matters more than motion.`;
 Stay intentional.`;
   }
 
+  if (text.includes("tonight") || text.includes("go out")) {
+    return `You are deciding how to spend your energy tonight.
+
+• Choose based on how you want to feel after
+• Do not follow noise
+• Rest is a valid move
+
+What benefits you most tonight?`;
+  }
+
   return `Think about what benefits you most right now.
 
 • Choose alignment over noise
@@ -256,7 +274,11 @@ What feels right?`;
 
 export default function TwinMePage() {
   const [messages, setMessages] = useState<Message[]>([
-    { id: 1, role: "twin", text: "TwinMe is now crew-aware and movement-aware." },
+    {
+      id: 1,
+      role: "twin",
+      text: "TwinMe is now crew-aware and movement-aware.",
+    },
   ]);
 
   const [input, setInput] = useState("");
@@ -278,13 +300,17 @@ export default function TwinMePage() {
         l?.active &&
         typeof l.latitude === "number" &&
         typeof l.longitude === "number" &&
-        l.timestamp
+        typeof l.timestamp === "string"
       ) {
+        const safeLatitude = l.latitude;
+        const safeLongitude = l.longitude;
+        const safeTimestamp = l.timestamp;
+
         setPositionHistory((prev) => {
           const nextPoint: PositionPoint = {
-            latitude: l.latitude,
-            longitude: l.longitude,
-            timestamp: l.timestamp,
+            latitude: safeLatitude,
+            longitude: safeLongitude,
+            timestamp: safeTimestamp,
           };
 
           const last = prev[prev.length - 1];
