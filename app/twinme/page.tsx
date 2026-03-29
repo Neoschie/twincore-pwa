@@ -16,6 +16,9 @@ type PartyLive = {
   heartbeatBpm: number;
   ghostMode: boolean;
   trustedOnly: boolean;
+  vibeLabel?: string;
+  autoTracking?: boolean;
+  timestamp?: string;
 };
 
 const STARTER_PROMPTS = [
@@ -35,12 +38,41 @@ function getLiveContext(): PartyLive | null {
   }
 }
 
+function getLiveNudge(live: PartyLive | null) {
+  if (!live?.active) {
+    return "TwinMe is standing by. Turn Party Mode on when your night starts moving.";
+  }
+
+  if (live.status === "Drinking" || live.status === "At club") {
+    return "Energy is high right now. Stay close to trusted people and keep your next move slower than the room.";
+  }
+
+  if (live.status === "Heading home") {
+    return "You’re in exit mode. Keep the route clean and finish the night simply.";
+  }
+
+  if (live.status === "Safe") {
+    return "You’re stable. This is a good moment to check in, recover, and close the night properly.";
+  }
+
+  if (live.status === "Listening to music") {
+    return "The vibe is smooth, but stay more aware than the moment feels.";
+  }
+
+  if (live.status === "Watching Netflix") {
+    return "You’re in a low-pressure zone. Keep things easy and restorative.";
+  }
+
+  return "Your live state is active. Keep your movement intentional and your awareness current.";
+}
+
 function buildTwinReply(input: string, live: PartyLive | null) {
   const text = input.toLowerCase();
 
   if (live?.active) {
     if (live.status === "Drinking" || live.status === "At club") {
-      return `You are currently in a high-energy environment (${live.status}).
+      if (text.includes("tonight") || text.includes("go out")) {
+        return `You are currently in a high-energy environment (${live.status}).
 
 Your awareness matters more than the vibe right now.
 
@@ -49,6 +81,15 @@ Your awareness matters more than the vibe right now.
 • Keep track of your exit plan before you need it
 
 Right now matters more than the plan. Stay in control of the moment.`;
+      }
+
+      return `You are live in ${live.status}, and your energy is already elevated.
+
+• Keep your decisions slower than your emotions
+• Stay visible to people you trust
+• Avoid drifting into situations you did not choose clearly
+
+What would help you stay most in control over the next hour?`;
     }
 
     if (live.status === "Heading home") {
@@ -73,6 +114,16 @@ This is the best time to reset.
 • Lock in anything you need for tomorrow
 
 You handled the night. Close it properly.`;
+    }
+
+    if (live.status === "Listening to music") {
+      return `You are in a lighter live state right now (${live.status}).
+
+• Enjoy the moment without drifting too far from awareness
+• Keep your next move intentional
+• Stay aligned with how you want the night to end
+
+What would keep tonight feeling good without becoming messy?`;
     }
   }
 
@@ -129,6 +180,8 @@ export default function TwinMePage() {
 
   const freeLimit = 10;
   const remaining = useMemo(() => Math.max(0, freeLimit - promptCount), [promptCount]);
+
+  const liveNudge = useMemo(() => getLiveNudge(liveState), [liveState]);
 
   useEffect(() => {
     const load = () => {
@@ -225,6 +278,20 @@ export default function TwinMePage() {
             <Link href="/" style={secondaryButton}>
               Back Home
             </Link>
+          </div>
+        </section>
+
+        <section style={liveNudgeCard}>
+          <div style={sectionLabel}>LIVE NUDGE</div>
+          <div
+            style={{
+              marginTop: 10,
+              fontSize: 18,
+              fontWeight: 800,
+              lineHeight: 1.5,
+            }}
+          >
+            {liveNudge}
           </div>
         </section>
 
@@ -431,6 +498,15 @@ const liveCard: React.CSSProperties = {
   borderRadius: 24,
   padding: 18,
   marginTop: 16,
+};
+
+const liveNudgeCard: React.CSSProperties = {
+  border: "1px solid rgba(59,130,246,0.26)",
+  background: "linear-gradient(135deg, rgba(59,130,246,0.18), rgba(88,28,135,0.18))",
+  borderRadius: 24,
+  padding: 18,
+  marginTop: 16,
+  boxShadow: "0 0 24px rgba(59,130,246,0.10)",
 };
 
 const limitCard: React.CSSProperties = {
