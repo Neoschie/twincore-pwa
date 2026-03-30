@@ -87,7 +87,7 @@ function getSpotsContext(): SpotsSnapshot | null {
 }
 
 /* -------------------------
-   🧠 TIME ENGINE
+   TIME ENGINE
 --------------------------*/
 
 function getMinutesActive(live: PartyLive | null) {
@@ -96,7 +96,7 @@ function getMinutesActive(live: PartyLive | null) {
 }
 
 /* -------------------------
-   👥 CREW AWARENESS
+   CREW AWARENESS
 --------------------------*/
 
 function getCrewInsight(crew: CrewStatus[]) {
@@ -110,7 +110,7 @@ function getCrewInsight(crew: CrewStatus[]) {
 }
 
 /* -------------------------
-   📍 MOVEMENT AWARENESS
+   MOVEMENT AWARENESS
 --------------------------*/
 
 function getDistanceBetweenPoints(a: PositionPoint, b: PositionPoint) {
@@ -135,7 +135,7 @@ function getMovementInsight(history: PositionPoint[]) {
 }
 
 /* -------------------------
-   🌍 ENVIRONMENT AWARENESS
+   ENVIRONMENT AWARENESS
 --------------------------*/
 
 function getEnvironmentInsight(spots: SpotsSnapshot | null) {
@@ -161,7 +161,7 @@ function getEnvironmentInsight(spots: SpotsSnapshot | null) {
 }
 
 /* -------------------------
-   🧠 LIVE NUDGE
+   LIVE NUDGE
 --------------------------*/
 
 function getLiveNudge(
@@ -244,7 +244,7 @@ function getLiveNudge(
 }
 
 /* -------------------------
-   ⚠️ ALERTS
+   ALERTS
 --------------------------*/
 
 function getAlert(
@@ -298,7 +298,7 @@ function getAlert(
 }
 
 /* -------------------------
-   💬 REPLY
+   REPLY
 --------------------------*/
 
 function buildReply(
@@ -360,7 +360,10 @@ Control matters more than motion.`;
 Stay intentional.`;
   }
 
-  if (spots?.selectedTone === "safe" && (text.includes("go") || text.includes("move") || text.includes("where"))) {
+  if (
+    spots?.selectedTone === "safe" &&
+    (text.includes("go") || text.includes("move") || text.includes("where"))
+  ) {
     return `Your environment looks more stable right now.
 
 • Stay near the safer layer if possible
@@ -467,12 +470,28 @@ export default function TwinMePage() {
   );
 
   const nudge = useMemo(
-    () => getLiveNudge(live, minutes, crewLevel, movementLevel, environmentLevel, spots),
+    () =>
+      getLiveNudge(
+        live,
+        minutes,
+        crewLevel,
+        movementLevel,
+        environmentLevel,
+        spots
+      ),
     [live, minutes, crewLevel, movementLevel, environmentLevel, spots]
   );
 
   const alert = useMemo(
-    () => getAlert(live, minutes, crewLevel, movementLevel, environmentLevel, spots),
+    () =>
+      getAlert(
+        live,
+        minutes,
+        crewLevel,
+        movementLevel,
+        environmentLevel,
+        spots
+      ),
     [live, minutes, crewLevel, movementLevel, environmentLevel, spots]
   );
 
@@ -491,16 +510,37 @@ export default function TwinMePage() {
   }
 
   return (
-    <main style={{ minHeight: "100vh", background: "#050510", color: "white", padding: 20 }}>
+    <main
+      style={{
+        minHeight: "100vh",
+        background: "#050510",
+        color: "white",
+        padding: 20,
+      }}
+    >
       <h1>TwinMe (Crew + Movement + Environment Aware)</h1>
 
-      <div style={{ marginTop: 20, padding: 16, background: "#1e293b", borderRadius: 12 }}>
+      <div
+        style={{
+          marginTop: 20,
+          padding: 16,
+          background: "#1e293b",
+          borderRadius: 12,
+        }}
+      >
         <b>LIVE NUDGE</b>
         <div>{nudge}</div>
       </div>
 
       {alert && (
-        <div style={{ marginTop: 10, padding: 12, background: "#7f1d1d", borderRadius: 10 }}>
+        <div
+          style={{
+            marginTop: 10,
+            padding: 12,
+            background: "#7f1d1d",
+            borderRadius: 10,
+          }}
+        >
           {alert}
         </div>
       )}
@@ -513,10 +553,18 @@ export default function TwinMePage() {
           borderRadius: 10,
         }}
       >
-        <div><b>Crew:</b> {crewLevel}</div>
-        <div><b>Movement:</b> {movementLevel}</div>
-        <div><b>Environment:</b> {environmentLevel}</div>
-        <div><b>Selected Spot:</b> {spots?.selectedName || "none"}</div>
+        <div>
+          <b>Crew:</b> {crewLevel}
+        </div>
+        <div>
+          <b>Movement:</b> {movementLevel}
+        </div>
+        <div>
+          <b>Environment:</b> {environmentLevel}
+        </div>
+        <div>
+          <b>Selected Spot:</b> {spots?.selectedName || "none"}
+        </div>
       </div>
 
       <div style={{ marginTop: 20 }}>
@@ -537,30 +585,4 @@ export default function TwinMePage() {
       </Link>
     </main>
   );
-}
-
-/* -------------------------
-   ENVIRONMENT ENGINE
---------------------------*/
-
-function getEnvironmentInsight(spots: SpotsSnapshot | null) {
-  if (!spots) return "unknown";
-
-  if ((spots.riskCount || 0) > 0 && (spots.safeCount || 0) === 0) {
-    return "unsafe";
-  }
-
-  if ((spots.safeCount || 0) > 0 && (spots.nearbyCount || 0) > 0) {
-    return "supported";
-  }
-
-  if ((spots.hotspotCount || 0) > 0 && (spots.riskCount || 0) > 0) {
-    return "volatile";
-  }
-
-  if ((spots.nearbyCount || 0) === 0) {
-    return "thin";
-  }
-
-  return "balanced";
 }

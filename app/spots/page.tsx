@@ -14,6 +14,8 @@ import {
   LocateFixed,
   EyeOff,
   Lock,
+  Activity,
+  Zap,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -44,18 +46,15 @@ type RadarPoint = {
   trusted: boolean;
   blurred: boolean;
   originalName?: string;
+  clusterStrength: number;
+  intensity: number;
 };
 
 function toRadians(value: number) {
   return (value * Math.PI) / 180;
 }
 
-function getDistanceKm(
-  lat1: number,
-  lng1: number,
-  lat2: number,
-  lng2: number
-) {
+function getDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number) {
   const earthRadiusKm = 6371;
   const dLat = toRadians(lat2 - lat1);
   const dLng = toRadians(lng2 - lng1);
@@ -86,21 +85,15 @@ function parseStoredStringArray(raw: string | null): string[] {
     const parsed = JSON.parse(raw);
 
     if (Array.isArray(parsed)) {
-      return parsed
-        .map((item) => String(item).trim())
-        .filter(Boolean);
+      return parsed.map((item) => String(item).trim()).filter(Boolean);
     }
 
     if (Array.isArray(parsed?.ids)) {
-      return parsed.ids
-        .map((item: unknown) => String(item).trim())
-        .filter(Boolean);
+      return parsed.ids.map((item: unknown) => String(item).trim()).filter(Boolean);
     }
 
     if (Array.isArray(parsed?.names)) {
-      return parsed.names
-        .map((item: unknown) => String(item).trim())
-        .filter(Boolean);
+      return parsed.names.map((item: unknown) => String(item).trim()).filter(Boolean);
     }
 
     if (Array.isArray(parsed?.members)) {
@@ -130,7 +123,6 @@ function parseStoredStringArray(raw: string | null): string[] {
 
 function parseStoredBoolean(raw: string | null) {
   if (!raw) return false;
-
   const value = raw.trim().toLowerCase();
   return value === "true" || value === "1" || value === "yes" || value === "on";
 }
@@ -142,6 +134,7 @@ function getToneClasses(tone: SpotTone) {
       ring: "border-orange-400/40",
       card: "border-orange-500/20 bg-[linear-gradient(180deg,#24150f,#110c08)]",
       badge: "bg-orange-500/15 text-orange-100",
+      haze: "bg-orange-500/10",
     };
   }
 
@@ -151,6 +144,7 @@ function getToneClasses(tone: SpotTone) {
       ring: "border-emerald-400/40",
       card: "border-emerald-500/20 bg-[linear-gradient(180deg,#102019,#09120d)]",
       badge: "bg-emerald-500/15 text-emerald-100",
+      haze: "bg-emerald-500/10",
     };
   }
 
@@ -160,6 +154,7 @@ function getToneClasses(tone: SpotTone) {
       ring: "border-red-400/40",
       card: "border-red-500/20 bg-[linear-gradient(180deg,#2a1417,#15090b)]",
       badge: "bg-red-500/15 text-red-100",
+      haze: "bg-red-500/10",
     };
   }
 
@@ -168,6 +163,7 @@ function getToneClasses(tone: SpotTone) {
     ring: "border-blue-400/40",
     card: "border-blue-500/20 bg-[linear-gradient(180deg,#131c2b,#0b1119)]",
     badge: "bg-blue-500/15 text-blue-100",
+    haze: "bg-blue-500/10",
   };
 }
 
@@ -176,12 +172,6 @@ function getToneIcon(tone: SpotTone) {
   if (tone === "safe") return <Shield className="h-4 w-4" />;
   if (tone === "risk") return <AlertTriangle className="h-4 w-4" />;
   return <MapPin className="h-4 w-4" />;
-}
-
-function getPulseClass(tone: SpotTone) {
-  if (tone === "risk") return "animate-ping";
-  if (tone === "lit") return "animate-pulse";
-  return "";
 }
 
 function getPointTone(row: CrewStatusRow, distanceKm: number): SpotTone {
@@ -264,87 +254,33 @@ function getBlurredNote(tone: SpotTone, distanceKm: number) {
   return "A non-trusted point is on the grid. Fine detail remains blurred in this view.";
 }
 
-function buildFallbackPoints(
-  partyStatus: string | null,
-  hasSharedLocation: boolean,
-  trustedOnly: boolean
-): RadarPoint[] {
-  const base: RadarPoint[] = [
-    {
-      id: "fallback-1",
-      name: "Downtown Club",
-      tone: "lit",
-      crew: 2,
-      x: 72,
-      y: 28,
-      note: "High energy. Stay with your people.",
-      distanceKm: 1.4,
-      status: "active",
-      trusted: true,
-      blurred: false,
-    },
-    {
-      id: "fallback-2",
-      name: "Late Night Diner",
-      tone: "safe",
-      crew: 1,
-      x: 26,
-      y: 78,
-      note: "Good reset point if the night is winding down.",
-      distanceKm: 2.1,
-      status: "safe",
-      trusted: true,
-      blurred: false,
-    },
-    {
-      id: "fallback-3",
-      name: "Unknown House Party",
-      tone: "risk",
-      crew: 0,
-      x: 82,
-      y: 68,
-      note: "Low visibility and no crew presence.",
-      distanceKm: 3.7,
-      status: "unknown",
-      trusted: false,
-      blurred: true,
-    },
-    {
-      id: "fallback-4",
-      name: "Lounge Bar",
-      tone: "chill",
-      crew: 3,
-      x: 42,
-      y: 36,
-      note: "Lower pressure environment with crew nearby.",
-      distanceKm: 0.9,
-      status: "active",
-      trusted: true,
-      blurred: false,
-    },
-  ];
+function getBaseIntensity(tone: SpotTone, distanceKm: number) {
+  const distanceFactor = clamp(1.7 - distanceKm / 3, 0.4, 1.3);
 
-  const processed = base.map((point, index) => {
-    if (point.trusted) return point;
+  if (tone === "risk") return clamp(95 * distanceFactor, 40, 100);
+  if (tone === "lit") return clamp(78 * distanceFactor, 30, 95);
+  if (tone === "safe") return clamp(58 * distanceFactor, 20, 85);
+  return clamp(46 * distanceFactor, 15, 75);
+}
 
-    return {
-      ...point,
-      name: getBlurredName(index, point.tone),
-      note: getBlurredNote(point.tone, point.distanceKm),
-      x: clamp(point.x + 3, 10, 90),
-      y: clamp(point.y - 2, 10, 90),
-    };
-  });
+function MiniMeter({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">
+          {label}
+        </span>
+        <span className="text-sm font-semibold text-white">{value}</span>
+      </div>
 
-  if (trustedOnly) {
-    return processed.filter((point) => point.trusted);
-  }
-
-  if (!hasSharedLocation && !partyStatus) {
-    return processed;
-  }
-
-  return processed;
+      <div className="h-2 overflow-hidden rounded-full bg-white/10">
+        <div
+          className="h-full rounded-full bg-white/80 transition-all duration-300"
+          style={{ width: `${value}%` }}
+        />
+      </div>
+    </div>
+  );
 }
 
 export default function SpotsPage() {
@@ -494,28 +430,22 @@ export default function SpotsPage() {
       return { x: 38, y: 48 };
     }
 
-    if (ghostMode) {
-      return { x: 50, y: 50 };
-    }
-
     return { x: 50, y: 50 };
-  }, [partyStatus, userCoords, ghostMode]);
+  }, [partyStatus, userCoords]);
+
+  const hasRealSignals = useMemo(() => {
+    return crewRows.some(
+      (row) =>
+        typeof row.latitude === "number" &&
+        typeof row.longitude === "number" &&
+        Number.isFinite(row.latitude) &&
+        Number.isFinite(row.longitude)
+    );
+  }, [crewRows]);
 
   const radarPoints = useMemo(() => {
     if (!userCoords) {
-      return buildFallbackPoints(partyStatus, hasSharedLocation, trustedOnly).map((point) => {
-        const slightShift = liveTick ? 0.8 : -0.8;
-
-        if (point.tone === "lit") {
-          return { ...point, x: point.x + slightShift, y: point.y };
-        }
-
-        if (point.tone === "risk") {
-          return { ...point, x: point.x, y: point.y + slightShift };
-        }
-
-        return point;
-      });
+      return [] as RadarPoint[];
     }
 
     const validRows = crewRows.filter(
@@ -527,10 +457,10 @@ export default function SpotsPage() {
     );
 
     if (validRows.length === 0) {
-      return buildFallbackPoints(partyStatus, hasSharedLocation, trustedOnly);
+      return [] as RadarPoint[];
     }
 
-    const builtPoints = validRows.map((row, index) => {
+    const draftPoints = validRows.map((row, index) => {
       const distanceKm = getDistanceKm(
         userCoords.lat,
         userCoords.lng,
@@ -548,14 +478,14 @@ export default function SpotsPage() {
       const baseNote = getPointNote(row, distanceKm, tone);
       const slightShift = liveTick
         ? tone === "lit"
-          ? 0.5
+          ? 0.55
           : tone === "risk"
-          ? 0.3
+          ? 0.35
           : 0
         : tone === "lit"
-        ? -0.5
+        ? -0.55
         : tone === "risk"
-        ? -0.3
+        ? -0.35
         : 0;
 
       const rowId = normalizeValue(row.id);
@@ -581,24 +511,61 @@ export default function SpotsPage() {
         status: row.status || "active",
         trusted,
         blurred,
+        clusterStrength: 1,
+        intensity: getBaseIntensity(tone, distanceKm),
       } as RadarPoint;
     });
 
+    const withClusters = draftPoints.map((point) => {
+      const closeCount = draftPoints.filter((other) => {
+        if (other.id === point.id) return false;
+        const dx = other.x - point.x;
+        const dy = other.y - point.y;
+        const gridDistance = Math.sqrt(dx * dx + dy * dy);
+        return gridDistance <= 18;
+      }).length;
+
+      const clusterStrength = clamp(closeCount + 1, 1, 4);
+      const boostedIntensity = clamp(
+        point.intensity + clusterStrength * (point.tone === "risk" ? 6 : 4),
+        15,
+        100
+      );
+
+      let note = point.note;
+
+      if (clusterStrength >= 3 && point.tone === "lit") {
+        note = point.blurred
+          ? "A non-trusted high-energy cluster is forming here. Detail remains limited."
+          : `${point.originalName || point.name} is part of an active cluster. Energy is building in this area.`;
+      }
+
+      if (clusterStrength >= 3 && point.tone === "safe") {
+        note = point.blurred
+          ? "A protected support cluster is visible here. Detail remains limited."
+          : `${point.originalName || point.name} is sitting in a stronger support cluster. This could be a useful regroup zone.`;
+      }
+
+      if (clusterStrength >= 2 && point.tone === "risk") {
+        note = point.blurred
+          ? "A non-trusted elevated cluster is visible here. Treat this area carefully."
+          : `${point.originalName || point.name} is in an elevated cluster. Attention here matters sooner, not later.`;
+      }
+
+      return {
+        ...point,
+        clusterStrength,
+        intensity: boostedIntensity,
+        note,
+      };
+    });
+
     if (trustedOnly) {
-      return builtPoints.filter((point) => point.trusted);
+      return withClusters.filter((point) => point.trusted);
     }
 
-    return builtPoints;
-  }, [
-    crewRows,
-    userCoords,
-    liveTick,
-    partyStatus,
-    hasSharedLocation,
-    trustedIds,
-    trustedNames,
-    trustedOnly,
-  ]);
+    return withClusters;
+  }, [crewRows, userCoords, liveTick, trustedIds, trustedNames, trustedOnly]);
 
   useEffect(() => {
     if (!selectedSpotId && radarPoints.length > 0) {
@@ -615,6 +582,80 @@ export default function SpotsPage() {
   const selectedSpot =
     radarPoints.find((spot) => spot.id === selectedSpotId) ?? radarPoints[0];
 
+  const nearbyCount = useMemo(() => {
+    return radarPoints.filter((point) => point.distanceKm <= 1.5).length;
+  }, [radarPoints]);
+
+  const trustedVisibleCount = radarPoints.filter((point) => point.trusted).length;
+  const visibleCount = radarPoints.length;
+  const riskCount = radarPoints.filter((point) => point.tone === "risk").length;
+  const litCount = radarPoints.filter((point) => point.tone === "lit").length;
+  const safeCount = radarPoints.filter((point) => point.tone === "safe").length;
+  const hotspotCount = radarPoints.filter((point) => point.clusterStrength >= 3).length;
+
+  const radarEnergy = useMemo(() => {
+    if (riskCount > 0) return "risk";
+    if (litCount >= 2 || hotspotCount >= 1) return "lit";
+    if (safeCount >= 1) return "safe";
+    return "calm";
+  }, [riskCount, litCount, hotspotCount, safeCount]);
+
+  const sweepDuration = useMemo(() => {
+    if (!sweepOn) return 0;
+    if (radarEnergy === "risk") return 2.2;
+    if (radarEnergy === "lit") return 2.8;
+    if (radarEnergy === "safe") return 3.6;
+    return 4.4;
+  }, [radarEnergy, sweepOn]);
+
+  const ambientClasses = useMemo(() => {
+    if (radarEnergy === "risk") {
+      return {
+        top: "bg-[radial-gradient(circle_at_top,rgba(239,68,68,0.18),transparent_34%),radial-gradient(circle_at_bottom,rgba(59,130,246,0.08),transparent_30%)]",
+        orbA: "bg-red-500/12",
+        orbB: "bg-orange-500/10",
+      };
+    }
+
+    if (radarEnergy === "lit") {
+      return {
+        top: "bg-[radial-gradient(circle_at_top,rgba(249,115,22,0.16),transparent_34%),radial-gradient(circle_at_bottom,rgba(236,72,153,0.08),transparent_28%)]",
+        orbA: "bg-orange-500/12",
+        orbB: "bg-fuchsia-500/10",
+      };
+    }
+
+    if (radarEnergy === "safe") {
+      return {
+        top: "bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.14),transparent_34%),radial-gradient(circle_at_bottom,rgba(59,130,246,0.08),transparent_28%)]",
+        orbA: "bg-emerald-500/10",
+        orbB: "bg-cyan-500/10",
+      };
+    }
+
+    return {
+      top: "bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.12),transparent_34%),radial-gradient(circle_at_bottom,rgba(249,115,22,0.06),transparent_28%)]",
+      orbA: "bg-blue-500/10",
+      orbB: "bg-cyan-500/8",
+    };
+  }, [radarEnergy]);
+
+  const emptyStateReason = useMemo(() => {
+    if (!hasSharedLocation && !userCoords) {
+      return "Turn on location to place your live awareness grid around you.";
+    }
+
+    if (!hasRealSignals) {
+      if (trustedOnly) {
+        return "No trusted live crew signals are available right now.";
+      }
+
+      return "No live crew signals are on the map yet.";
+    }
+
+    return "No visible signals right now.";
+  }, [hasSharedLocation, userCoords, hasRealSignals, trustedOnly]);
+
   const twinInsight = useMemo(() => {
     if (ghostMode && trustedOnly) {
       return "TwinMe: Ghost Mode and Trusted Crew Only are both on. Your view is privacy-first and restricted to trusted signals.";
@@ -624,12 +665,20 @@ export default function SpotsPage() {
       return "TwinMe: Ghost Mode is on. Your exact position is visually softened while awareness stays active.";
     }
 
+    if (trustedOnly && radarPoints.length === 0) {
+      return "TwinMe: trusted-only view is active, but there are no trusted live signals right now.";
+    }
+
     if (trustedOnly) {
       return "TwinMe: only trusted crew signals are being shown right now.";
     }
 
-    if (!hasSharedLocation) {
-      return "TwinMe: turn location on to improve live awareness and keep your movement easier for crew to follow.";
+    if (!hasSharedLocation && !userCoords) {
+      return "TwinMe: turn location on to improve live awareness and place your grid around your actual position.";
+    }
+
+    if (radarPoints.length === 0) {
+      return "TwinMe: there are no live signals yet. Stay intentional, keep your status current, and let the grid populate naturally.";
     }
 
     if (!selectedSpot) {
@@ -640,12 +689,24 @@ export default function SpotsPage() {
       return "TwinMe: this point is outside your trusted layer, so details are intentionally blurred.";
     }
 
+    if (selectedSpot.tone === "risk" && selectedSpot.clusterStrength >= 2) {
+      return "TwinMe: risk is concentrating here. Move early if you need to intervene or exit.";
+    }
+
     if (selectedSpot.tone === "risk") {
       return "TwinMe: this point needs attention. Someone may be isolated, off-pattern, or signaling risk.";
     }
 
+    if (selectedSpot.tone === "lit" && selectedSpot.clusterStrength >= 3) {
+      return "TwinMe: this zone is heating up. High energy plus clustering can change the night fast.";
+    }
+
     if (selectedSpot.tone === "lit") {
       return "TwinMe: energy is high here. Only move in if your people are aligned and your exit stays easy.";
+    }
+
+    if (selectedSpot.tone === "safe" && selectedSpot.clusterStrength >= 2) {
+      return "TwinMe: this looks like a strong regroup pocket. Good place to stabilize the night.";
     }
 
     if (selectedSpot.tone === "safe") {
@@ -657,38 +718,42 @@ export default function SpotsPage() {
     }
 
     return "TwinMe: this area looks more balanced. Stay aware, but it is a better choice than high-chaos spots.";
-  }, [ghostMode, trustedOnly, hasSharedLocation, selectedSpot]);
+  }, [ghostMode, trustedOnly, hasSharedLocation, userCoords, radarPoints.length, selectedSpot]);
 
   const safetyState = useMemo(() => {
+    if (radarPoints.length === 0) return "waiting";
     if (!selectedSpot) return "aware";
     if (!selectedSpot.trusted) return "restricted";
     if (selectedSpot.tone === "risk") return "high attention";
     if (selectedSpot.tone === "lit") return "active";
     if (selectedSpot.tone === "safe") return "stable";
     return "aware";
-  }, [selectedSpot]);
+  }, [selectedSpot, radarPoints.length]);
 
-  const nearbyCount = useMemo(() => {
-    return radarPoints.filter((point) => point.distanceKm <= 1.5).length;
-  }, [radarPoints]);
-
-  const visibleCount = radarPoints.length;
-  const trustedVisibleCount = radarPoints.filter((point) => point.trusted).length;
+  const gridLabel = useMemo(() => {
+    if (radarPoints.length === 0) return "Standby";
+    if (radarEnergy === "risk") return "Elevated";
+    if (radarEnergy === "lit") return "Surging";
+    if (radarEnergy === "safe") return "Stable";
+    return "Balanced";
+  }, [radarEnergy, radarPoints.length]);
 
   return (
     <main className="min-h-screen overflow-hidden bg-[#0A0A0B] text-white">
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.12),transparent_34%),radial-gradient(circle_at_bottom,rgba(249,115,22,0.10),transparent_34%)]" />
-        <div className="absolute left-1/2 top-14 h-[24rem] w-[24rem] -translate-x-1/2 rounded-full bg-blue-500/10 blur-3xl animate-orb-drift" />
-        <div className="absolute bottom-10 right-[-8%] h-64 w-64 rounded-full bg-orange-500/10 blur-3xl animate-orb-drift" />
+        <div className={`absolute inset-0 ${ambientClasses.top}`} />
+        <div
+          className={`absolute left-1/2 top-14 h-[24rem] w-[24rem] -translate-x-1/2 rounded-full blur-3xl animate-orb-drift ${ambientClasses.orbA}`}
+        />
+        <div
+          className={`absolute bottom-10 right-[-8%] h-64 w-64 rounded-full blur-3xl animate-orb-drift ${ambientClasses.orbB}`}
+        />
         <div className="absolute inset-0 opacity-[0.08] [background-image:linear-gradient(rgba(255,255,255,0.55)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.55)_1px,transparent_1px)] [background-size:26px_26px]" />
       </div>
 
       <div className="relative mx-auto w-full max-w-md px-4 py-8">
         <header className="mb-8">
-          <div className="mb-2 text-xs tracking-[0.3em] text-white/50">
-            TWINCORE
-          </div>
+          <div className="mb-2 text-xs tracking-[0.3em] text-white/50">TWINCORE</div>
 
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -758,6 +823,28 @@ export default function SpotsPage() {
           ) : null}
         </section>
 
+        <section className="mb-6 grid grid-cols-2 gap-3">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div className="mb-2 inline-flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-white/55">
+              <Zap className="h-3.5 w-3.5" />
+              Grid Energy
+            </div>
+            <div className="text-2xl font-semibold">{gridLabel}</div>
+            <p className="mt-1 text-sm text-white/60">
+              {hotspotCount} hotspot{hotspotCount === 1 ? "" : "s"}
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div className="mb-2 inline-flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-white/55">
+              <Activity className="h-3.5 w-3.5" />
+              Visible Layer
+            </div>
+            <div className="text-2xl font-semibold">{visibleCount}</div>
+            <p className="mt-1 text-sm text-white/60">signals on map</p>
+          </div>
+        </section>
+
         <section className="mb-6 rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,#101216,#090A0D)] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.42)]">
           <div className="relative aspect-square overflow-hidden rounded-[1.6rem] border border-white/10 bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.10),rgba(0,0,0,0.4)_52%,rgba(0,0,0,0.88)_100%)]">
             <div className="absolute inset-6 rounded-full border border-white/10" />
@@ -768,9 +855,37 @@ export default function SpotsPage() {
             <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-white/10" />
             <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-white/10" />
 
+            {hotspotCount > 0
+              ? radarPoints
+                  .filter((spot) => spot.clusterStrength >= 3)
+                  .slice(0, 3)
+                  .map((spot) => {
+                    const tone = getToneClasses(spot.tone);
+                    const hotspotSize = clamp(spot.clusterStrength * 42, 70, 130);
+
+                    return (
+                      <div
+                        key={`hotspot-${spot.id}`}
+                        className={`pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 rounded-full blur-2xl ${tone.haze} opacity-60`}
+                        style={{
+                          left: `${spot.x}%`,
+                          top: `${spot.y}%`,
+                          width: `${hotspotSize}px`,
+                          height: `${hotspotSize}px`,
+                        }}
+                      />
+                    );
+                  })
+              : null}
+
             {sweepOn ? (
               <div className="pointer-events-none absolute inset-0">
-                <div className="absolute left-1/2 top-1/2 h-[48%] w-[48%] -translate-x-1/2 -translate-y-1/2 origin-bottom-right rounded-tl-full bg-[conic-gradient(from_0deg,rgba(96,165,250,0.0)_0deg,rgba(96,165,250,0.0)_280deg,rgba(96,165,250,0.28)_340deg,rgba(96,165,250,0.0)_360deg)] animate-[spin_4s_linear_infinite]" />
+                <div
+                  className="absolute left-1/2 top-1/2 h-[48%] w-[48%] -translate-x-1/2 -translate-y-1/2 origin-bottom-right rounded-tl-full bg-[conic-gradient(from_0deg,rgba(96,165,250,0.0)_0deg,rgba(96,165,250,0.0)_280deg,rgba(96,165,250,0.28)_340deg,rgba(96,165,250,0.0)_360deg)]"
+                  style={{
+                    animation: `spin ${sweepDuration}s linear infinite`,
+                  }}
+                />
               </div>
             ) : null}
 
@@ -787,39 +902,66 @@ export default function SpotsPage() {
               <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/10 bg-white/5 blur-sm" />
             ) : null}
 
-            {radarPoints.map((spot) => {
-              const tone = getToneClasses(spot.tone);
-              const selected = selectedSpot?.id === spot.id;
+            {radarPoints.length > 0 ? (
+              radarPoints.map((spot) => {
+                const tone = getToneClasses(spot.tone);
+                const selected = selectedSpot?.id === spot.id;
+                const glowScale = spot.blurred
+                  ? 0.38
+                  : clamp(0.4 + spot.intensity / 120, 0.45, 1.15);
 
-              return (
-                <button
-                  key={spot.id}
-                  type="button"
-                  onClick={() => setSelectedSpotId(spot.id)}
-                  className={`absolute z-20 -translate-x-1/2 -translate-y-1/2 ${
-                    spot.blurred ? "opacity-80" : ""
-                  }`}
-                  style={{ left: `${spot.x}%`, top: `${spot.y}%` }}
-                >
-                  <span
-                    className={`absolute inset-0 rounded-full ${tone.dot} ${
-                      spot.blurred ? "opacity-25 blur-lg" : `opacity-50 blur-md ${getPulseClass(spot.tone)}`
+                const nodeSize = clamp(34 + spot.clusterStrength * 3, 34, 46);
+
+                return (
+                  <button
+                    key={spot.id}
+                    type="button"
+                    onClick={() => setSelectedSpotId(spot.id)}
+                    className={`absolute z-20 -translate-x-1/2 -translate-y-1/2 ${
+                      spot.blurred ? "opacity-80" : ""
                     }`}
-                  />
-                  <span
-                    className={`relative flex h-10 w-10 items-center justify-center rounded-full border bg-black/50 backdrop-blur ${
-                      spot.blurred ? "border-white/20" : tone.ring
-                    } ${selected ? "scale-110" : "scale-100"} transition-all duration-200`}
+                    style={{ left: `${spot.x}%`, top: `${spot.y}%` }}
                   >
                     <span
-                      className={`h-3.5 w-3.5 rounded-full ${
-                        spot.blurred ? "bg-white/60 blur-[1px]" : tone.dot
-                      }`}
+                      className={`absolute inset-0 rounded-full ${
+                        spot.blurred ? "bg-white/60" : tone.dot
+                      } ${spot.tone === "risk" ? "animate-ping" : spot.tone === "lit" ? "animate-pulse" : ""}`}
+                      style={{
+                        opacity: spot.blurred ? 0.16 : glowScale,
+                        filter: spot.blurred ? "blur(12px)" : "blur(10px)",
+                        transform: `scale(${spot.clusterStrength >= 3 ? 1.6 : 1.2})`,
+                      }}
                     />
-                  </span>
-                </button>
-              );
-            })}
+                    <span
+                      className={`relative flex items-center justify-center rounded-full border bg-black/50 backdrop-blur ${
+                        spot.blurred ? "border-white/20" : tone.ring
+                      } ${selected ? "scale-110" : "scale-100"} transition-all duration-200`}
+                      style={{ width: `${nodeSize}px`, height: `${nodeSize}px` }}
+                    >
+                      <span
+                        className={`rounded-full ${
+                          spot.blurred ? "bg-white/60 blur-[1px]" : tone.dot
+                        }`}
+                        style={{
+                          width: `${clamp(10 + spot.clusterStrength, 10, 15)}px`,
+                          height: `${clamp(10 + spot.clusterStrength, 10, 15)}px`,
+                        }}
+                      />
+                    </span>
+                  </button>
+                );
+              })
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center p-8">
+                <div className="max-w-[260px] rounded-3xl border border-white/10 bg-black/30 px-5 py-6 text-center backdrop-blur">
+                  <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/5">
+                    <Radar className="h-5 w-5 text-white/75" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-white">No live signals yet</h3>
+                  <p className="mt-2 text-sm leading-6 text-white/60">{emptyStateReason}</p>
+                </div>
+              </div>
+            )}
 
             <div className="absolute left-4 top-4 rounded-full bg-white/10 px-3 py-1 text-[11px] font-medium text-white/75">
               NORTH
@@ -865,12 +1007,21 @@ export default function SpotsPage() {
 
             <p className="text-sm leading-6 text-white/75">{selectedSpot.note}</p>
 
+            <div className="mt-3 flex flex-wrap gap-2">
+              <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
+                Intensity {selectedSpot.intensity}
+              </span>
+              <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
+                Cluster {selectedSpot.clusterStrength}
+              </span>
+            </div>
+
             <div className="mt-4 grid grid-cols-3 gap-3">
               <MiniMeter
                 label="Risk"
                 value={
                   selectedSpot.tone === "risk"
-                    ? 90
+                    ? clamp(selectedSpot.intensity, 60, 100)
                     : selectedSpot.tone === "lit"
                     ? 68
                     : selectedSpot.tone === "safe"
@@ -880,11 +1031,7 @@ export default function SpotsPage() {
               />
               <MiniMeter
                 label="Crew"
-                value={
-                  selectedSpot.blurred
-                    ? 12
-                    : Math.min(100, selectedSpot.crew * 35)
-                }
+                value={selectedSpot.blurred ? 12 : Math.min(100, selectedSpot.clusterStrength * 24)}
               />
               <MiniMeter
                 label="Exit"
@@ -900,7 +1047,33 @@ export default function SpotsPage() {
               />
             </div>
           </section>
-        ) : null}
+        ) : (
+          <section className="mb-6 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#14141a,#0c0c10)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold tracking-wide text-white/80">
+              <Activity className="h-3.5 w-3.5" />
+              SIGNAL STATE
+            </div>
+
+            <h3 className="text-2xl font-semibold text-white">Waiting for live movement</h3>
+            <p className="mt-3 text-sm leading-6 text-white/70">{emptyStateReason}</p>
+
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <div className="text-xs uppercase tracking-[0.18em] text-white/50">Location</div>
+                <div className="mt-2 text-lg font-semibold">
+                  {hasSharedLocation || userCoords ? "Ready" : "Needed"}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <div className="text-xs uppercase tracking-[0.18em] text-white/50">Crew Layer</div>
+                <div className="mt-2 text-lg font-semibold">
+                  {hasRealSignals ? "Listening" : "Standby"}
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
 
         <section className="mb-6 rounded-3xl border border-blue-500/20 bg-[linear-gradient(180deg,#1a1f2e,#0c0f1a)] p-5 shadow-[0_18px_50px_rgba(59,130,246,0.18)]">
           <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold tracking-wide text-white/80">
@@ -928,60 +1101,65 @@ export default function SpotsPage() {
             <span className="text-sm text-white/55">{visibleCount} visible</span>
           </div>
 
-          <div className="space-y-3">
-            {radarPoints.map((spot) => {
-              const tone = getToneClasses(spot.tone);
-              const selected = selectedSpot?.id === spot.id;
+          {radarPoints.length > 0 ? (
+            <div className="space-y-3">
+              {radarPoints.map((spot) => {
+                const tone = getToneClasses(spot.tone);
+                const selected = selectedSpot?.id === spot.id;
 
-              return (
-                <button
-                  key={spot.id}
-                  type="button"
-                  onClick={() => setSelectedSpotId(spot.id)}
-                  className={`twincore-press w-full rounded-3xl border p-4 text-left shadow-[0_12px_30px_rgba(0,0,0,0.28)] ${
-                    spot.blurred
-                      ? "border-white/10 bg-[linear-gradient(180deg,#17181d,#0d0e12)]"
-                      : tone.card
-                  } ${selected ? "ring-1 ring-white/20" : ""}`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2 text-white">
-                        {spot.blurred ? <Lock className="h-4 w-4" /> : getToneIcon(spot.tone)}
-                        <span className={`text-lg font-semibold ${spot.blurred ? "blur-[1px]" : ""}`}>
-                          {spot.name}
-                        </span>
+                return (
+                  <button
+                    key={spot.id}
+                    type="button"
+                    onClick={() => setSelectedSpotId(spot.id)}
+                    className={`twincore-press w-full rounded-3xl border p-4 text-left shadow-[0_12px_30px_rgba(0,0,0,0.28)] ${
+                      spot.blurred
+                        ? "border-white/10 bg-[linear-gradient(180deg,#17181d,#0d0e12)]"
+                        : tone.card
+                    } ${selected ? "ring-1 ring-white/20" : ""}`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2 text-white">
+                          {spot.blurred ? <Lock className="h-4 w-4" /> : getToneIcon(spot.tone)}
+                          <span className={`text-lg font-semibold ${spot.blurred ? "blur-[1px]" : ""}`}>
+                            {spot.name}
+                          </span>
+                        </div>
+
+                        <p className="mt-2 text-sm leading-6 text-white/70">{spot.note}</p>
                       </div>
 
-                      <p className="mt-2 text-sm leading-6 text-white/70">
-                        {spot.note}
-                      </p>
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-semibold tracking-wide ${
+                          spot.blurred ? "bg-white/10 text-white/75" : tone.badge
+                        }`}
+                      >
+                        {spot.blurred ? "blurred" : spot.tone}
+                      </span>
                     </div>
 
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-semibold tracking-wide ${
-                        spot.blurred ? "bg-white/10 text-white/75" : tone.badge
-                      }`}
-                    >
-                      {spot.blurred ? "blurred" : spot.tone}
-                    </span>
-                  </div>
+                    <div className="mt-3 flex items-center justify-between text-sm text-white/65">
+                      <span className="inline-flex items-center gap-1.5">
+                        <Users className="h-4 w-4" />
+                        Crew nearby: {spot.clusterStrength}
+                      </span>
 
-                  <div className="mt-3 flex items-center justify-between text-sm text-white/65">
-                    <span className="inline-flex items-center gap-1.5">
-                      <Users className="h-4 w-4" />
-                      Crew nearby: {spot.crew}
-                    </span>
-
-                    <span className="inline-flex items-center gap-1.5">
-                      <Route className="h-4 w-4" />
-                      {spot.distanceKm.toFixed(2)} km
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+                      <span className="inline-flex items-center gap-1.5">
+                        <Route className="h-4 w-4" />
+                        {spot.distanceKm.toFixed(2)} km
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#14141a,#0c0c10)] p-5 shadow-[0_12px_30px_rgba(0,0,0,0.28)]">
+              <p className="text-lg font-semibold text-white">No live points yet</p>
+              <p className="mt-2 text-sm leading-6 text-white/65">{emptyStateReason}</p>
+            </div>
+          )}
         </section>
 
         <nav className="grid grid-cols-2 gap-3">
@@ -1001,31 +1179,5 @@ export default function SpotsPage() {
         </nav>
       </div>
     </main>
-  );
-}
-
-function MiniMeter({
-  label,
-  value,
-}: {
-  label: string;
-  value: number;
-}) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">
-          {label}
-        </span>
-        <span className="text-sm font-semibold text-white">{value}</span>
-      </div>
-
-      <div className="h-2 overflow-hidden rounded-full bg-white/10">
-        <div
-          className="h-full rounded-full bg-white/80 transition-all duration-300"
-          style={{ width: `${value}%` }}
-        />
-      </div>
-    </div>
   );
 }

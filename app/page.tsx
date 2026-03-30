@@ -14,7 +14,6 @@ import {
   AlertTriangle,
   Snowflake,
   Music4,
-  Sparkles,
   EyeOff,
   Lock,
 } from "lucide-react";
@@ -34,6 +33,12 @@ type CrewRow = {
 
 const featureCards = [
   {
+    title: "Spots",
+    description: "Safe places, hotspots, and live map signals",
+    href: "/spots",
+    tone: "ice",
+  },
+  {
     title: "Crew",
     description: "Live crew awareness and movement",
     href: "/crew",
@@ -44,12 +49,6 @@ const featureCards = [
     description: "Live status and energy tracking",
     href: "/party",
     tone: "warm",
-  },
-  {
-    title: "Spots",
-    description: "Safe places, hotspots, and live map signals",
-    href: "/spots",
-    tone: "ice",
   },
   {
     title: "TwinMe",
@@ -470,50 +469,6 @@ export default function HomePage() {
         </section>
 
         <section className="mb-8">
-          <Link
-            href="/spots"
-            className="block rounded-3xl border border-cyan-400/20 bg-[linear-gradient(180deg,#10202a,#091218)] p-5 shadow-[0_18px_45px_rgba(34,211,238,0.14)] transition hover:scale-[1.01] active:scale-[0.99]"
-          >
-            <div className="mb-3 flex items-start justify-between gap-3">
-              <div>
-                <div className="inline-flex items-center gap-2 text-sm font-medium text-cyan-100">
-                  <Sparkles className="h-4 w-4" />
-                  SPOTS
-                </div>
-                <h3 className="mt-2 text-2xl font-semibold text-white">
-                  Live map awareness
-                </h3>
-              </div>
-
-              <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
-                {spotsStatusText}
-              </span>
-            </div>
-
-            <p className="text-sm leading-6 text-white/75">
-              Safe places, hotspots, crew-linked areas, and movement-aware map signals in one layer.
-            </p>
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
-                <MapPin className="h-3.5 w-3.5" />
-                Live spots
-              </span>
-
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
-                <EyeOff className="h-3.5 w-3.5" />
-                {ghostMode ? "Ghost protected" : "Ghost available"}
-              </span>
-
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
-                <Lock className="h-3.5 w-3.5" />
-                {trustedOnly ? "Trusted only on" : "Trusted layer ready"}
-              </span>
-            </div>
-          </Link>
-        </section>
-
-        <section className="mb-8">
           <div className="rounded-3xl border border-blue-500/20 bg-[linear-gradient(180deg,#1a1f2e,#0c0f1a)] p-5 shadow-[0_18px_45px_rgba(59,130,246,0.14)]">
             <div className="mb-3 flex items-center gap-2 text-sm text-blue-100">
               <Brain className="h-4 w-4" />
@@ -581,7 +536,12 @@ export default function HomePage() {
         </section>
 
         <section className="mb-8">
-          <h3 className="mb-4 text-xl font-semibold">Core</h3>
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-xl font-semibold">Core</h3>
+            <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/75">
+              {spotsStatusText}
+            </span>
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
             {featureCards.map((card) => (
@@ -590,10 +550,34 @@ export default function HomePage() {
                 href={card.href}
                 className={`rounded-3xl p-5 transition hover:scale-[1.02] active:scale-[0.98] ${getToneClass(
                   card.tone
-                )}`}
+                )} ${card.title === "Spots" ? "ring-1 ring-cyan-300/20" : ""}`}
               >
-                <div className="text-2xl font-semibold">{card.title}</div>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="text-2xl font-semibold">{card.title}</div>
+                  {card.title === "Spots" ? (
+                    <div className="flex flex-col items-end gap-1">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-1 text-[10px] font-medium text-white/85">
+                        <EyeOff className="h-3 w-3" />
+                        {ghostMode ? "Ghost" : "Map"}
+                      </span>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-1 text-[10px] font-medium text-white/85">
+                        <Lock className="h-3 w-3" />
+                        {trustedOnly ? "Trusted" : "Open"}
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
+
                 <p className="mt-2 text-sm text-white/65">{card.description}</p>
+
+                {card.title === "Spots" ? (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-medium text-white/85">
+                      <MapPin className="h-3.5 w-3.5" />
+                      Live spots
+                    </span>
+                  </div>
+                ) : null}
               </Link>
             ))}
           </div>
