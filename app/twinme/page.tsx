@@ -39,6 +39,19 @@ type PositionPoint = {
   timestamp: string;
 };
 
+type SpotsSnapshot = {
+  visibleCount?: number;
+  nearbyCount?: number;
+  hotspotCount?: number;
+  riskCount?: number;
+  safeCount?: number;
+  trustedVisibleCount?: number;
+  selectedTone?: "lit" | "safe" | "risk" | "chill" | null;
+  selectedName?: string | null;
+  radarEnergy?: "risk" | "lit" | "safe" | "calm" | null;
+  timestamp?: string;
+};
+
 /* -------------------------
    DATA LOADERS
 --------------------------*/
@@ -60,6 +73,16 @@ function getCrewContext(): CrewStatus[] {
     return JSON.parse(raw);
   } catch {
     return [];
+  }
+}
+
+function getSpotsContext(): SpotsSnapshot | null {
+  try {
+    const raw = localStorage.getItem("twincore_spots_snapshot");
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
   }
 }
 
@@ -112,6 +135,32 @@ function getMovementInsight(history: PositionPoint[]) {
 }
 
 /* -------------------------
+   🌍 ENVIRONMENT AWARENESS
+--------------------------*/
+
+function getEnvironmentInsight(spots: SpotsSnapshot | null) {
+  if (!spots) return "unknown";
+
+  if ((spots.riskCount || 0) > 0 && (spots.safeCount || 0) === 0) {
+    return "unsafe";
+  }
+
+  if ((spots.safeCount || 0) > 0 && (spots.nearbyCount || 0) > 0) {
+    return "supported";
+  }
+
+  if ((spots.hotspotCount || 0) > 0 && (spots.riskCount || 0) > 0) {
+    return "volatile";
+  }
+
+  if ((spots.nearbyCount || 0) === 0) {
+    return "thin";
+  }
+
+  return "balanced";
+}
+
+/* -------------------------
    🧠 LIVE NUDGE
 --------------------------*/
 
@@ -119,10 +168,28 @@ function getLiveNudge(
   live: PartyLive | null,
   minutes: number,
   crewLevel: string,
-  movementLevel: string
+  movementLevel: string,
+  environmentLevel: string,
+  spots: SpotsSnapshot | null
 ) {
   if (!live?.active) {
     return "TwinMe is standing by. Turn Party Mode on when your night starts moving.";
+  }
+
+  if (environmentLevel === "unsafe") {
+    return "You do not have a strong safe-zone layer nearby right now. Reduce drift and move more deliberately.";
+  }
+
+  if (environmentLevel === "volatile") {
+    return "This environment is unstable. Hotspots and risk are mixing, so your next move needs to be intentional.";
+  }
+
+  if (environmentLevel === "thin") {
+    return "Your environment looks thin right now. There are not many nearby signals or support points.";
+  }
+
+  if (environmentLevel === "supported" && movementLevel === "stable") {
+    return "You have some support nearby. This is a better moment to stay grounded and avoid unnecessary movement.";
   }
 
   if (crewLevel === "no_crew") {
@@ -169,6 +236,10 @@ function getLiveNudge(
     return "You’re heading home. Stay focused until you're fully safe.";
   }
 
+  if (spots?.selectedTone === "safe") {
+    return "Your current environment looks more stable. Keep it simple and do not trade a safe zone for noise.";
+  }
+
   return "Stay aware and move intentionally.";
 }
 
@@ -180,9 +251,22 @@ function getAlert(
   live: PartyLive | null,
   minutes: number,
   crewLevel: string,
-  movementLevel: string
+  movementLevel: string,
+  environmentLevel: string,
+  spots: SpotsSnapshot | null
 ) {
   if (!live?.active) return null;
+
+  if (
+    environmentLevel === "unsafe" &&
+    (live.status === "Drinking" || live.status === "At club")
+  ) {
+    return "⚠️ High-energy state with weak environment support. Prioritize a safer zone now.";
+  }
+
+  if (environmentLevel === "volatile" && movementLevel === "drifting") {
+    return "⚠️ You are drifting inside an unstable environment. Pause before your next move.";
+  }
 
   if (crewLevel === "alone" && movementLevel === "moving") {
     return "⚠️ You are moving alone in an active state. Reduce movement and reassess.";
@@ -206,6 +290,10 @@ function getAlert(
     return "⚠️ Prolonged high-energy state. Start transitioning out.";
   }
 
+  if ((spots?.safeCount || 0) === 0 && (spots?.riskCount || 0) > 0) {
+    return "⚠️ No nearby safe-zone signal is visible while risk is present.";
+  }
+
   return null;
 }
 
@@ -216,9 +304,31 @@ function getAlert(
 function buildReply(
   input: string,
   live: PartyLive | null,
-  movementLevel: string
+  movementLevel: string,
+  environmentLevel: string,
+  spots: SpotsSnapshot | null
 ) {
   const text = input.toLowerCase();
+
+  if (environmentLevel === "unsafe") {
+    return `Your environment does not look supportive right now.
+
+• Prioritize safer ground over momentum
+• Do not drift deeper into weak-support areas
+• Make your next move about stability, not excitement
+
+Safer options matter more than vibe right now.`;
+  }
+
+  if (environmentLevel === "volatile") {
+    return `This area looks unstable.
+
+• Hotspots and risk are mixing
+• Slow down before changing locations
+• Pick the safer option even if it feels less exciting
+
+You do not need more stimulation right now — you need control.`;
+  }
 
   if (movementLevel === "drifting") {
     return `You’ve been drifting across positions.
@@ -250,6 +360,16 @@ Control matters more than motion.`;
 Stay intentional.`;
   }
 
+  if (spots?.selectedTone === "safe" && (text.includes("go") || text.includes("move") || text.includes("where"))) {
+    return `Your environment looks more stable right now.
+
+• Stay near the safer layer if possible
+• Do not trade safety for extra noise
+• Use the stable zone to reset your decisions
+
+The best move is usually the cleaner one.`;
+  }
+
   if (text.includes("tonight") || text.includes("go out")) {
     return `You are deciding how to spend your energy tonight.
 
@@ -277,13 +397,14 @@ export default function TwinMePage() {
     {
       id: 1,
       role: "twin",
-      text: "TwinMe is now crew-aware and movement-aware.",
+      text: "TwinMe is now crew-aware, movement-aware, and environment-aware.",
     },
   ]);
 
   const [input, setInput] = useState("");
   const [live, setLive] = useState<PartyLive | null>(null);
   const [crew, setCrew] = useState<CrewStatus[]>([]);
+  const [spots, setSpots] = useState<SpotsSnapshot | null>(null);
   const [minutes, setMinutes] = useState(0);
   const [positionHistory, setPositionHistory] = useState<PositionPoint[]>([]);
 
@@ -291,9 +412,11 @@ export default function TwinMePage() {
     const interval = setInterval(() => {
       const l = getLiveContext();
       const c = getCrewContext();
+      const s = getSpotsContext();
 
       setLive(l);
       setCrew(c);
+      setSpots(s);
       setMinutes(getMinutesActive(l));
 
       if (
@@ -338,15 +461,19 @@ export default function TwinMePage() {
     () => getMovementInsight(positionHistory),
     [positionHistory]
   );
+  const environmentLevel = useMemo(
+    () => getEnvironmentInsight(spots),
+    [spots]
+  );
 
   const nudge = useMemo(
-    () => getLiveNudge(live, minutes, crewLevel, movementLevel),
-    [live, minutes, crewLevel, movementLevel]
+    () => getLiveNudge(live, minutes, crewLevel, movementLevel, environmentLevel, spots),
+    [live, minutes, crewLevel, movementLevel, environmentLevel, spots]
   );
 
   const alert = useMemo(
-    () => getAlert(live, minutes, crewLevel, movementLevel),
-    [live, minutes, crewLevel, movementLevel]
+    () => getAlert(live, minutes, crewLevel, movementLevel, environmentLevel, spots),
+    [live, minutes, crewLevel, movementLevel, environmentLevel, spots]
   );
 
   function sendMessage() {
@@ -356,7 +483,7 @@ export default function TwinMePage() {
     const twin = {
       id: Date.now() + 1,
       role: "twin" as const,
-      text: buildReply(input, live, movementLevel),
+      text: buildReply(input, live, movementLevel, environmentLevel, spots),
     };
 
     setMessages((prev) => [...prev, user, twin]);
@@ -365,7 +492,7 @@ export default function TwinMePage() {
 
   return (
     <main style={{ minHeight: "100vh", background: "#050510", color: "white", padding: 20 }}>
-      <h1>TwinMe (Crew + Movement Aware)</h1>
+      <h1>TwinMe (Crew + Movement + Environment Aware)</h1>
 
       <div style={{ marginTop: 20, padding: 16, background: "#1e293b", borderRadius: 12 }}>
         <b>LIVE NUDGE</b>
@@ -388,6 +515,8 @@ export default function TwinMePage() {
       >
         <div><b>Crew:</b> {crewLevel}</div>
         <div><b>Movement:</b> {movementLevel}</div>
+        <div><b>Environment:</b> {environmentLevel}</div>
+        <div><b>Selected Spot:</b> {spots?.selectedName || "none"}</div>
       </div>
 
       <div style={{ marginTop: 20 }}>
@@ -408,4 +537,30 @@ export default function TwinMePage() {
       </Link>
     </main>
   );
+}
+
+/* -------------------------
+   ENVIRONMENT ENGINE
+--------------------------*/
+
+function getEnvironmentInsight(spots: SpotsSnapshot | null) {
+  if (!spots) return "unknown";
+
+  if ((spots.riskCount || 0) > 0 && (spots.safeCount || 0) === 0) {
+    return "unsafe";
+  }
+
+  if ((spots.safeCount || 0) > 0 && (spots.nearbyCount || 0) > 0) {
+    return "supported";
+  }
+
+  if ((spots.hotspotCount || 0) > 0 && (spots.riskCount || 0) > 0) {
+    return "volatile";
+  }
+
+  if ((spots.nearbyCount || 0) === 0) {
+    return "thin";
+  }
+
+  return "balanced";
 }
