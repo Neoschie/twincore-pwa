@@ -738,6 +738,44 @@ export default function SpotsPage() {
     return "Balanced";
   }, [radarEnergy, radarPoints.length]);
 
+  useEffect(() => {
+  if (!selectedSpot) return;
+
+  const snapshot = {
+    visibleCount,
+    nearbyCount,
+    hotspotCount,
+    riskCount,
+    safeCount,
+    trustedVisibleCount,
+    radarEnergy,
+    selectedTone: selectedSpot.tone,
+    selectedName:
+      selectedSpot.originalName || selectedSpot.name || null,
+    selectedDistanceKm:
+      typeof selectedSpot.distanceKm === "number"
+        ? Number(selectedSpot.distanceKm.toFixed(2))
+        : null,
+    selectedTrusted: selectedSpot.trusted,
+    selectedBlurred: selectedSpot.blurred,
+    updatedAt: new Date().toISOString(),
+  };
+
+  window.localStorage.setItem(
+    "twincore_spots_snapshot",
+    JSON.stringify(snapshot)
+  );
+}, [
+  visibleCount,
+  nearbyCount,
+  hotspotCount,
+  riskCount,
+  safeCount,
+  trustedVisibleCount,
+  radarEnergy,
+  selectedSpot,
+]);
+
   return (
     <main className="min-h-screen overflow-hidden bg-[#0A0A0B] text-white">
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
