@@ -61,6 +61,8 @@ type SpotsSnapshot = {
 type AwarenessLevel = "low" | "guarded" | "elevated" | "critical";
 type DesyncLevel = "synced" | "watch" | "drifting" | "separated";
 type DriftLevel = "stable" | "rising" | "elevated" | "prolonged";
+type TrajectoryDirection = "stable" | "rising" | "accelerating" | "dropping";
+type TrajectoryRiskWindow = "none" | "approaching" | "imminent";
 
 type BaselineSnapshot = {
   avgBpm: number;
@@ -71,6 +73,12 @@ type MicroGuidance = {
   title: string;
   actions: string[];
   tone: "steady" | "supportive" | "protective";
+};
+
+type TrajectoryInsight = {
+  direction: TrajectoryDirection;
+  riskWindow: TrajectoryRiskWindow;
+  summary: string;
 };
 
 type SpeechRecognitionLike = {
@@ -496,6 +504,74 @@ function getDesyncInsight(
 }
 
 /* -------------------------
+   TRAJECTORY ENGINE
+--------------------------*/
+
+function getTrajectoryInsight(
+  live: PartyLive | null,
+  minutes: number,
+  movementLevel: string,
+  desyncLevel: DesyncLevel,
+  driftLevel: DriftLevel
+): TrajectoryInsight {
+  if (!live?.active || typeof live.heartbeatBpm !== "number") {
+    return {
+      direction: "stable",
+      riskWindow: "none",
+      summary: "No active trajectory. TwinMe is in standby.",
+    };
+  }
+
+  let direction: TrajectoryDirection = "stable";
+  let riskWindow: TrajectoryRiskWindow = "none";
+
+  if (live.heartbeatBpm >= 115 && minutes > 20) {
+    direction = "accelerating";
+  } else if (live.heartbeatBpm >= 100) {
+    direction = "rising";
+  }
+
+  if (driftLevel === "elevated" || driftLevel === "prolonged") {
+    direction = "accelerating";
+  } else if (driftLevel === "rising" && direction === "stable") {
+    direction = "rising";
+  }
+
+  if (
+    direction === "accelerating" &&
+    (desyncLevel === "drifting" ||
+      desyncLevel === "separated" ||
+      movementLevel === "drifting")
+  ) {
+    riskWindow = "imminent";
+  } else if (
+    direction === "rising" ||
+    driftLevel === "rising" ||
+    desyncLevel === "watch"
+  ) {
+    riskWindow = "approaching";
+  }
+
+  let summary = "Your pace looks stable right now.";
+
+  if (riskWindow === "approaching") {
+    summary =
+      "If this pace continues, you may enter a higher-risk state soon. Stay intentional.";
+  }
+
+  if (riskWindow === "imminent") {
+    summary =
+      "You are trending toward a high-risk state. Slow down now before it compounds.";
+  }
+
+  return {
+    direction,
+    riskWindow,
+    summary,
+  };
+}
+
+/* -------------------------
    MICRO-GUIDANCE
 --------------------------*/
 
@@ -505,7 +581,8 @@ function getMicroGuidance(
   environmentLevel: string,
   desyncLevel: DesyncLevel,
   driftLevel: DriftLevel,
-  noSupportActive: boolean
+  noSupportActive: boolean,
+  trajectory: TrajectoryInsight
 ): MicroGuidance {
   if (!live?.active) {
     return {
@@ -515,6 +592,30 @@ function getMicroGuidance(
         "Take one breath before deciding your next move.",
         "Notice one thing around you that feels calm.",
         "Keep your next choice simple.",
+      ],
+    };
+  }
+
+  if (trajectory.riskWindow === "imminent") {
+    return {
+      title: "Interrupt The Pattern",
+      tone: "protective",
+      actions: [
+        "Stop where you are for 10 seconds.",
+        "Choose one stabilizing move instead of a new stimulating one.",
+        "Do not let the next few minutes choose for you.",
+      ],
+    };
+  }
+
+  if (trajectory.riskWindow === "approaching") {
+    return {
+      title: "Get Ahead Of It",
+      tone: "supportive",
+      actions: [
+        "Slow your next move down on purpose.",
+        "Choose the simpler option before pressure builds.",
+        "Use the next minute to stabilize, not escalate.",
       ],
     };
   }
@@ -603,7 +704,8 @@ function getAwarenessScore(
   spots: SpotsSnapshot | null,
   desyncLevel: DesyncLevel,
   driftLevel: DriftLevel,
-  noSupportActive: boolean
+  noSupportActive: boolean,
+  trajectory: TrajectoryInsight
 ) {
   let score = 18;
 
@@ -707,6 +809,12 @@ function getAwarenessScore(
     score += 10;
   }
 
+  if (trajectory.riskWindow === "approaching") {
+    score += 6;
+  } else if (trajectory.riskWindow === "imminent") {
+    score += 12;
+  }
+
   const clamped = Math.max(0, Math.min(100, score));
 
   let level: AwarenessLevel = "low";
@@ -750,10 +858,19 @@ function getLiveNudge(
   spots: SpotsSnapshot | null,
   desyncLevel: DesyncLevel,
   driftLevel: DriftLevel,
-  noSupportActive: boolean
+  noSupportActive: boolean,
+  trajectory: TrajectoryInsight
 ) {
   if (!live?.active) {
     return "TwinMe is standing by. Turn Party Mode on when your night starts moving.";
+  }
+
+  if (trajectory.riskWindow === "imminent") {
+    return "If you continue at this pace, you’re about to enter a high-risk state. Slow down now and stabilize your position.";
+  }
+
+  if (trajectory.riskWindow === "approaching") {
+    return "You’re trending toward a higher-risk state. Stay intentional with your next few moves.";
   }
 
   if (noSupportActive && driftLevel === "prolonged") {
@@ -867,9 +984,14 @@ function getAlert(
   environmentLevel: string,
   spots: SpotsSnapshot | null,
   desyncLevel: DesyncLevel,
-  noSupportActive: boolean
+  noSupportActive: boolean,
+  trajectory: TrajectoryInsight
 ) {
   if (!live?.active) return null;
+
+  if (trajectory.riskWindow === "imminent") {
+    return "⚠️ Your current pattern is trending toward a high-risk state. Interrupt it now.";
+  }
 
   if (noSupportActive && minutes > 20 && environmentLevel !== "supported") {
     return "⚠️ You are active without visible support around you. Keep your next move small and intentional.";
@@ -934,9 +1056,30 @@ function buildReply(
   environmentLevel: string,
   spots: SpotsSnapshot | null,
   desyncLevel: DesyncLevel,
-  noSupportActive: boolean
+  noSupportActive: boolean,
+  trajectory: TrajectoryInsight
 ) {
   const text = input.toLowerCase();
+
+  if (trajectory.riskWindow === "imminent") {
+    return `Your current pattern is heading toward a higher-risk state.
+
+• Interrupt the pace now
+• Choose one stabilizing move
+• Do not let the next few minutes decide for you
+
+The best move right now is the one that slows the pattern down.`;
+  }
+
+  if (trajectory.riskWindow === "approaching") {
+    return `You are trending toward a more pressured state.
+
+• Get ahead of it early
+• Keep your next move simple
+• Choose stability before intensity grows
+
+The earlier you intervene, the easier this stays.`;
+  }
 
   if (noSupportActive) {
     return `You do not have much support around you right now.
@@ -1084,13 +1227,15 @@ function getEnvironmentTheme(
   awarenessLevel: AwarenessLevel,
   desyncLevel: DesyncLevel,
   driftLevel: DriftLevel,
-  noSupportActive: boolean
+  noSupportActive: boolean,
+  trajectory: TrajectoryInsight
 ) {
   if (
     awarenessLevel === "critical" ||
     environmentLevel === "unsafe" ||
     desyncLevel === "separated" ||
-    driftLevel === "prolonged"
+    driftLevel === "prolonged" ||
+    trajectory.riskWindow === "imminent"
   ) {
     return {
       pageBg:
@@ -1108,7 +1253,8 @@ function getEnvironmentTheme(
     awarenessLevel === "elevated" ||
     environmentLevel === "volatile" ||
     desyncLevel === "drifting" ||
-    driftLevel === "elevated"
+    driftLevel === "elevated" ||
+    trajectory.riskWindow === "approaching"
   ) {
     return {
       pageBg:
@@ -1172,14 +1318,22 @@ function getPulseDurationMs(
   environmentLevel: string,
   desyncLevel: DesyncLevel,
   driftLevel: DriftLevel,
-  noSupportActive: boolean
+  noSupportActive: boolean,
+  trajectory: TrajectoryInsight
 ) {
-  if (desyncLevel === "separated" || driftLevel === "prolonged") return 800;
+  if (
+    desyncLevel === "separated" ||
+    driftLevel === "prolonged" ||
+    trajectory.riskWindow === "imminent"
+  ) {
+    return 800;
+  }
   if (awarenessLevel === "critical") return 900;
   if (
     desyncLevel === "drifting" ||
     awarenessLevel === "elevated" ||
-    driftLevel === "elevated"
+    driftLevel === "elevated" ||
+    trajectory.riskWindow === "approaching"
   ) {
     return 1100;
   }
@@ -1344,6 +1498,18 @@ export default function TwinMePage() {
     [live, minutes]
   );
 
+  const trajectory = useMemo(
+    () =>
+      getTrajectoryInsight(
+        live,
+        minutes,
+        movementLevel,
+        desync.level,
+        internalDrift.level
+      ),
+    [live, minutes, movementLevel, desync.level, internalDrift.level]
+  );
+
   const awareness = useMemo(
     () =>
       getAwarenessScore(
@@ -1355,7 +1521,8 @@ export default function TwinMePage() {
         spots,
         desync.level,
         internalDrift.level,
-        noSupportMode.active
+        noSupportMode.active,
+        trajectory
       ),
     [
       live,
@@ -1367,6 +1534,7 @@ export default function TwinMePage() {
       desync.level,
       internalDrift.level,
       noSupportMode.active,
+      trajectory,
     ]
   );
 
@@ -1381,7 +1549,8 @@ export default function TwinMePage() {
         spots,
         desync.level,
         internalDrift.level,
-        noSupportMode.active
+        noSupportMode.active,
+        trajectory
       ),
     [
       live,
@@ -1393,6 +1562,7 @@ export default function TwinMePage() {
       desync.level,
       internalDrift.level,
       noSupportMode.active,
+      trajectory,
     ]
   );
 
@@ -1406,7 +1576,8 @@ export default function TwinMePage() {
         environmentLevel,
         spots,
         desync.level,
-        noSupportMode.active
+        noSupportMode.active,
+        trajectory
       ),
     [
       live,
@@ -1417,6 +1588,7 @@ export default function TwinMePage() {
       spots,
       desync.level,
       noSupportMode.active,
+      trajectory,
     ]
   );
 
@@ -1428,7 +1600,8 @@ export default function TwinMePage() {
         environmentLevel,
         desync.level,
         internalDrift.level,
-        noSupportMode.active
+        noSupportMode.active,
+        trajectory
       ),
     [
       live,
@@ -1437,6 +1610,7 @@ export default function TwinMePage() {
       desync.level,
       internalDrift.level,
       noSupportMode.active,
+      trajectory,
     ]
   );
 
@@ -1447,7 +1621,8 @@ export default function TwinMePage() {
         awareness.level,
         desync.level,
         internalDrift.level,
-        noSupportMode.active
+        noSupportMode.active,
+        trajectory
       ),
     [
       environmentLevel,
@@ -1455,6 +1630,7 @@ export default function TwinMePage() {
       desync.level,
       internalDrift.level,
       noSupportMode.active,
+      trajectory,
     ]
   );
 
@@ -1466,7 +1642,8 @@ export default function TwinMePage() {
         environmentLevel,
         desync.level,
         internalDrift.level,
-        noSupportMode.active
+        noSupportMode.active,
+        trajectory
       ),
     [
       live?.heartbeatBpm,
@@ -1475,6 +1652,7 @@ export default function TwinMePage() {
       desync.level,
       internalDrift.level,
       noSupportMode.active,
+      trajectory,
     ]
   );
 
@@ -1494,7 +1672,8 @@ export default function TwinMePage() {
       environmentLevel,
       spots,
       desync.level,
-      noSupportMode.active
+      noSupportMode.active,
+      trajectory
     );
 
     const twin: Message = {
@@ -1717,6 +1896,25 @@ export default function TwinMePage() {
               </div>
             ))}
           </div>
+        </section>
+
+        <section className="mb-4 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#11141a,#0b0d11)] p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <div className="text-[11px] uppercase tracking-[0.18em] text-white/55">
+                Trajectory
+              </div>
+              <div className="mt-1 text-2xl font-semibold capitalize text-white">
+                {trajectory.direction}
+              </div>
+            </div>
+
+            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-white/80">
+              {trajectory.riskWindow}
+            </span>
+          </div>
+
+          <p className="text-sm leading-6 text-white/75">{trajectory.summary}</p>
         </section>
 
         <section className="mb-4 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#11141a,#0b0d11)] p-4">
