@@ -9,7 +9,6 @@ import {
   Pause,
   Play,
   Send,
-  IdCard,
   Users,
   LocateFixed,
   CheckCircle2,
@@ -20,6 +19,7 @@ import {
   EyeOff,
   MapPin,
   Sparkles,
+  Volume2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -66,6 +66,40 @@ type PrivacySettings = {
   blurPresence: boolean;
   trustedOnly: boolean;
   trustedList: string[];
+};
+
+type CrewStatusRow = {
+  id: string;
+  name: string;
+  status: string | null;
+  updated_at?: string | null;
+};
+
+type CrewDesyncState = {
+  level: "aligned" | "watch" | "separated";
+  message: string;
+  activeCount: number;
+  differentCount: number;
+};
+
+type IsolationState = {
+  level: "connected" | "isolated";
+  message: string;
+};
+
+type StaleState = {
+  level: "fresh" | "stale";
+  message: string;
+};
+
+type PredictiveRisk = {
+  level: "stable" | "rising" | "high";
+  message: string;
+};
+
+type Intervention = {
+  actions: string[];
+  level: "none" | "suggest" | "urgent";
 };
 
 const defaultPrivacy: PrivacySettings = {
@@ -148,7 +182,8 @@ function getStatusVisual(status: PartyStatus | null): VisualMode {
       return {
         mode: "balanced",
         title: "Balanced Mode",
-        subtitle: "Party Mode is on. Keep your signals current and your exits easy.",
+        subtitle:
+          "Party Mode is on. Keep your signals current and your exits easy.",
         heroGlow:
           "bg-[radial-gradient(circle,rgba(255,255,255,0.10)_0%,rgba(59,130,246,0.10)_35%,rgba(0,0,0,0)_72%)]",
         orbGlow:
@@ -362,10 +397,198 @@ async function getCurrentCoordinates(): Promise<Coordinates> {
   });
 }
 
+function isHighEnergyStatus(status: string | null | undefined) {
+  return status === "Drinking" || status === "At club";
+}
+
+function isAwayFromCrewStatus(status: string | null | undefined) {
+  return (
+    status === "Outside" ||
+    status === "Heading home" ||
+    status === "Safe" ||
+    status === "Watching Netflix"
+  );
+}
+
+function getCrewDesyncState(
+  selfStatus: PartyStatus | null,
+  crewRows: CrewStatusRow[]
+): CrewDesyncState {
+  if (!selfStatus || crewRows.length === 0) {
+    return {
+      level: "aligned",
+      message: "No meaningful crew desync signal yet.",
+      activeCount: 0,
+      differentCount: 0,
+    };
+  }
+
+  const crewHighEnergy = crewRows.filter((row) => isHighEnergyStatus(row.status));
+  const crewAway = crewRows.filter((row) => isAwayFromCrewStatus(row.status));
+
+  if (crewHighEnergy.length >= 1 && isAwayFromCrewStatus(selfStatus)) {
+    return {
+      level: "separated",
+      message:
+        "Your crew is still in a high-energy state while you have shifted away from that flow.",
+      activeCount: crewHighEnergy.length,
+      differentCount: crewHighEnergy.length,
+    };
+  }
+
+  if (crewAway.length >= 1 && isHighEnergyStatus(selfStatus)) {
+    return {
+      level: "watch",
+      message:
+        "You are still in a high-energy state while part of your crew has shifted out of it.",
+      activeCount: crewAway.length,
+      differentCount: crewAway.length,
+    };
+  }
+
+  if (crewHighEnergy.length >= 2 && selfStatus === "Listening to music") {
+    return {
+      level: "watch",
+      message:
+        "Your crew energy is climbing faster than your current state. Stay aware of where the group is moving.",
+      activeCount: crewHighEnergy.length,
+      differentCount: crewHighEnergy.length,
+    };
+  }
+
+  return {
+    level: "aligned",
+    message: "You look reasonably aligned with your crew’s current state.",
+    activeCount: crewHighEnergy.length,
+    differentCount: 0,
+  };
+}
+
+function getIsolationState(crewRows: CrewStatusRow[]): IsolationState {
+  if (crewRows.length === 0) {
+    return {
+      level: "isolated",
+      message:
+        "No active crew detected. You are currently moving without a support layer.",
+    };
+  }
+
+  return {
+    level: "connected",
+    message: "Crew presence detected.",
+  };
+}
+
+function getStaleState(crewRows: CrewStatusRow[]): StaleState {
+  if (crewRows.length === 0) {
+    return {
+      level: "fresh",
+      message: "No crew data yet.",
+    };
+  }
+
+  const now = Date.now();
+
+  const staleCount = crewRows.filter((row) => {
+    if (!row.updated_at) return true;
+    const last = new Date(row.updated_at).getTime();
+    return now - last > 60000;
+  });
+
+  if (staleCount.length >= crewRows.length) {
+    return {
+      level: "stale",
+      message: "Crew signals are outdated. Do not rely on current crew state.",
+    };
+  }
+
+  return {
+    level: "fresh",
+    message: "Crew signals are active.",
+  };
+}
+
+function getPredictiveRisk(
+  bpm: number,
+  desync: CrewDesyncState,
+  isolation: IsolationState,
+  stale: StaleState
+): PredictiveRisk {
+  let score = 0;
+
+  if (bpm >= 110) score += 2;
+  else if (bpm >= 100) score += 1;
+
+  if (desync.level === "watch") score += 1;
+  if (desync.level === "separated") score += 2;
+
+  if (isolation.level === "isolated") score += 2;
+
+  if (stale.level === "stale") score += 2;
+
+  if (score >= 5) {
+    return {
+      level: "high",
+      message:
+        "Your situation is trending toward high risk. Slow down and reassess immediately.",
+    };
+  }
+
+  if (score >= 3) {
+    return {
+      level: "rising",
+      message:
+        "Your state is starting to shift. Stay intentional and stabilize early.",
+    };
+  }
+
+  return {
+    level: "stable",
+    message: "You are stable. Keep your awareness active.",
+  };
+}
+
+function getIntervention(
+  risk: PredictiveRisk,
+  desync: CrewDesyncState,
+  isolation: IsolationState
+): Intervention {
+  const actions: string[] = [];
+
+  if (risk.level === "high") {
+    actions.push("Slow down immediately");
+    actions.push("Move to a safer environment");
+  }
+
+  if (desync.level === "separated") {
+    actions.push("Reconnect with your crew");
+  }
+
+  if (isolation.level === "isolated") {
+    actions.push("Share your location or check in");
+  }
+
+  if (risk.level === "high") {
+    actions.push("Consider calling a ride");
+  }
+
+  return {
+    actions,
+    level:
+      risk.level === "high"
+        ? "urgent"
+        : actions.length > 0
+          ? "suggest"
+          : "none",
+  };
+}
+
 export default function PartyPage() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const firstSyncSkippedRef = useRef(false);
   const trackingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const autoVoiceLastLabelRef = useRef("idle");
+  const autoVoiceLastSpokenAtRef = useRef(0);
 
   const [displayName, setDisplayName] = useState("Neo");
   const [selectedStatus, setSelectedStatus] = useState<PartyStatus | null>(null);
@@ -379,11 +602,37 @@ export default function PartyPage() {
   const [autoTracking, setAutoTracking] = useState(false);
   const [privacy, setPrivacy] = useState<PrivacySettings>(defaultPrivacy);
   const [partyActive, setPartyActive] = useState(false);
+  const [autoVoiceEnabled, setAutoVoiceEnabled] = useState(true);
+  const [crewRows, setCrewRows] = useState<CrewStatusRow[]>([]);
+  const [crewDesync, setCrewDesync] = useState<CrewDesyncState>({
+    level: "aligned",
+    message: "No meaningful crew desync signal yet.",
+    activeCount: 0,
+    differentCount: 0,
+  });
+  const [isolation, setIsolation] = useState<IsolationState>({
+    level: "connected",
+    message: "You are connected to your crew.",
+  });
+  const [stale, setStale] = useState<StaleState>({
+    level: "fresh",
+    message: "Crew signals are active.",
+  });
+  const [risk, setRisk] = useState<PredictiveRisk>({
+    level: "stable",
+    message: "You are stable. Keep your awareness active.",
+  });
+  const [intervention, setIntervention] = useState<Intervention>({
+    actions: [],
+    level: "none",
+  });
 
   useEffect(() => {
     const savedName = window.localStorage.getItem("twincore_display_name");
     const savedStatus = window.localStorage.getItem("twincore_party_status");
-    const savedLocation = window.localStorage.getItem("twincore_last_shared_location");
+    const savedLocation = window.localStorage.getItem(
+      "twincore_last_shared_location"
+    );
     const savedAutoTracking =
       window.localStorage.getItem("twincore_party_auto_tracking") === "true";
     const savedPartyActive =
@@ -512,7 +761,10 @@ export default function PartyPage() {
 
     window.localStorage.setItem("twincore_party_live", JSON.stringify(liveState));
     window.localStorage.setItem("twincore_party_status", status);
-    window.localStorage.setItem("twincore_party_active", active ? "true" : "false");
+    window.localStorage.setItem(
+      "twincore_party_active",
+      active ? "true" : "false"
+    );
   }
 
   async function syncCrewStatus(
@@ -528,12 +780,12 @@ export default function PartyPage() {
         trigger === "checkin"
           ? "Sending live check-in..."
           : trigger === "tracking"
-          ? "Tracking live movement..."
-          : trigger === "toggle"
-          ? active
-            ? "Turning Party Mode on..."
-            : "Turning Party Mode off..."
-          : "Syncing live status..."
+            ? "Tracking live movement..."
+            : trigger === "toggle"
+              ? active
+                ? "Turning Party Mode on..."
+                : "Turning Party Mode off..."
+              : "Syncing live status..."
       );
 
       const coords = await getCurrentCoordinates();
@@ -554,7 +806,29 @@ export default function PartyPage() {
 
       writePartyLiveState(status, coords, trigger, active);
 
-      const rowId = getCrewStatusId();
+      if (!supabase) {
+        throw new Error("Supabase is not configured.");
+      }
+
+      const rowIdFromStorage = getCrewStatusId();
+
+      const { data: existingByName, error: lookupError } = await supabase
+        .from("crew_status")
+        .select("id,name")
+        .eq("name", displayName)
+        .maybeSingle();
+
+      if (lookupError) {
+        throw new Error(lookupError.message || "Could not look up crew row.");
+      }
+
+      const rowId =
+        ((existingByName as { id?: string } | null)?.id as string | undefined) ||
+        rowIdFromStorage;
+
+      if (rowId !== rowIdFromStorage) {
+        window.localStorage.setItem("twincore_crew_status_id", rowId);
+      }
 
       const payloadLatitude =
         privacy.ghostMode && privacy.blurPresence
@@ -569,13 +843,8 @@ export default function PartyPage() {
       const payloadLocationName = privacy.trustedOnly
         ? "Trusted Crew Only"
         : privacy.ghostMode
-        ? privacy.ghostLabel || "Low Visibility"
-        : exactLocationName;
-
-      const payloadLocation =
-        privacy.trustedOnly || (privacy.ghostMode && privacy.blurPresence)
-          ? null
-          : exactMapsUrl;
+          ? privacy.ghostLabel || "Low Visibility"
+          : exactLocationName;
 
       const payloadVibe = privacy.ghostMode
         ? privacy.ghostLabel || "Low Visibility"
@@ -590,7 +859,6 @@ export default function PartyPage() {
         latitude: payloadLatitude,
         longitude: payloadLongitude,
         location_name: payloadLocationName,
-        location: payloadLocation,
         heartbeat_bpm: active ? getHeartbeatForStatus(status) : 68,
         vibe_label: active ? payloadVibe : "Party off",
         mood: active ? payloadMood : "safe",
@@ -624,12 +892,12 @@ export default function PartyPage() {
         trigger === "checkin"
           ? "Check-in sent live to crew"
           : trigger === "tracking"
-          ? "Live tracking updated"
-          : trigger === "toggle"
-          ? active
-            ? "Party Mode is live"
-            : "Party Mode powered down"
-          : "Party status synced live"
+            ? "Live tracking updated"
+            : trigger === "toggle"
+              ? active
+                ? "Party Mode is live"
+                : "Party Mode powered down"
+              : "Party status synced live"
       );
 
       window.setTimeout(() => {
@@ -639,6 +907,46 @@ export default function PartyPage() {
     } catch (error: unknown) {
       setSyncState("error");
       setSyncMessage(normalizeErrorMessage(error));
+    }
+  }
+
+  async function refreshCrewAwareness() {
+    if (!supabase) return;
+    if (!displayName || !selectedStatus) return;
+
+    try {
+      const { data, error } = await supabase
+        .from("crew_status")
+        .select("id,name,status,updated_at")
+        .neq("name", displayName)
+        .limit(12);
+
+      if (error) return;
+
+      const rows = (Array.isArray(data) ? data : []) as CrewStatusRow[];
+      const nextDesync = getCrewDesyncState(selectedStatus, rows);
+      const nextIsolation = getIsolationState(rows);
+      const nextStale = getStaleState(rows);
+      const nextRisk = getPredictiveRisk(
+        getHeartbeatForStatus(selectedStatus),
+        nextDesync,
+        nextIsolation,
+        nextStale
+      );
+      const nextIntervention = getIntervention(
+        nextRisk,
+        nextDesync,
+        nextIsolation
+      );
+
+      setCrewRows(rows);
+      setCrewDesync(nextDesync);
+      setIsolation(nextIsolation);
+      setStale(nextStale);
+      setRisk(nextRisk);
+      setIntervention(nextIntervention);
+    } catch {
+      // ignore awareness refresh errors
     }
   }
 
@@ -689,9 +997,7 @@ export default function PartyPage() {
       return;
     }
 
-    if (!partyActive) {
-      return;
-    }
+    if (!partyActive) return;
 
     void syncCrewStatus(selectedStatus, "status", true);
   }, [selectedStatus]);
@@ -711,7 +1017,6 @@ export default function PartyPage() {
 
   useEffect(() => {
     if (!selectedStatus) return;
-
     writePartyLiveState(selectedStatus, lastCoords, "bootstrap", partyActive);
   }, [privacy, autoTracking, lastCoords, selectedStatus, partyActive]);
 
@@ -748,6 +1053,143 @@ export default function PartyPage() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    void refreshCrewAwareness();
+
+    const interval = window.setInterval(() => {
+      void refreshCrewAwareness();
+    }, 6000);
+
+    return () => window.clearInterval(interval);
+  }, [displayName, selectedStatus, partyActive]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!("speechSynthesis" in window)) return;
+    if (!autoVoiceEnabled) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const raw = window.localStorage.getItem("twincore_party_live");
+        if (!raw) return;
+
+        const live = JSON.parse(raw) as {
+          active?: boolean;
+          heartbeatBpm?: number;
+          status?: PartyStatus;
+        };
+
+        if (!live?.active) return;
+
+        let nextCrewRows = crewRows;
+
+        if (supabase && displayName) {
+          const { data } = await supabase
+            .from("crew_status")
+            .select("id,name,status,updated_at")
+            .neq("name", displayName)
+            .limit(12);
+
+          nextCrewRows = (Array.isArray(data) ? data : []) as CrewStatusRow[];
+          setCrewRows(nextCrewRows);
+        }
+
+        const nextStale = getStaleState(nextCrewRows);
+        const nextIsolation = getIsolationState(nextCrewRows);
+        const nextDesync = getCrewDesyncState(live.status ?? null, nextCrewRows);
+        const bpm = live.heartbeatBpm || 0;
+        const nextRisk = getPredictiveRisk(
+          bpm,
+          nextDesync,
+          nextIsolation,
+          nextStale
+        );
+        const nextIntervention = getIntervention(
+          nextRisk,
+          nextDesync,
+          nextIsolation
+        );
+
+        setStale(nextStale);
+        setIsolation(nextIsolation);
+        setCrewDesync(nextDesync);
+        setRisk(nextRisk);
+        setIntervention(nextIntervention);
+
+        let label = "stable";
+        let message: string | null = null;
+
+        if (nextRisk.level === "high") {
+          label = "risk_high";
+          message =
+            "TwinMe check. Your situation is trending toward high risk. Slow down immediately.";
+        } else if (nextStale.level === "stale") {
+          label = "stale";
+          message =
+            "TwinMe check. Your crew signals are outdated. Do not rely on them.";
+        } else if (nextIsolation.level === "isolated") {
+          label = "isolated";
+          message =
+            "TwinMe check. You are currently isolated. Stay aware.";
+        } else if (nextDesync.level === "separated") {
+          label = "crew_separated";
+          message =
+            "TwinMe check. You are no longer aligned with your crew.";
+        } else if (nextDesync.level === "watch") {
+          label = "crew_watch";
+          message =
+            "TwinMe check. Your state is starting to drift from your crew. Correct it early.";
+        } else if (bpm >= 120) {
+          label = "critical";
+          message =
+            "TwinMe check. Your pace is very high. Slow down now and stabilize.";
+        } else if (bpm >= 110) {
+          label = "elevated";
+          message =
+            "TwinMe check. Your pace is rising. Stay intentional and slow your next move.";
+        } else if (bpm >= 100) {
+          label = "guarded";
+          message =
+            "TwinMe check. Stay aware. Keep your next move simple.";
+        }
+
+        if (!message) {
+          autoVoiceLastLabelRef.current = label;
+          return;
+        }
+
+        const now = Date.now();
+        const cooldown =
+          label === "critical" ||
+          label === "crew_separated" ||
+          label === "isolated" ||
+          label === "stale" ||
+          label === "risk_high"
+            ? 12000
+            : 20000;
+
+        const labelChanged = label !== autoVoiceLastLabelRef.current;
+        const cooldownPassed =
+          now - autoVoiceLastSpokenAtRef.current > cooldown;
+
+        if (!labelChanged && !cooldownPassed) return;
+
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(message);
+        utterance.rate = 1;
+        utterance.pitch = 0.95;
+        window.speechSynthesis.speak(utterance);
+
+        autoVoiceLastLabelRef.current = label;
+        autoVoiceLastSpokenAtRef.current = now;
+      } catch {
+        // ignore auto voice errors
+      }
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [autoVoiceEnabled, crewRows, displayName]);
 
   const visual = useMemo(() => getStatusVisual(selectedStatus), [selectedStatus]);
 
@@ -801,6 +1243,27 @@ export default function PartyPage() {
     writePartyLiveState(selectedStatus, lastCoords, "toggle", nextActive);
   }
 
+  function handleInterventionAction(action: string) {
+    if (action.includes("Reconnect")) {
+      window.location.href = "/crew";
+      return;
+    }
+
+    if (action.includes("safer environment")) {
+      window.location.href = "/spots";
+      return;
+    }
+
+    if (action.includes("check in")) {
+      void handleSendCheckIn();
+      return;
+    }
+
+    if (action.includes("ride")) {
+      window.open("https://maps.google.com", "_blank", "noopener,noreferrer");
+    }
+  }
+
   const liveSystemLabel = useMemo(() => {
     if (!partyActive) return "Party Mode off";
     if (autoTracking) return "Party Mode live + tracking";
@@ -826,6 +1289,11 @@ export default function PartyPage() {
 
     return "Spots and TwinMe receive your live status, mood, heartbeat, and movement as you update.";
   }, [partyActive, privacy.ghostMode, privacy.trustedOnly]);
+
+  const locationLabel = useMemo(() => {
+    if (!lastCoords) return "No live location yet";
+    return getFriendlyLocationName(lastCoords);
+  }, [lastCoords]);
 
   return (
     <main className="min-h-screen overflow-hidden bg-[#0A0A0B] text-white">
@@ -876,7 +1344,9 @@ export default function PartyPage() {
               Party Mode
             </h1>
             <p className="mt-2 text-sm text-white/60">
-              Live awareness for nights, movement, and exits.
+              Live awareness for nights, movement, exits, crew desync,
+              isolation, stale signals, predictive risk, intervention,
+              and action execution.
             </p>
           </div>
 
@@ -894,7 +1364,9 @@ export default function PartyPage() {
           <div className="absolute right-0 top-0 h-28 w-28 rounded-full bg-white/5 blur-3xl" />
 
           <div className="relative">
-            <div className="mb-2 text-4xl leading-none">{getModeIcon(selectedStatus)}</div>
+            <div className="mb-2 text-4xl leading-none">
+              {getModeIcon(selectedStatus)}
+            </div>
 
             <div className="mb-3 text-4xl font-semibold tracking-tight text-white">
               Tonight
@@ -941,9 +1413,18 @@ export default function PartyPage() {
                   AUTO TRACKING
                 </span>
               ) : null}
+
+              {autoVoiceEnabled ? (
+                <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold tracking-wide text-white/85">
+                  <Volume2 className="mr-1 h-3 w-3" />
+                  AUTO VOICE
+                </span>
+              ) : null}
             </div>
 
-            <p className="mt-4 text-sm leading-6 text-white/70">{visual.subtitle}</p>
+            <p className="mt-4 text-sm leading-6 text-white/70">
+              {visual.subtitle}
+            </p>
 
             <div className="mt-5 grid grid-cols-3 gap-3">
               <Meter label="Energy" value={visual.energyValue} />
@@ -996,12 +1477,272 @@ export default function PartyPage() {
             </button>
           </div>
 
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setAutoVoiceEnabled((prev) => !prev)}
+              className="rounded-2xl bg-[linear-gradient(180deg,#17171d,#121218)] px-4 py-4 text-sm font-semibold text-white shadow-[0_8px_24px_rgba(0,0,0,0.32)] transition duration-200 hover:scale-[1.02] active:scale-[0.97]"
+            >
+              {autoVoiceEnabled ? "Auto Voice On" : "Auto Voice Off"}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSendCheckIn}
+              className="rounded-2xl bg-white/10 px-4 py-4 text-sm font-semibold text-white transition duration-200 hover:bg-white/15 active:scale-[0.97]"
+            >
+              {checkInSent ? "Check-in Sent" : "Send Check-in"}
+            </button>
+          </div>
+
           <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
             <div className="mb-2 flex items-center gap-2 text-sm font-medium text-white/85">
               <MapPin className="h-4 w-4" />
               Spots + TwinMe bridge
             </div>
             <p className="text-sm leading-6 text-white/70">{spotsBridgeText}</p>
+          </div>
+        </section>
+
+        <section className="mb-6 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-2xl font-semibold text-white">Crew Desync</h2>
+              <p className="mt-1 text-sm text-white/60">
+                TwinMe now reads your state against your crew’s state.
+              </p>
+            </div>
+          </div>
+
+          <div
+            className={`rounded-2xl border p-4 ${
+              crewDesync.level === "separated"
+                ? "border-red-400/20 bg-red-500/10"
+                : crewDesync.level === "watch"
+                  ? "border-orange-400/20 bg-orange-500/10"
+                  : "border-white/10 bg-white/5"
+            }`}
+          >
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <div className="text-sm font-medium text-white/90">
+                Crew state read
+              </div>
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${
+                  crewDesync.level === "separated"
+                    ? "bg-red-500/15 text-red-100"
+                    : crewDesync.level === "watch"
+                      ? "bg-orange-500/15 text-orange-100"
+                      : "bg-white/10 text-white/80"
+                }`}
+              >
+                {crewDesync.level}
+              </span>
+            </div>
+
+            <p className="text-sm leading-6 text-white/80">
+              {crewDesync.message}
+            </p>
+
+            <div className="mt-3 text-xs text-white/55">
+              Crew rows read: {crewRows.length} · active mismatch signals:{" "}
+              {crewDesync.differentCount}
+            </div>
+          </div>
+        </section>
+
+        <section className="mb-6 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
+          <div className="mb-4">
+            <h2 className="text-2xl font-semibold text-white">Isolation</h2>
+            <p className="text-sm text-white/60">
+              TwinMe monitors if you are operating without crew presence.
+            </p>
+          </div>
+
+          <div
+            className={`rounded-2xl border p-4 ${
+              isolation.level === "isolated"
+                ? "border-red-400/20 bg-red-500/10"
+                : "border-white/10 bg-white/5"
+            }`}
+          >
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <span className="text-sm text-white">Isolation state</span>
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${
+                  isolation.level === "isolated"
+                    ? "bg-red-500/15 text-red-100"
+                    : "bg-white/10 text-white/80"
+                }`}
+              >
+                {isolation.level}
+              </span>
+            </div>
+
+            <p className="text-sm text-white/80">{isolation.message}</p>
+          </div>
+        </section>
+
+        <section className="mb-6 rounded-3xl border border-white/10 bg-[#0c0c0f] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
+          <h2 className="mb-2 text-xl font-semibold text-white">
+            Signal Freshness
+          </h2>
+
+          <div
+            className={`rounded-xl border p-4 ${
+              stale.level === "stale"
+                ? "border-yellow-400/20 bg-yellow-500/10"
+                : "border-white/10 bg-white/5"
+            }`}
+          >
+            <div className="mb-1 flex justify-between">
+              <span className="text-sm text-white">Crew signal state</span>
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${
+                  stale.level === "stale"
+                    ? "bg-yellow-500/15 text-yellow-100"
+                    : "bg-white/10 text-white/80"
+                }`}
+              >
+                {stale.level}
+              </span>
+            </div>
+
+            <p className="text-sm text-white/80">{stale.message}</p>
+          </div>
+        </section>
+
+        <section className="mb-6 rounded-3xl border border-white/10 bg-[#0c0c0f] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
+          <h2 className="mb-2 text-xl font-semibold text-white">
+            Predictive Risk
+          </h2>
+
+          <div
+            className={`rounded-xl border p-4 ${
+              risk.level === "high"
+                ? "border-red-400/20 bg-red-500/10"
+                : risk.level === "rising"
+                  ? "border-orange-400/20 bg-orange-500/10"
+                  : "border-white/10 bg-white/5"
+            }`}
+          >
+            <div className="mb-1 flex justify-between">
+              <span className="text-sm text-white">Risk trajectory</span>
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${
+                  risk.level === "high"
+                    ? "bg-red-500/15 text-red-100"
+                    : risk.level === "rising"
+                      ? "bg-orange-500/15 text-orange-100"
+                      : "bg-white/10 text-white/80"
+                }`}
+              >
+                {risk.level}
+              </span>
+            </div>
+
+            <p className="text-sm text-white/80">{risk.message}</p>
+          </div>
+        </section>
+
+        <section className="mb-6 rounded-3xl border border-white/10 bg-[#0c0c0f] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
+          <h2 className="mb-2 text-xl font-semibold text-white">
+            Intervention Mode
+          </h2>
+
+          <div
+            className={`rounded-xl border p-4 ${
+              intervention.level === "urgent"
+                ? "border-red-400/20 bg-red-500/10"
+                : intervention.level === "suggest"
+                  ? "border-orange-400/20 bg-orange-500/10"
+                  : "border-white/10 bg-white/5"
+            }`}
+          >
+            <div className="mb-2 flex justify-between">
+              <span className="text-sm text-white">Action guidance</span>
+              <span
+                className={`text-xs uppercase ${
+                  intervention.level === "urgent"
+                    ? "text-red-300"
+                    : intervention.level === "suggest"
+                      ? "text-orange-300"
+                      : "text-white/60"
+                }`}
+              >
+                {intervention.level}
+              </span>
+            </div>
+
+            {intervention.actions.length === 0 ? (
+              <p className="text-sm text-white/60">No intervention needed.</p>
+            ) : (
+              <div className="space-y-2">
+                {intervention.actions.map((action, i) => (
+                  <button
+                    key={i}
+                    onClick={() => handleInterventionAction(action)}
+                    className="w-full rounded-xl bg-white/5 px-4 py-3 text-left text-sm text-white/85 transition hover:bg-white/10"
+                  >
+                    • {action}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="mb-6 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-2xl font-semibold text-white">Audio + Vibe</h2>
+              <p className="mt-1 text-sm text-white/60">
+                Keep the room alive, but keep awareness higher than the vibe.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={handleToggleAudio}
+              className="rounded-2xl bg-[linear-gradient(180deg,#17171d,#121218)] px-4 py-4 text-sm font-semibold text-white shadow-[0_8px_24px_rgba(0,0,0,0.32)] transition duration-200 hover:scale-[1.02] active:scale-[0.97]"
+            >
+              <span className="inline-flex items-center gap-2">
+                {isPlaying ? (
+                  <Pause className="h-4 w-4" />
+                ) : (
+                  <Play className="h-4 w-4" />
+                )}
+                {isPlaying ? "Pause Sound" : "Play Sound"}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSendCheckIn}
+              className="rounded-2xl bg-[linear-gradient(180deg,#17171d,#121218)] px-4 py-4 text-sm font-semibold text-white shadow-[0_8px_24px_rgba(0,0,0,0.32)] transition duration-200 hover:scale-[1.02] active:scale-[0.97]"
+            >
+              <span className="inline-flex items-center gap-2">
+                <Send className="h-4 w-4" />
+                Crew Ping
+              </span>
+            </button>
+          </div>
+
+          {!audioReady ? (
+            <div className="mt-3 rounded-2xl border border-orange-500/20 bg-orange-500/10 px-4 py-3 text-sm text-orange-100">
+              Party audio could not load. Check that{" "}
+              <span className="font-semibold">{PARTY_AUDIO_SRC}</span> exists in{" "}
+              <span className="font-semibold">public/</span>.
+            </div>
+          ) : null}
+
+          <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-white/55">
+              Twin Tip
+            </div>
+            <p className="text-sm leading-6 text-white/80">{visual.twinTip}</p>
           </div>
         </section>
 
@@ -1015,78 +1756,94 @@ export default function PartyPage() {
             </div>
           </div>
 
-          <div
-            className={`rounded-2xl border p-4 ${
-              syncState === "synced"
-                ? "border-emerald-500/20 bg-emerald-500/10"
-                : syncState === "error"
-                ? "border-red-500/20 bg-red-500/10"
-                : "border-white/10 bg-white/[0.04]"
-            }`}
-          >
-            <div className="mb-2 flex items-center gap-2 text-sm font-medium text-white/85">
-              {syncState === "syncing" ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : syncState === "synced" ? (
-                <CheckCircle2 className="h-4 w-4 text-emerald-300" />
-              ) : syncState === "error" ? (
-                <AlertTriangle className="h-4 w-4 text-red-300" />
-              ) : (
-                <Users className="h-4 w-4" />
-              )}
-              {syncMessage}
+          <div className="grid gap-3">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div className="inline-flex items-center gap-2 text-sm font-medium text-white/85">
+                  <Users className="h-4 w-4" />
+                  Sync status
+                </div>
+
+                <span
+                  className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${
+                    syncState === "synced"
+                      ? "bg-emerald-500/15 text-emerald-100"
+                      : syncState === "syncing"
+                        ? "bg-white/10 text-white"
+                        : syncState === "error"
+                          ? "bg-red-500/15 text-red-100"
+                          : "bg-white/10 text-white/80"
+                  }`}
+                >
+                  {syncState === "syncing" ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : syncState === "synced" ? (
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                  ) : syncState === "error" ? (
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                  ) : (
+                    <LocateFixed className="h-3.5 w-3.5" />
+                  )}
+                  {syncState}
+                </span>
+              </div>
+
+              <p className="text-sm leading-6 text-white/75">{syncMessage}</p>
             </div>
 
-            <div className="space-y-1 text-sm text-white/70">
-              <p>Party Mode: {partyActive ? "Live" : "Off"}</p>
-              <p>
-                Last live point:{" "}
-                {lastCoords
-                  ? `${lastCoords.latitude.toFixed(5)}, ${lastCoords.longitude.toFixed(5)}`
-                  : "No location yet"}
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <div className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-white/55">
+                Last live location
+              </div>
+              <p className="text-sm leading-6 text-white/80">{locationLabel}</p>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <div className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-white/55">
+                Privacy layer
+              </div>
+              <p className="text-sm leading-6 text-white/80">
+                Ghost mode:{" "}
+                <span className="font-semibold">
+                  {privacy.ghostMode ? "On" : "Off"}
+                </span>
+                {" · "}
+                Blur:{" "}
+                <span className="font-semibold">
+                  {privacy.blurPresence ? "On" : "Off"}
+                </span>
+                {" · "}
+                Trusted only:{" "}
+                <span className="font-semibold">
+                  {privacy.trustedOnly ? "On" : "Off"}
+                </span>
               </p>
-              <p>Ghost Mode: {privacy.ghostMode ? "On" : "Off"}</p>
-              <p>Trusted Only: {privacy.trustedOnly ? "On" : "Off"}</p>
             </div>
           </div>
         </section>
 
         <section className="mb-6 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <h2 className="text-2xl font-semibold text-white">Set Your Status</h2>
-
-            <button
-              type="button"
-              onClick={handleToggleAudio}
-              className="inline-flex items-center gap-2 rounded-2xl bg-[linear-gradient(180deg,#1A1A1F,#141419)] px-4 py-3 text-sm font-medium text-white shadow-[0_8px_24px_rgba(0,0,0,0.35)] transition duration-200 hover:scale-[1.02] active:scale-[0.97]"
-            >
-              {isPlaying ? (
-                <>
-                  <Pause className="h-4 w-4" />
-                  Pause Sound
-                </>
-              ) : (
-                <>
-                  <Play className="h-4 w-4" />
-                  {audioReady ? "Play Sound" : "Sound Unavailable"}
-                </>
-              )}
-            </button>
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-2xl font-semibold text-white">Status Layer</h2>
+              <p className="mt-1 text-sm text-white/60">
+                Choose the state that best matches your current phase.
+              </p>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             {PARTY_STATUSES.map((status) => {
               const active = selectedStatus === status;
-
               return (
                 <button
                   key={status}
                   type="button"
                   onClick={() => handleStatusClick(status)}
-                  className={`rounded-2xl px-4 py-5 text-center text-lg font-semibold transition duration-200 active:scale-[0.97] ${
+                  className={`rounded-2xl px-4 py-4 text-left text-sm font-semibold transition duration-200 active:scale-[0.97] ${
                     active
                       ? "border border-white/80 bg-[linear-gradient(180deg,#24242b,#17171d)] text-white shadow-[0_12px_28px_rgba(255,255,255,0.06)]"
-                      : "bg-[linear-gradient(180deg,#17171d,#121218)] text-white/92 shadow-[0_8px_24px_rgba(0,0,0,0.32)] hover:scale-[1.02]"
+                      : "bg-[linear-gradient(180deg,#17171d,#121218)] text-white/80 shadow-[0_8px_24px_rgba(0,0,0,0.32)] hover:scale-[1.02]"
                   }`}
                 >
                   {status}
@@ -1096,68 +1853,20 @@ export default function PartyPage() {
           </div>
         </section>
 
-        <section className="mb-6 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
-          <h2 className="mb-4 text-2xl font-semibold text-white">Quick Actions</h2>
-
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={handleSendCheckIn}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(180deg,#1A1A1F,#141419)] px-4 py-5 text-center text-lg font-semibold text-white shadow-[0_8px_24px_rgba(0,0,0,0.35)] transition duration-200 hover:scale-[1.02] active:scale-[0.97]"
-            >
-              <Send className="h-5 w-5" />
-              {checkInSent ? "Check-In Sent" : "Send Check-In"}
-            </button>
-
-            <Link
-              href="/spots"
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(180deg,#1A1A1F,#141419)] px-4 py-5 text-center text-lg font-semibold text-white shadow-[0_8px_24px_rgba(0,0,0,0.35)] transition duration-200 hover:scale-[1.02] active:scale-[0.97]"
-            >
-              <LocateFixed className="h-5 w-5" />
-              Open Spots
-            </Link>
-
-            <Link
-              href="/contact-card"
-              className="col-span-2 inline-flex items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(180deg,#1A1A1F,#141419)] px-4 py-5 text-center text-lg font-semibold text-white shadow-[0_8px_24px_rgba(0,0,0,0.35)] transition duration-200 hover:scale-[1.02] active:scale-[0.97]"
-            >
-              <IdCard className="h-5 w-5" />
-              Share Contact Card
-            </Link>
-          </div>
-        </section>
-
-        <section className="mb-6 rounded-3xl border border-blue-500/20 bg-[linear-gradient(180deg,#1a1f2e,#0c0f1a)] p-5 shadow-[0_18px_45px_rgba(59,130,246,0.14)]">
-          <div className="mb-3 flex items-center gap-2 text-sm text-blue-100">
-            <Sparkles className="h-4 w-4" />
-            TWINME SNAPSHOT
-          </div>
-
-          <p className="text-sm leading-6 text-white/80">{visual.twinTip}</p>
-        </section>
-
-        <nav className="grid grid-cols-3 gap-3">
-          <Link
-            href="/"
-            className="rounded-2xl bg-[linear-gradient(180deg,#1A1A1F,#141419)] px-4 py-4 text-center text-base font-medium text-white shadow-[0_8px_24px_rgba(0,0,0,0.35)] transition duration-200 hover:scale-[1.02] active:scale-[0.97]"
-          >
-            Home
+        <div className="mt-6 flex items-center justify-between text-xs text-white/45">
+          <Link href="/" className="transition hover:text-white/75">
+            Dashboard
           </Link>
-
-          <Link
-            href="/crew"
-            className="rounded-2xl bg-[linear-gradient(180deg,#1A1A1F,#141419)] px-4 py-4 text-center text-base font-medium text-white shadow-[0_8px_24px_rgba(0,0,0,0.35)] transition duration-200 hover:scale-[1.02] active:scale-[0.97]"
-          >
+          <Link href="/crew" className="transition hover:text-white/75">
             Crew
           </Link>
-
-          <Link
-            href="/profile"
-            className="rounded-2xl bg-[linear-gradient(180deg,#1A1A1F,#141419)] px-4 py-4 text-center text-base font-medium text-white shadow-[0_8px_24px_rgba(0,0,0,0.35)] transition duration-200 hover:scale-[1.02] active:scale-[0.97]"
-          >
-            Profile
+          <Link href="/spots" className="transition hover:text-white/75">
+            Spots
           </Link>
-        </nav>
+          <Link href="/twinme" className="transition hover:text-white/75">
+            TwinMe
+          </Link>
+        </div>
       </div>
     </main>
   );
