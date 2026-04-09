@@ -35,23 +35,39 @@ export default function JoinPage() {
 
     try {
       const localInvite = createLocalInvite(inviterName, crewName);
+      const link = `${window.location.origin}/invite/${localInvite.code}`;
 
-      if (supabase) {
-        await supabase.from("crew_invites").insert({
+      if (!supabase) {
+        setCreatedLink(link);
+        setInviteCode(localInvite.code);
+        setStatusMessage("Supabase is not connected in this build.");
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("crew_invites")
+        .insert({
           code: localInvite.code,
           inviter_name: localInvite.inviterName,
           crew_name: localInvite.crewName,
           status: localInvite.status,
           created_at: localInvite.createdAt,
-        });
+        })
+        .select();
+
+      if (error) {
+        console.error("SUPABASE INSERT ERROR:", error);
+        setStatusMessage(`Supabase error: ${error.message}`);
+        return;
       }
 
-      const link = `${window.location.origin}/invite/${localInvite.code}`;
+      console.log("INSERT SUCCESS:", data);
       setCreatedLink(link);
       setInviteCode(localInvite.code);
       setStatusMessage("Invite created successfully.");
-    } catch {
-      setStatusMessage("Invite created locally, but remote save may not be configured yet.");
+    } catch (error) {
+      console.error("CREATE INVITE ERROR:", error);
+      setStatusMessage("Invite creation failed. Check the browser console for details.");
     } finally {
       setCreating(false);
     }

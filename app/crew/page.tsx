@@ -33,6 +33,14 @@ type CrewStatusRow = {
   longitude?: number | null;
 };
 
+type CrewMemberRow = {
+  id: string;
+  invite_code?: string | null;
+  display_name?: string | null;
+  crew_name?: string | null;
+  joined_at?: string | null;
+};
+
 type FilterMode = "all" | "active" | "heading-home";
 
 type PrivacySettings = {
@@ -189,6 +197,24 @@ function getDisplayRow(row: CrewStatusRow, privacy: PrivacySettings): CrewStatus
   };
 }
 
+function dedupeCrewRows(rows: CrewStatusRow[]) {
+  const seen = new Set<string>();
+  const deduped: CrewStatusRow[] = [];
+
+  for (const row of rows) {
+    const key = `${(row.name || "").trim().toLowerCase()}::${(row.status || "")
+      .trim()
+      .toLowerCase()}::${(row.location_name || "").trim().toLowerCase()}`;
+
+    if (!seen.has(key)) {
+      seen.add(key);
+      deduped.push(row);
+    }
+  }
+
+  return deduped;
+}
+
 export default function CrewPage() {
   const [crewRows, setCrewRows] = useState<CrewStatusRow[]>([]);
   const [crewMessage, setCrewMessage] = useState("Checking crew pulse...");
@@ -197,13 +223,44 @@ export default function CrewPage() {
   const [privacy, setPrivacy] = useState<PrivacySettings>(defaultPrivacy);
 
   async function loadCrewSignals() {
-    const { data, error } = await supabase
-      .from("crew_status")
-      .select("*")
-      .order("updated_at", { ascending: false });
+    if (!supabase) {
+      setCrewRows([]);
+      setCrewMessage("Crew connection unavailable");
+      return;
+    }
 
-    if (!error && data && data.length > 0) {
-      setCrewRows(data as CrewStatusRow[]);
+    const [{ data: statusData, error: statusError }, { data: membersData, error: membersError }] =
+      await Promise.all([
+        supabase.from("crew_status").select("*").order("updated_at", { ascending: false }),
+        supabase.from("crew_members").select("*").order("joined_at", { ascending: false }),
+      ]);
+
+    const combined: CrewStatusRow[] = [];
+
+    if (!statusError && Array.isArray(statusData) && statusData.length > 0) {
+      combined.push(...(statusData as CrewStatusRow[]));
+    }
+
+    if (!membersError && Array.isArray(membersData) && membersData.length > 0) {
+      const mappedMembers = (membersData as CrewMemberRow[]).map((member) => ({
+        id: member.id,
+        name: member.display_name || "Crew Member",
+        status: "joined",
+        heartbeat_bpm: null,
+        vibe_label: "Connected",
+        location_name: member.crew_name || "TwinCore Crew",
+        updated_at: member.joined_at || new Date().toISOString(),
+        latitude: null,
+        longitude: null,
+      }));
+
+      combined.push(...mappedMembers);
+    }
+
+    const deduped = dedupeCrewRows(combined);
+
+    if (deduped.length > 0) {
+      setCrewRows(deduped);
       setCrewMessage("Crew pulse connected");
       return;
     }
@@ -378,7 +435,7 @@ export default function CrewPage() {
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
               {radarRows.map((row, index) => {
                 const tone = getRadarPointClass(row);
-                const trusted = canSeeFull(crewRows[index] || row, privacy);
+                const trusted = canSeeFull(filteredRows[index] || row, privacy);
 
                 return (
                   <div
@@ -439,6 +496,8 @@ export default function CrewPage() {
                 ? "TwinMe: one or more crew signals need attention. Reduce drift and check in now."
                 : crewStats.headingHome > 0
                 ? "TwinMe: your crew is starting to split. Keep tabs on who is heading home."
+                : crewStats.total > 0
+                ? "TwinMe: your crew is building. Stay connected and keep the energy aligned."
                 : "TwinMe: your crew looks stable right now. Stay connected and enjoy the moment."}
             </div>
 
@@ -456,12 +515,11 @@ export default function CrewPage() {
 
           <div className="space-y-4">
             {filteredRows.map((row, i) => {
-              const original = crewRows[i] || row;
               const name = row.name || `Crew ${i + 1}`;
               const status = row.status || "active";
               const location = row.location_name || "Unknown";
               const tone = getRowTone(row);
-              const trusted = canSeeFull(original, privacy);
+              const trusted = canSeeFull(row, privacy);
 
               return (
                 <AnimatedCard
@@ -506,7 +564,9 @@ export default function CrewPage() {
                       label="Heartbeat"
                       value={
                         trusted || !privacy.trustedOnly
-                          ? `${row.heartbeat_bpm || 70} BPM`
+                          ? row.heartbeat_bpm
+                            ? `${row.heartbeat_bpm} BPM`
+                            : "Linked"
                           : "Masked"
                       }
                     />

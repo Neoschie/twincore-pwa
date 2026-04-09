@@ -1,5 +1,4 @@
 "use client";
-
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -22,10 +21,9 @@ import {
   Volume2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-
 const STORAGE_KEY = "twincore_profile";
 const PARTY_AUDIO_SRC = "/party-mode.mp3";
-
+const JOINED_CREW_KEY = "twincore_joined_crew";
 const PARTY_STATUSES = [
   "Outside",
   "Drinking",
@@ -35,9 +33,7 @@ const PARTY_STATUSES = [
   "Heading home",
   "Safe",
 ] as const;
-
 type PartyStatus = (typeof PARTY_STATUSES)[number];
-
 type VisualMode = {
   mode: "fire" | "ice" | "sound" | "balanced";
   title: string;
@@ -52,14 +48,11 @@ type VisualMode = {
   awarenessValue: number;
   twinTip: string;
 };
-
 type SyncState = "idle" | "syncing" | "synced" | "error";
-
 type Coordinates = {
   latitude: number;
   longitude: number;
 };
-
 type PrivacySettings = {
   ghostMode: boolean;
   ghostLabel: string;
@@ -67,7 +60,6 @@ type PrivacySettings = {
   trustedOnly: boolean;
   trustedList: string[];
 };
-
 type CrewStatusRow = {
   id: string;
   name: string;
@@ -75,33 +67,39 @@ type CrewStatusRow = {
   updated_at?: string | null;
 };
 
+type CrewMemberRow = {
+  crew_owner: string;
+  member_name: string;
+};
+
+type JoinedCrewStorage = {
+  crewOwner?: string;
+  memberName?: string;
+  inviteCode?: string;
+  joinedAt?: string;
+};
 type CrewDesyncState = {
   level: "aligned" | "watch" | "separated";
   message: string;
   activeCount: number;
   differentCount: number;
 };
-
 type IsolationState = {
   level: "connected" | "isolated";
   message: string;
 };
-
 type StaleState = {
   level: "fresh" | "stale";
   message: string;
 };
-
 type PredictiveRisk = {
   level: "stable" | "rising" | "high";
   message: string;
 };
-
 type Intervention = {
   actions: string[];
   level: "none" | "suggest" | "urgent";
 };
-
 const defaultPrivacy: PrivacySettings = {
   ghostMode: false,
   ghostLabel: "Low Visibility",
@@ -109,7 +107,6 @@ const defaultPrivacy: PrivacySettings = {
   trustedOnly: false,
   trustedList: [],
 };
-
 function getStatusVisual(status: PartyStatus | null): VisualMode {
   switch (status) {
     case "Drinking":
@@ -133,7 +130,6 @@ function getStatusVisual(status: PartyStatus | null): VisualMode {
         twinTip:
           "Energy is high. Stay with your people and slow your next decision down.",
       };
-
     case "Heading home":
     case "Safe":
     case "Watching Netflix":
@@ -156,7 +152,6 @@ function getStatusVisual(status: PartyStatus | null): VisualMode {
         twinTip:
           "This is the cleanest phase of the night. Confirm your safety and keep your exit simple.",
       };
-
     case "Listening to music":
       return {
         mode: "sound",
@@ -177,7 +172,6 @@ function getStatusVisual(status: PartyStatus | null): VisualMode {
         twinTip:
           "Good vibe zone. Don’t get pulled into drift just because the room feels good.",
       };
-
     default:
       return {
         mode: "balanced",
@@ -201,12 +195,10 @@ function getStatusVisual(status: PartyStatus | null): VisualMode {
       };
   }
 }
-
 function getModeIcon(status: PartyStatus | null) {
   if (status === "Drinking" || status === "At club") {
     return <Flame className="h-10 w-10 text-orange-400" />;
   }
-
   if (
     status === "Heading home" ||
     status === "Safe" ||
@@ -214,10 +206,8 @@ function getModeIcon(status: PartyStatus | null) {
   ) {
     return <Snowflake className="h-10 w-10 text-cyan-300" />;
   }
-
   return <Music4 className="h-10 w-10 text-fuchsia-300" />;
 }
-
 function Meter({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
@@ -227,7 +217,6 @@ function Meter({ label, value }: { label: string; value: number }) {
         </span>
         <span className="text-sm font-semibold text-white">{value}</span>
       </div>
-
       <div className="h-2 overflow-hidden rounded-full bg-white/10">
         <div
           className="h-full rounded-full bg-white/80 transition-all duration-500"
@@ -237,7 +226,6 @@ function Meter({ label, value }: { label: string; value: number }) {
     </div>
   );
 }
-
 function getHeartbeatForStatus(status: PartyStatus | null) {
   switch (status) {
     case "Drinking":
@@ -258,7 +246,6 @@ function getHeartbeatForStatus(status: PartyStatus | null) {
       return 74;
   }
 }
-
 function getMoodForStatus(status: PartyStatus | null) {
   switch (status) {
     case "Drinking":
@@ -278,7 +265,6 @@ function getMoodForStatus(status: PartyStatus | null) {
       return "steady";
   }
 }
-
 function getVibeLabelForStatus(status: PartyStatus | null) {
   switch (status) {
     case "Drinking":
@@ -299,29 +285,23 @@ function getVibeLabelForStatus(status: PartyStatus | null) {
       return "Party active";
   }
 }
-
 function getFriendlyLocationName(coords: Coordinates) {
   return `${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`;
 }
-
 function getCrewStatusId() {
   const existing = window.localStorage.getItem("twincore_crew_status_id");
   if (existing) return existing;
-
   const created =
     typeof crypto !== "undefined" && "randomUUID" in crypto
       ? crypto.randomUUID()
       : `crew-${Date.now()}`;
-
   window.localStorage.setItem("twincore_crew_status_id", created);
   return created;
 }
-
 function normalizeErrorMessage(error: unknown) {
   if (error instanceof Error && error.message) {
     return error.message;
   }
-
   if (
     typeof error === "object" &&
     error !== null &&
@@ -330,24 +310,29 @@ function normalizeErrorMessage(error: unknown) {
   ) {
     return (error as { message: string }).message;
   }
-
   if (typeof error === "string" && error.trim()) {
     return error;
   }
-
   return "Live sync failed. Check location access and Supabase permissions.";
 }
-
 function roundCoordinate(value: number, decimals: number) {
   const factor = 10 ** decimals;
   return Math.round(value * factor) / factor;
+}
+function getJoinedCrew(): JoinedCrewStorage {
+  try {
+    const raw = window.localStorage.getItem(JOINED_CREW_KEY);
+    if (!raw) return {};
+    return JSON.parse(raw) as JoinedCrewStorage;
+  } catch {
+    return {};
+  }
 }
 
 function getPrivacySettings(): PrivacySettings {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaultPrivacy;
-
     const parsed = JSON.parse(raw) as Partial<PrivacySettings>;
     return {
       ghostMode: parsed.ghostMode ?? false,
@@ -360,14 +345,12 @@ function getPrivacySettings(): PrivacySettings {
     return defaultPrivacy;
   }
 }
-
 async function getCurrentCoordinates(): Promise<Coordinates> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
       reject(new Error("Geolocation is not supported on this device."));
       return;
     }
-
     navigator.geolocation.getCurrentPosition(
       (position) => {
         resolve({
@@ -380,12 +363,10 @@ async function getCurrentCoordinates(): Promise<Coordinates> {
           reject(new Error("Location access was denied."));
           return;
         }
-
         if (geoError.code === geoError.TIMEOUT) {
           reject(new Error("Location request timed out."));
           return;
         }
-
         reject(new Error("Location access is off. Turn it on for live sync."));
       },
       {
@@ -396,11 +377,9 @@ async function getCurrentCoordinates(): Promise<Coordinates> {
     );
   });
 }
-
 function isHighEnergyStatus(status: string | null | undefined) {
   return status === "Drinking" || status === "At club";
 }
-
 function isAwayFromCrewStatus(status: string | null | undefined) {
   return (
     status === "Outside" ||
@@ -409,7 +388,6 @@ function isAwayFromCrewStatus(status: string | null | undefined) {
     status === "Watching Netflix"
   );
 }
-
 function getCrewDesyncState(
   selfStatus: PartyStatus | null,
   crewRows: CrewStatusRow[]
@@ -422,10 +400,8 @@ function getCrewDesyncState(
       differentCount: 0,
     };
   }
-
   const crewHighEnergy = crewRows.filter((row) => isHighEnergyStatus(row.status));
   const crewAway = crewRows.filter((row) => isAwayFromCrewStatus(row.status));
-
   if (crewHighEnergy.length >= 1 && isAwayFromCrewStatus(selfStatus)) {
     return {
       level: "separated",
@@ -435,7 +411,6 @@ function getCrewDesyncState(
       differentCount: crewHighEnergy.length,
     };
   }
-
   if (crewAway.length >= 1 && isHighEnergyStatus(selfStatus)) {
     return {
       level: "watch",
@@ -445,7 +420,6 @@ function getCrewDesyncState(
       differentCount: crewAway.length,
     };
   }
-
   if (crewHighEnergy.length >= 2 && selfStatus === "Listening to music") {
     return {
       level: "watch",
@@ -455,7 +429,6 @@ function getCrewDesyncState(
       differentCount: crewHighEnergy.length,
     };
   }
-
   return {
     level: "aligned",
     message: "You look reasonably aligned with your crew’s current state.",
@@ -463,7 +436,6 @@ function getCrewDesyncState(
     differentCount: 0,
   };
 }
-
 function getIsolationState(crewRows: CrewStatusRow[]): IsolationState {
   if (crewRows.length === 0) {
     return {
@@ -472,13 +444,11 @@ function getIsolationState(crewRows: CrewStatusRow[]): IsolationState {
         "No active crew detected. You are currently moving without a support layer.",
     };
   }
-
   return {
     level: "connected",
     message: "Crew presence detected.",
   };
 }
-
 function getStaleState(crewRows: CrewStatusRow[]): StaleState {
   if (crewRows.length === 0) {
     return {
@@ -486,28 +456,23 @@ function getStaleState(crewRows: CrewStatusRow[]): StaleState {
       message: "No crew data yet.",
     };
   }
-
   const now = Date.now();
-
   const staleCount = crewRows.filter((row) => {
     if (!row.updated_at) return true;
     const last = new Date(row.updated_at).getTime();
     return now - last > 60000;
   });
-
   if (staleCount.length >= crewRows.length) {
     return {
       level: "stale",
       message: "Crew signals are outdated. Do not rely on current crew state.",
     };
   }
-
   return {
     level: "fresh",
     message: "Crew signals are active.",
   };
 }
-
 function getPredictiveRisk(
   bpm: number,
   desync: CrewDesyncState,
@@ -515,17 +480,12 @@ function getPredictiveRisk(
   stale: StaleState
 ): PredictiveRisk {
   let score = 0;
-
   if (bpm >= 110) score += 2;
   else if (bpm >= 100) score += 1;
-
   if (desync.level === "watch") score += 1;
   if (desync.level === "separated") score += 2;
-
   if (isolation.level === "isolated") score += 2;
-
   if (stale.level === "stale") score += 2;
-
   if (score >= 5) {
     return {
       level: "high",
@@ -533,7 +493,6 @@ function getPredictiveRisk(
         "Your situation is trending toward high risk. Slow down and reassess immediately.",
     };
   }
-
   if (score >= 3) {
     return {
       level: "rising",
@@ -541,37 +500,30 @@ function getPredictiveRisk(
         "Your state is starting to shift. Stay intentional and stabilize early.",
     };
   }
-
   return {
     level: "stable",
     message: "You are stable. Keep your awareness active.",
   };
 }
-
 function getIntervention(
   risk: PredictiveRisk,
   desync: CrewDesyncState,
   isolation: IsolationState
 ): Intervention {
   const actions: string[] = [];
-
   if (risk.level === "high") {
     actions.push("Slow down immediately");
     actions.push("Move to a safer environment");
   }
-
   if (desync.level === "separated") {
     actions.push("Reconnect with your crew");
   }
-
   if (isolation.level === "isolated") {
     actions.push("Share your location or check in");
   }
-
   if (risk.level === "high") {
     actions.push("Consider calling a ride");
   }
-
   return {
     actions,
     level:
@@ -582,15 +534,14 @@ function getIntervention(
           : "none",
   };
 }
-
 export default function PartyPage() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const firstSyncSkippedRef = useRef(false);
   const trackingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoVoiceLastLabelRef = useRef("idle");
   const autoVoiceLastSpokenAtRef = useRef(0);
-
   const [displayName, setDisplayName] = useState("Neo");
+  const [crewOwner, setCrewOwner] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<PartyStatus | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioReady, setAudioReady] = useState(true);
@@ -626,7 +577,6 @@ export default function PartyPage() {
     actions: [],
     level: "none",
   });
-
   useEffect(() => {
     const savedName = window.localStorage.getItem("twincore_display_name");
     const savedStatus = window.localStorage.getItem("twincore_party_status");
@@ -637,25 +587,28 @@ export default function PartyPage() {
       window.localStorage.getItem("twincore_party_auto_tracking") === "true";
     const savedPartyActive =
       window.localStorage.getItem("twincore_party_active") === "true";
-
     if (savedName) {
       setDisplayName(savedName);
     }
 
+    const joinedCrew = getJoinedCrew();
+    if (joinedCrew.crewOwner?.trim()) {
+      setCrewOwner(joinedCrew.crewOwner.trim());
+    } else if (savedName) {
+      setCrewOwner(savedName);
+    }
     if (savedStatus && PARTY_STATUSES.includes(savedStatus as PartyStatus)) {
       setSelectedStatus(savedStatus as PartyStatus);
     } else {
       setSelectedStatus("Listening to music");
       window.localStorage.setItem("twincore_party_status", "Listening to music");
     }
-
     if (savedLocation) {
       try {
         const parsed = JSON.parse(savedLocation) as {
           latitude?: number;
           longitude?: number;
         };
-
         if (
           typeof parsed.latitude === "number" &&
           typeof parsed.longitude === "number"
@@ -669,71 +622,63 @@ export default function PartyPage() {
         // ignore bad cache
       }
     }
-
     if (savedAutoTracking) {
       setAutoTracking(true);
     }
-
     if (savedPartyActive) {
       setPartyActive(true);
     }
-
     setPrivacy(getPrivacySettings());
-
     const onStorage = () => {
       setPrivacy(getPrivacySettings());
-
       const nextName = window.localStorage.getItem("twincore_display_name");
       if (nextName) setDisplayName(nextName);
 
+      const nextJoinedCrew = getJoinedCrew();
+      if (nextJoinedCrew.crewOwner?.trim()) {
+        setCrewOwner(nextJoinedCrew.crewOwner.trim());
+      } else if (nextName) {
+        setCrewOwner(nextName);
+      }
       const nextStatus = window.localStorage.getItem("twincore_party_status");
       if (nextStatus && PARTY_STATUSES.includes(nextStatus as PartyStatus)) {
         setSelectedStatus(nextStatus as PartyStatus);
       }
-
       const nextPartyActive =
         window.localStorage.getItem("twincore_party_active") === "true";
       setPartyActive(nextPartyActive);
     };
-
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
   }, []);
-
   useEffect(() => {
     if (!selectedStatus) return;
     window.localStorage.setItem("twincore_party_status", selectedStatus);
   }, [selectedStatus]);
-
   useEffect(() => {
     window.localStorage.setItem(
       "twincore_party_auto_tracking",
       autoTracking ? "true" : "false"
     );
   }, [autoTracking]);
-
   useEffect(() => {
     window.localStorage.setItem(
       "twincore_party_active",
       partyActive ? "true" : "false"
     );
   }, [partyActive]);
-
   useEffect(() => {
     if (!isPlaying) {
       setPulse(false);
       return;
     }
-
     const interval = window.setInterval(() => {
       setPulse((prev) => !prev);
     }, 900);
-
     return () => {
       window.clearInterval(interval);
     };
   }, [isPlaying]);
-
   function writePartyLiveState(
     status: PartyStatus,
     coords: Coordinates | null,
@@ -741,7 +686,6 @@ export default function PartyPage() {
     activeOverride?: boolean
   ) {
     const active = activeOverride ?? partyActive;
-
     const liveState = {
       active,
       status,
@@ -758,7 +702,6 @@ export default function PartyPage() {
       latitude: coords?.latitude ?? null,
       longitude: coords?.longitude ?? null,
     };
-
     window.localStorage.setItem("twincore_party_live", JSON.stringify(liveState));
     window.localStorage.setItem("twincore_party_status", status);
     window.localStorage.setItem(
@@ -766,14 +709,12 @@ export default function PartyPage() {
       active ? "true" : "false"
     );
   }
-
   async function syncCrewStatus(
     status: PartyStatus,
     trigger: "status" | "checkin" | "tracking" | "toggle",
     activeOverride?: boolean
   ) {
     const active = activeOverride ?? partyActive;
-
     try {
       setSyncState("syncing");
       setSyncMessage(
@@ -787,13 +728,10 @@ export default function PartyPage() {
                 : "Turning Party Mode off..."
               : "Syncing live status..."
       );
-
       const coords = await getCurrentCoordinates();
       setLastCoords(coords);
-
       const exactMapsUrl = `https://maps.google.com/?q=${coords.latitude},${coords.longitude}`;
       const exactLocationName = getFriendlyLocationName(coords);
-
       window.localStorage.setItem(
         "twincore_last_shared_location",
         JSON.stringify({
@@ -803,55 +741,42 @@ export default function PartyPage() {
           mapsUrl: exactMapsUrl,
         })
       );
-
       writePartyLiveState(status, coords, trigger, active);
-
       if (!supabase) {
         throw new Error("Supabase is not configured.");
       }
-
       const rowIdFromStorage = getCrewStatusId();
-
       const { data: existingByName, error: lookupError } = await supabase
         .from("crew_status")
         .select("id,name")
         .eq("name", displayName)
         .maybeSingle();
-
       if (lookupError) {
         throw new Error(lookupError.message || "Could not look up crew row.");
       }
-
       const rowId =
         ((existingByName as { id?: string } | null)?.id as string | undefined) ||
         rowIdFromStorage;
-
       if (rowId !== rowIdFromStorage) {
         window.localStorage.setItem("twincore_crew_status_id", rowId);
       }
-
       const payloadLatitude =
         privacy.ghostMode && privacy.blurPresence
           ? roundCoordinate(coords.latitude, 2)
           : coords.latitude;
-
       const payloadLongitude =
         privacy.ghostMode && privacy.blurPresence
           ? roundCoordinate(coords.longitude, 2)
           : coords.longitude;
-
       const payloadLocationName = privacy.trustedOnly
         ? "Trusted Crew Only"
         : privacy.ghostMode
           ? privacy.ghostLabel || "Low Visibility"
           : exactLocationName;
-
       const payloadVibe = privacy.ghostMode
         ? privacy.ghostLabel || "Low Visibility"
         : getVibeLabelForStatus(status);
-
       const payloadMood = privacy.ghostMode ? "ghost" : getMoodForStatus(status);
-
       const payload = {
         id: rowId,
         name: displayName,
@@ -863,15 +788,12 @@ export default function PartyPage() {
         vibe_label: active ? payloadVibe : "Party off",
         mood: active ? payloadMood : "safe",
       };
-
       const { error } = await supabase
         .from("crew_status")
         .upsert(payload, { onConflict: "id" });
-
       if (error) {
         throw new Error(error.message || "Supabase write failed.");
       }
-
       const checkInPayload = {
         active,
         status,
@@ -881,12 +803,10 @@ export default function PartyPage() {
         longitude: coords.longitude,
         mapsUrl: exactMapsUrl,
       };
-
       window.localStorage.setItem(
         "twincore_party_checkin",
         JSON.stringify(checkInPayload)
       );
-
       setSyncState("synced");
       setSyncMessage(
         trigger === "checkin"
@@ -899,7 +819,6 @@ export default function PartyPage() {
                 : "Party Mode powered down"
               : "Party status synced live"
       );
-
       window.setTimeout(() => {
         setSyncState("idle");
         setSyncMessage(autoTracking ? "Auto tracking active" : "Ready to sync");
@@ -909,21 +828,55 @@ export default function PartyPage() {
       setSyncMessage(normalizeErrorMessage(error));
     }
   }
+  async function loadCrewRowsForAwareness() {
+    if (!supabase || !displayName) return [] as CrewStatusRow[];
+
+    const joined = getJoinedCrew();
+    const owner = joined.crewOwner?.trim() || crewOwner || displayName;
+
+    const memberNames = new Set<string>();
+    memberNames.add(owner);
+
+    const { data: memberRows, error: memberError } = await supabase
+      .from("crew_members")
+      .select("crew_owner, member_name")
+      .eq("crew_owner", owner);
+
+    if (memberError) {
+      throw new Error(memberError.message || "Unable to load crew members.");
+    }
+
+    (Array.isArray(memberRows) ? (memberRows as CrewMemberRow[]) : []).forEach((row) => {
+      if (row.member_name?.trim()) {
+        memberNames.add(row.member_name.trim());
+      }
+    });
+
+    const namesToLoad = Array.from(memberNames).filter((name) => name !== displayName);
+
+    if (!namesToLoad.length) {
+      return [];
+    }
+
+    const { data: statusRows, error: statusError } = await supabase
+      .from("crew_status")
+      .select("id,name,status,updated_at")
+      .in("name", namesToLoad);
+
+    if (statusError) {
+      throw new Error(statusError.message || "Unable to load crew status.");
+    }
+
+    return (Array.isArray(statusRows) ? statusRows : []) as CrewStatusRow[];
+  }
 
   async function refreshCrewAwareness() {
     if (!supabase) return;
     if (!displayName || !selectedStatus) return;
 
     try {
-      const { data, error } = await supabase
-        .from("crew_status")
-        .select("id,name,status,updated_at")
-        .neq("name", displayName)
-        .limit(12);
+      const rows = await loadCrewRowsForAwareness();
 
-      if (error) return;
-
-      const rows = (Array.isArray(data) ? data : []) as CrewStatusRow[];
       const nextDesync = getCrewDesyncState(selectedStatus, rows);
       const nextIsolation = getIsolationState(rows);
       const nextStale = getStaleState(rows);
@@ -952,91 +905,69 @@ export default function PartyPage() {
 
   function stopAutoTracking() {
     setAutoTracking(false);
-
     if (trackingRef.current) {
       clearInterval(trackingRef.current);
       trackingRef.current = null;
     }
-
     setSyncState("idle");
     setSyncMessage("Auto tracking stopped");
   }
-
   function startAutoTracking() {
     if (!selectedStatus || !partyActive) return;
-
     if (trackingRef.current) {
       clearInterval(trackingRef.current);
       trackingRef.current = null;
     }
-
     setAutoTracking(true);
     setSyncState("syncing");
     setSyncMessage("Starting auto tracking...");
-
     void syncCrewStatus(selectedStatus, "tracking", true);
-
     trackingRef.current = setInterval(() => {
       if (!selectedStatus) return;
       void syncCrewStatus(selectedStatus, "tracking", true);
     }, 12000);
   }
-
   useEffect(() => {
     if (!selectedStatus) return;
-
     writePartyLiveState(
       selectedStatus,
       lastCoords,
       firstSyncSkippedRef.current ? "status" : "bootstrap",
       partyActive
     );
-
     if (!firstSyncSkippedRef.current) {
       firstSyncSkippedRef.current = true;
       return;
     }
-
     if (!partyActive) return;
-
     void syncCrewStatus(selectedStatus, "status", true);
   }, [selectedStatus]);
-
   useEffect(() => {
     if (!selectedStatus) return;
-
     writePartyLiveState(selectedStatus, lastCoords, "toggle", partyActive);
-
     if (!partyActive) {
       stopAutoTracking();
       return;
     }
-
     void syncCrewStatus(selectedStatus, "toggle", true);
   }, [partyActive]);
-
   useEffect(() => {
     if (!selectedStatus) return;
     writePartyLiveState(selectedStatus, lastCoords, "bootstrap", partyActive);
   }, [privacy, autoTracking, lastCoords, selectedStatus, partyActive]);
-
   useEffect(() => {
     if (!selectedStatus) return;
-
     if (autoTracking && partyActive) {
       if (trackingRef.current) {
         clearInterval(trackingRef.current);
         trackingRef.current = null;
       }
-
       trackingRef.current = setInterval(() => {
         void syncCrewStatus(selectedStatus, "tracking", true);
       }, 12000);
-
       void syncCrewStatus(selectedStatus, "tracking", true);
       setSyncMessage("Auto tracking active");
     }
-
     return () => {
       if (trackingRef.current) {
         clearInterval(trackingRef.current);
@@ -1044,7 +975,6 @@ export default function PartyPage() {
       }
     };
   }, [autoTracking, selectedStatus, privacy, partyActive]);
-
   useEffect(() => {
     return () => {
       if (trackingRef.current) {
@@ -1053,48 +983,32 @@ export default function PartyPage() {
       }
     };
   }, []);
-
   useEffect(() => {
     void refreshCrewAwareness();
-
     const interval = window.setInterval(() => {
       void refreshCrewAwareness();
     }, 6000);
-
     return () => window.clearInterval(interval);
-  }, [displayName, selectedStatus, partyActive]);
-
+  }, [displayName, crewOwner, selectedStatus, partyActive]);
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!("speechSynthesis" in window)) return;
     if (!autoVoiceEnabled) return;
-
     const interval = setInterval(async () => {
       try {
         const raw = window.localStorage.getItem("twincore_party_live");
         if (!raw) return;
-
         const live = JSON.parse(raw) as {
           active?: boolean;
           heartbeatBpm?: number;
           status?: PartyStatus;
         };
-
         if (!live?.active) return;
-
         let nextCrewRows = crewRows;
-
         if (supabase && displayName) {
-          const { data } = await supabase
-            .from("crew_status")
-            .select("id,name,status,updated_at")
-            .neq("name", displayName)
-            .limit(12);
-
-          nextCrewRows = (Array.isArray(data) ? data : []) as CrewStatusRow[];
+          nextCrewRows = await loadCrewRowsForAwareness();
           setCrewRows(nextCrewRows);
         }
-
         const nextStale = getStaleState(nextCrewRows);
         const nextIsolation = getIsolationState(nextCrewRows);
         const nextDesync = getCrewDesyncState(live.status ?? null, nextCrewRows);
@@ -1110,16 +1024,13 @@ export default function PartyPage() {
           nextDesync,
           nextIsolation
         );
-
         setStale(nextStale);
         setIsolation(nextIsolation);
         setCrewDesync(nextDesync);
         setRisk(nextRisk);
         setIntervention(nextIntervention);
-
         let label = "stable";
         let message: string | null = null;
-
         if (nextRisk.level === "high") {
           label = "risk_high";
           message =
@@ -1153,12 +1064,10 @@ export default function PartyPage() {
           message =
             "TwinMe check. Stay aware. Keep your next move simple.";
         }
-
         if (!message) {
           autoVoiceLastLabelRef.current = label;
           return;
         }
-
         const now = Date.now();
         const cooldown =
           label === "critical" ||
@@ -1168,42 +1077,33 @@ export default function PartyPage() {
           label === "risk_high"
             ? 12000
             : 20000;
-
         const labelChanged = label !== autoVoiceLastLabelRef.current;
         const cooldownPassed =
           now - autoVoiceLastSpokenAtRef.current > cooldown;
-
         if (!labelChanged && !cooldownPassed) return;
-
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(message);
         utterance.rate = 1;
         utterance.pitch = 0.95;
         window.speechSynthesis.speak(utterance);
-
         autoVoiceLastLabelRef.current = label;
         autoVoiceLastSpokenAtRef.current = now;
       } catch {
         // ignore auto voice errors
       }
     }, 4000);
-
     return () => clearInterval(interval);
-  }, [autoVoiceEnabled, crewRows, displayName]);
-
+  }, [autoVoiceEnabled, crewRows, displayName, crewOwner]);
   const visual = useMemo(() => getStatusVisual(selectedStatus), [selectedStatus]);
-
   async function handleToggleAudio() {
     const audio = audioRef.current;
     if (!audio) return;
-
     try {
       if (isPlaying) {
         audio.pause();
         setIsPlaying(false);
         return;
       }
-
       await audio.play();
       setAudioReady(true);
       setIsPlaying(true);
@@ -1212,15 +1112,12 @@ export default function PartyPage() {
       setIsPlaying(false);
     }
   }
-
   function handleStatusClick(status: PartyStatus) {
     setSelectedStatus(status);
   }
-
   async function handleSendCheckIn() {
     const currentStatus = selectedStatus ?? "Listening to music";
     setCheckInSent(true);
-
     if (!partyActive) {
       setPartyActive(true);
       writePartyLiveState(currentStatus, lastCoords, "checkin", true);
@@ -1229,72 +1126,57 @@ export default function PartyPage() {
       writePartyLiveState(currentStatus, lastCoords, "checkin", true);
       await syncCrewStatus(currentStatus, "checkin", true);
     }
-
     window.setTimeout(() => {
       setCheckInSent(false);
     }, 2200);
   }
-
   function handleTogglePartyMode() {
     if (!selectedStatus) return;
-
     const nextActive = !partyActive;
     setPartyActive(nextActive);
     writePartyLiveState(selectedStatus, lastCoords, "toggle", nextActive);
   }
-
   function handleInterventionAction(action: string) {
     if (action.includes("Reconnect")) {
       window.location.href = "/crew";
       return;
     }
-
     if (action.includes("safer environment")) {
       window.location.href = "/spots";
       return;
     }
-
     if (action.includes("check in")) {
       void handleSendCheckIn();
       return;
     }
-
     if (action.includes("ride")) {
       window.open("https://maps.google.com", "_blank", "noopener,noreferrer");
     }
   }
-
   const liveSystemLabel = useMemo(() => {
     if (!partyActive) return "Party Mode off";
     if (autoTracking) return "Party Mode live + tracking";
     return "Party Mode live";
   }, [partyActive, autoTracking]);
-
   const spotsBridgeText = useMemo(() => {
     if (!partyActive) {
       return "Spots and TwinMe are on standby until Party Mode goes live.";
     }
-
     if (privacy.ghostMode && privacy.trustedOnly) {
       return "Spots and TwinMe receive live status, but your layer is protected and restricted to trusted visibility.";
     }
-
     if (privacy.ghostMode) {
       return "Spots and TwinMe receive live status with softened location detail.";
     }
-
     if (privacy.trustedOnly) {
       return "Spots and TwinMe receive live status inside a trusted-only layer.";
     }
-
     return "Spots and TwinMe receive your live status, mood, heartbeat, and movement as you update.";
   }, [partyActive, privacy.ghostMode, privacy.trustedOnly]);
-
   const locationLabel = useMemo(() => {
     if (!lastCoords) return "No live location yet";
     return getFriendlyLocationName(lastCoords);
   }, [lastCoords]);
-
   return (
     <main className="min-h-screen overflow-hidden bg-[#0A0A0B] text-white">
       <audio
@@ -1310,16 +1192,13 @@ export default function PartyPage() {
           setIsPlaying(false);
         }}
       />
-
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.12),transparent_34%),radial-gradient(circle_at_bottom,rgba(249,115,22,0.10),transparent_34%)]" />
-
         <div
           className={`absolute left-1/2 top-20 h-[24rem] w-[24rem] -translate-x-1/2 rounded-full blur-3xl ${visual.heroGlow} ${visual.ring} transition-all duration-500 ${
             pulse ? "scale-110 opacity-100" : "scale-100 opacity-85"
           }`}
         />
-
         <div
           className={`absolute bottom-24 right-[-10%] h-64 w-64 rounded-full blur-3xl ${visual.orbGlow} ${
             pulse ? "animate-pulse" : ""
@@ -1330,10 +1209,8 @@ export default function PartyPage() {
             pulse ? "animate-pulse" : ""
           }`}
         />
-
         <div className="absolute inset-0 opacity-[0.08] [background-image:linear-gradient(rgba(255,255,255,0.5)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.5)_1px,transparent_1px)] [background-size:26px_26px]" />
       </div>
-
       <div className="relative mx-auto w-full max-w-md px-4 py-8">
         <header className="mb-8 flex items-start justify-between gap-4">
           <div>
@@ -1349,7 +1226,6 @@ export default function PartyPage() {
               and action execution.
             </p>
           </div>
-
           <Link
             href="/profile"
             className="rounded-2xl bg-[linear-gradient(180deg,#1A1A1F,#141419)] px-4 py-3 text-sm font-medium text-white shadow-[0_8px_24px_rgba(0,0,0,0.35)] transition duration-200 hover:scale-[1.02] active:scale-[0.97]"
@@ -1357,63 +1233,52 @@ export default function PartyPage() {
             Profile
           </Link>
         </header>
-
         <section
           className={`relative mb-6 overflow-hidden rounded-3xl p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)] ${visual.card}`}
         >
           <div className="absolute right-0 top-0 h-28 w-28 rounded-full bg-white/5 blur-3xl" />
-
           <div className="relative">
             <div className="mb-2 text-4xl leading-none">
               {getModeIcon(selectedStatus)}
             </div>
-
             <div className="mb-3 text-4xl font-semibold tracking-tight text-white">
               Tonight
             </div>
-
             <div className="text-2xl font-semibold text-white">{displayName}</div>
-
             <div className="mt-3 text-lg text-white/80">
               Current status:{" "}
               <span className="font-medium text-white">
                 {selectedStatus || "Not set"}
               </span>
             </div>
-
             <div className="mt-4 flex flex-wrap gap-2">
               <span
                 className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold tracking-wide ${visual.badge}`}
               >
                 {visual.title}
               </span>
-
               <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold tracking-wide text-white/85">
                 <Sparkles className="mr-1 h-3 w-3" />
                 {liveSystemLabel.toUpperCase()}
               </span>
-
               {privacy.ghostMode ? (
                 <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold tracking-wide text-white/85">
                   <Ghost className="mr-1 h-3 w-3" />
                   GHOST MODE
                 </span>
               ) : null}
-
               {privacy.trustedOnly ? (
                 <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold tracking-wide text-white/85">
                   <EyeOff className="mr-1 h-3 w-3" />
                   TRUSTED ONLY
                 </span>
               ) : null}
-
               {autoTracking ? (
                 <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold tracking-wide text-white/85">
                   <Radar className="mr-1 h-3 w-3" />
                   AUTO TRACKING
                 </span>
               ) : null}
-
               {autoVoiceEnabled ? (
                 <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold tracking-wide text-white/85">
                   <Volume2 className="mr-1 h-3 w-3" />
@@ -1421,11 +1286,9 @@ export default function PartyPage() {
                 </span>
               ) : null}
             </div>
-
             <p className="mt-4 text-sm leading-6 text-white/70">
               {visual.subtitle}
             </p>
-
             <div className="mt-5 grid grid-cols-3 gap-3">
               <Meter label="Energy" value={visual.energyValue} />
               <Meter label="Risk" value={visual.riskValue} />
@@ -1433,7 +1296,6 @@ export default function PartyPage() {
             </div>
           </div>
         </section>
-
         <section className="mb-6 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
@@ -1443,7 +1305,6 @@ export default function PartyPage() {
               </p>
             </div>
           </div>
-
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
@@ -1456,7 +1317,6 @@ export default function PartyPage() {
             >
               {partyActive ? "Party On" : "Party Off"}
             </button>
-
             <button
               type="button"
               onClick={() => {
@@ -1476,7 +1336,6 @@ export default function PartyPage() {
               {autoTracking ? "Stop Tracking" : "Start Tracking"}
             </button>
           </div>
-
           <div className="mt-3 grid grid-cols-2 gap-3">
             <button
               type="button"
@@ -1485,7 +1344,6 @@ export default function PartyPage() {
             >
               {autoVoiceEnabled ? "Auto Voice On" : "Auto Voice Off"}
             </button>
-
             <button
               type="button"
               onClick={handleSendCheckIn}
@@ -1494,7 +1352,6 @@ export default function PartyPage() {
               {checkInSent ? "Check-in Sent" : "Send Check-in"}
             </button>
           </div>
-
           <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
             <div className="mb-2 flex items-center gap-2 text-sm font-medium text-white/85">
               <MapPin className="h-4 w-4" />
@@ -1503,7 +1360,6 @@ export default function PartyPage() {
             <p className="text-sm leading-6 text-white/70">{spotsBridgeText}</p>
           </div>
         </section>
-
         <section className="mb-6 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
@@ -1513,7 +1369,6 @@ export default function PartyPage() {
               </p>
             </div>
           </div>
-
           <div
             className={`rounded-2xl border p-4 ${
               crewDesync.level === "separated"
@@ -1539,18 +1394,15 @@ export default function PartyPage() {
                 {crewDesync.level}
               </span>
             </div>
-
             <p className="text-sm leading-6 text-white/80">
               {crewDesync.message}
             </p>
-
             <div className="mt-3 text-xs text-white/55">
               Crew rows read: {crewRows.length} · active mismatch signals:{" "}
               {crewDesync.differentCount}
             </div>
           </div>
         </section>
-
         <section className="mb-6 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
           <div className="mb-4">
             <h2 className="text-2xl font-semibold text-white">Isolation</h2>
@@ -1558,7 +1410,6 @@ export default function PartyPage() {
               TwinMe monitors if you are operating without crew presence.
             </p>
           </div>
-
           <div
             className={`rounded-2xl border p-4 ${
               isolation.level === "isolated"
@@ -1578,16 +1429,13 @@ export default function PartyPage() {
                 {isolation.level}
               </span>
             </div>
-
             <p className="text-sm text-white/80">{isolation.message}</p>
           </div>
         </section>
-
         <section className="mb-6 rounded-3xl border border-white/10 bg-[#0c0c0f] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
           <h2 className="mb-2 text-xl font-semibold text-white">
             Signal Freshness
           </h2>
-
           <div
             className={`rounded-xl border p-4 ${
               stale.level === "stale"
@@ -1607,16 +1455,13 @@ export default function PartyPage() {
                 {stale.level}
               </span>
             </div>
-
             <p className="text-sm text-white/80">{stale.message}</p>
           </div>
         </section>
-
         <section className="mb-6 rounded-3xl border border-white/10 bg-[#0c0c0f] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
           <h2 className="mb-2 text-xl font-semibold text-white">
             Predictive Risk
           </h2>
-
           <div
             className={`rounded-xl border p-4 ${
               risk.level === "high"
@@ -1640,16 +1485,13 @@ export default function PartyPage() {
                 {risk.level}
               </span>
             </div>
-
             <p className="text-sm text-white/80">{risk.message}</p>
           </div>
         </section>
-
         <section className="mb-6 rounded-3xl border border-white/10 bg-[#0c0c0f] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
           <h2 className="mb-2 text-xl font-semibold text-white">
             Intervention Mode
           </h2>
-
           <div
             className={`rounded-xl border p-4 ${
               intervention.level === "urgent"
@@ -1673,7 +1515,6 @@ export default function PartyPage() {
                 {intervention.level}
               </span>
             </div>
-
             {intervention.actions.length === 0 ? (
               <p className="text-sm text-white/60">No intervention needed.</p>
             ) : (
@@ -1691,7 +1532,6 @@ export default function PartyPage() {
             )}
           </div>
         </section>
-
         <section className="mb-6 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
@@ -1701,7 +1541,6 @@ export default function PartyPage() {
               </p>
             </div>
           </div>
-
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
@@ -1717,7 +1556,6 @@ export default function PartyPage() {
                 {isPlaying ? "Pause Sound" : "Play Sound"}
               </span>
             </button>
-
             <button
               type="button"
               onClick={handleSendCheckIn}
@@ -1729,7 +1567,6 @@ export default function PartyPage() {
               </span>
             </button>
           </div>
-
           {!audioReady ? (
             <div className="mt-3 rounded-2xl border border-orange-500/20 bg-orange-500/10 px-4 py-3 text-sm text-orange-100">
               Party audio could not load. Check that{" "}
@@ -1737,7 +1574,6 @@ export default function PartyPage() {
               <span className="font-semibold">public/</span>.
             </div>
           ) : null}
-
           <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4">
             <div className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-white/55">
               Twin Tip
@@ -1745,7 +1581,6 @@ export default function PartyPage() {
             <p className="text-sm leading-6 text-white/80">{visual.twinTip}</p>
           </div>
         </section>
-
         <section className="mb-6 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
@@ -1755,7 +1590,6 @@ export default function PartyPage() {
               </p>
             </div>
           </div>
-
           <div className="grid gap-3">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
               <div className="mb-2 flex items-center justify-between gap-3">
@@ -1763,7 +1597,6 @@ export default function PartyPage() {
                   <Users className="h-4 w-4" />
                   Sync status
                 </div>
-
                 <span
                   className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${
                     syncState === "synced"
@@ -1787,17 +1620,14 @@ export default function PartyPage() {
                   {syncState}
                 </span>
               </div>
-
               <p className="text-sm leading-6 text-white/75">{syncMessage}</p>
             </div>
-
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
               <div className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-white/55">
                 Last live location
               </div>
               <p className="text-sm leading-6 text-white/80">{locationLabel}</p>
             </div>
-
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
               <div className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-white/55">
                 Privacy layer
@@ -1821,7 +1651,6 @@ export default function PartyPage() {
             </div>
           </div>
         </section>
-
         <section className="mb-6 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
@@ -1831,7 +1660,6 @@ export default function PartyPage() {
               </p>
             </div>
           </div>
-
           <div className="grid grid-cols-2 gap-3">
             {PARTY_STATUSES.map((status) => {
               const active = selectedStatus === status;
@@ -1852,7 +1680,6 @@ export default function PartyPage() {
             })}
           </div>
         </section>
-
         <div className="mt-6 flex items-center justify-between text-xs text-white/45">
           <Link href="/" className="transition hover:text-white/75">
             Dashboard

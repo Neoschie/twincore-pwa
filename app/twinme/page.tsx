@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 /* -------------------------
    TYPES
@@ -25,8 +26,14 @@ type PartyLive = {
   longitude?: number | null;
 };
 
+type CrewCollapseInsight = {
+  level: "stable" | "thinning" | "collapsing";
+  summary: string;
+  activeNow: number;
+};
+
 type CrewStatus = {
-  id: string;
+  id?: string;
   name: string;
   status: string;
   latitude: number | null;
@@ -141,6 +148,9 @@ declare global {
 
 const TWINCORE_BASELINE_KEY = "twincore_internal_baseline";
 const TWINCORE_LEARNING_KEY = "twincore_learning_profile";
+const TWINCORE_MESSAGES_KEY = "twincore_twinme_messages";
+const TWINCORE_POSITION_HISTORY_KEY = "twincore_position_history";
+const TWINCORE_PROFILE_KEY = "twincore_profile";
 
 const STARTER_PROMPTS = [
   "What should I do tonight?",
@@ -149,38 +159,123 @@ const STARTER_PROMPTS = [
   "Am I getting off track?",
 ];
 
+const DEFAULT_CREW_COLLAPSE: CrewCollapseInsight = {
+  level: "stable",
+  summary: "No crew-collapse signal yet.",
+  activeNow: 0,
+};
+
+/* -------------------------
+   STORAGE HELPERS
+--------------------------*/
+
+function readJson<T>(key: string, fallback: T): T {
+  if (typeof window === "undefined") return fallback;
+
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeJson(key: string, value: unknown) {
+  if (typeof window === "undefined") return;
+
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // ignore storage failures
+  }
+}
+
 /* -------------------------
    DATA LOADERS
 --------------------------*/
 
-function getLiveContext(): PartyLive | null {
-  try {
-    const raw = localStorage.getItem("twincore_party_live");
-    if (!raw) return null;
-    return JSON.parse(raw) as PartyLive;
-  } catch {
-    return null;
-  }
-}
+async function getRealCrewContext(displayName: string): Promise<CrewStatus[]> {
+  if (!displayName || !supabase) return [];
 
-function getCrewContext(): CrewStatus[] {
   try {
-    const raw = localStorage.getItem("twincore_crew_snapshot");
-    if (!raw) return [];
-    return JSON.parse(raw) as CrewStatus[];
+    const joinedRaw = localStorage.getItem("twincore_joined_crew");
+    const joined = joinedRaw ? JSON.parse(joinedRaw) : {};
+    const owner = joined.crewOwner || displayName;
+
+    const { data: members, error: memberError } = await supabase
+      .from("crew_members")
+      .select("crew_owner, member_name")
+      .eq("crew_owner", owner);
+
+    if (memberError) return [];
+
+    const names = new Set<string>();
+    names.add(owner);
+
+    (members || []).forEach((m: { member_name?: string | null }) => {
+      if (m.member_name) names.add(m.member_name);
+    });
+
+    const list = Array.from(names);
+
+    const { data: statuses, error: statusError } = await supabase
+      .from("crew_status")
+      .select("*")
+      .in("name", list);
+
+    if (statusError) return [];
+
+    return (statuses || []) as CrewStatus[];
   } catch {
     return [];
   }
 }
 
+function getLiveContext(): PartyLive | null {
+  return readJson<PartyLive | null>("twincore_party_live", null);
+}
+
+async function getCrewContext(displayName: string): Promise<CrewStatus[]> {
+  return await getRealCrewContext(displayName);
+}
+
 function getSpotsContext(): SpotsSnapshot | null {
-  try {
-    const raw = localStorage.getItem("twincore_spots_snapshot");
-    if (!raw) return null;
-    return JSON.parse(raw) as SpotsSnapshot;
-  } catch {
-    return null;
+  return readJson<SpotsSnapshot | null>("twincore_spots_snapshot", null);
+}
+
+function getPositionHistory(): PositionPoint[] {
+  return readJson<PositionPoint[]>(TWINCORE_POSITION_HISTORY_KEY, []);
+}
+
+function updatePositionHistory(live: PartyLive | null) {
+  if (
+    !live?.active ||
+    typeof live.latitude !== "number" ||
+    typeof live.longitude !== "number"
+  ) {
+    return;
   }
+
+  const existing = getPositionHistory();
+  const next: PositionPoint[] = [
+    ...existing.slice(-11),
+    {
+      latitude: live.latitude,
+      longitude: live.longitude,
+      timestamp: new Date().toISOString(),
+    },
+  ];
+
+  writeJson(TWINCORE_POSITION_HISTORY_KEY, next);
+}
+
+function getDisplayName() {
+  const profile = readJson<{ displayName?: string } | null>(
+    TWINCORE_PROFILE_KEY,
+    null
+  );
+  return profile?.displayName?.trim() || "Neo";
 }
 
 /* -------------------------
@@ -188,13 +283,7 @@ function getSpotsContext(): SpotsSnapshot | null {
 --------------------------*/
 
 function getBaselineSnapshot(): BaselineSnapshot | null {
-  try {
-    const raw = localStorage.getItem(TWINCORE_BASELINE_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw) as BaselineSnapshot;
-  } catch {
-    return null;
-  }
+  return readJson<BaselineSnapshot | null>(TWINCORE_BASELINE_KEY, null);
 }
 
 function updateBaselineSnapshot(currentBpm: number) {
@@ -203,13 +292,10 @@ function updateBaselineSnapshot(currentBpm: number) {
   const existing = getBaselineSnapshot();
 
   if (!existing) {
-    localStorage.setItem(
-      TWINCORE_BASELINE_KEY,
-      JSON.stringify({
-        avgBpm: Math.round(currentBpm),
-        samples: 1,
-      })
-    );
+    writeJson(TWINCORE_BASELINE_KEY, {
+      avgBpm: Math.round(currentBpm),
+      samples: 1,
+    });
     return;
   }
 
@@ -217,13 +303,10 @@ function updateBaselineSnapshot(currentBpm: number) {
   const nextAvg =
     (existing.avgBpm * existing.samples + currentBpm) / nextSamples;
 
-  localStorage.setItem(
-    TWINCORE_BASELINE_KEY,
-    JSON.stringify({
-      avgBpm: Math.round(nextAvg),
-      samples: nextSamples,
-    })
-  );
+  writeJson(TWINCORE_BASELINE_KEY, {
+    avgBpm: Math.round(nextAvg),
+    samples: nextSamples,
+  });
 }
 
 function getInternalDriftInsight(
@@ -294,13 +377,7 @@ function getInternalDriftInsight(
 --------------------------*/
 
 function getLearningProfile(): LearningProfile | null {
-  try {
-    const raw = localStorage.getItem(TWINCORE_LEARNING_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw) as LearningProfile;
-  } catch {
-    return null;
-  }
+  return readJson<LearningProfile | null>(TWINCORE_LEARNING_KEY, null);
 }
 
 function updateLearningProfile(
@@ -368,7 +445,7 @@ function updateLearningProfile(
     updatedAt: new Date().toISOString(),
   };
 
-  localStorage.setItem(TWINCORE_LEARNING_KEY, JSON.stringify(nextProfile));
+  writeJson(TWINCORE_LEARNING_KEY, nextProfile);
 }
 
 function getLearnMeInsight(
@@ -428,7 +505,10 @@ function getLearnMeInsight(
 
 function getMinutesActive(live: PartyLive | null) {
   if (!live?.timestamp) return 0;
-  return Math.floor((Date.now() - new Date(live.timestamp).getTime()) / 60000);
+  return Math.max(
+    0,
+    Math.floor((Date.now() - new Date(live.timestamp).getTime()) / 60000)
+  );
 }
 
 /* -------------------------
@@ -443,6 +523,47 @@ function getCrewInsight(crew: CrewStatus[]) {
   if (activeCrew.length === 0) return "alone";
   if (activeCrew.length === 1) return "low";
   return "group";
+}
+
+function getCrewCollapseInsight(
+  live: PartyLive | null,
+  crew: CrewStatus[],
+  minutes: number
+): CrewCollapseInsight {
+  if (!live?.active || !crew.length) {
+    return DEFAULT_CREW_COLLAPSE;
+  }
+
+  const activeNow = crew.filter(
+    (member) =>
+      member.status &&
+      member.status !== "Safe" &&
+      member.status !== "Heading home"
+  ).length;
+
+  if (activeNow === 0) {
+    return {
+      level: "collapsing",
+      summary:
+        "Your crew support layer has effectively dropped away. Do not treat this moment like you still have the same group coverage.",
+      activeNow,
+    };
+  }
+
+  if (activeNow === 1 && minutes > 20) {
+    return {
+      level: "thinning",
+      summary:
+        "Your crew support is thinning. The room may still feel active, but your actual support layer is getting smaller.",
+      activeNow,
+    };
+  }
+
+  return {
+    level: "stable",
+    summary: "Crew support still looks present.",
+    activeNow,
+  };
 }
 
 /* -------------------------
@@ -1101,18 +1222,74 @@ function getLiveNudge(
     if (minutes < 10) return "Energy is rising. Stay close to your people.";
     if (minutes < 25) return "You’ve been active for a while. Check your crew position.";
     if (minutes < 45) return "High-risk window. Stay with your group and slow decisions.";
-    return "You’ve been out too long. Start thinking about your exit.";
+    return "You’ve been out for a while. Start shifting toward a steadier pace now.";
   }
 
-  if (live.status === "Heading home") {
-    return "You’re heading home. Stay focused until you're fully safe.";
+  return "You look fairly steady right now. Protect that by keeping your next move simple.";
+}
+
+function generateTwinResponse({
+  input,
+  live,
+  awareness,
+  trajectory,
+  desync,
+  drift,
+  learnMe,
+  noSupport,
+}: {
+  input: string;
+  live: PartyLive | null;
+  awareness: { score: number; level: AwarenessLevel };
+  trajectory: TrajectoryInsight;
+  desync: { level: DesyncLevel };
+  drift: { level: DriftLevel };
+  learnMe: LearnMeInsight;
+  noSupport: { active: boolean };
+}) {
+  // normalize input
+  const text = input.toLowerCase();
+
+  // HIGH RISK OVERRIDE
+  if (trajectory.riskWindow === "imminent") {
+    return "Stay with me for a second. Things are stacking right now. Slow your next move down on purpose.";
   }
 
-  if (spots?.selectedTone === "safe") {
-    return "Your current environment looks more stable. Keep it simple and do not trade a safe zone for noise.";
+  if (noSupport.active) {
+    return "I’m here with you. You don’t have strong support around you right now, so keep your next move simple and intentional.";
   }
 
-  return "Stay aware and move intentionally.";
+  if (desync.level === "separated") {
+    return "You’re out of sync right now. Before anything else, get yourself back into alignment.";
+  }
+
+  if (drift.level === "prolonged") {
+    return "You’ve been elevated for a while. This is where things usually start slipping. Slow this moment down.";
+  }
+
+  // USER INTENT DETECTION
+  if (text.includes("what should i do")) {
+    return "Keep it simple. Choose the option that keeps you steady, not the one that pulls you deeper in.";
+  }
+
+  if (text.includes("am i good") || text.includes("am i okay")) {
+    if (awareness.level === "low") {
+      return "You’re okay right now. Just stay aware and don’t drift.";
+    }
+    return "You’re not off track, but you’re not in a passive state either. Stay intentional.";
+  }
+
+  if (text.includes("help")) {
+    return "Tell me what’s pulling at you right now. We’ll simplify it.";
+  }
+
+  // LEARNING-BASED RESPONSE
+  if (learnMe.label === "recurring pattern") {
+    return "This feels familiar. You’ve been here before. Catching it earlier this time is the advantage.";
+  }
+
+  // DEFAULT (CALM PRESENCE)
+  return "I’m here. What’s your next move feeling like right now?";
 }
 
 /* -------------------------
@@ -1202,15 +1379,31 @@ function getPredictiveSignals(
   driftLevel: DriftLevel,
   noSupportActive: boolean,
   trajectory: TrajectoryInsight,
-  learnMe: LearnMeInsight
+  learnMe: LearnMeInsight,
+  crewCollapse: CrewCollapseInsight = DEFAULT_CREW_COLLAPSE
 ): PredictiveSignal[] {
   const signals: PredictiveSignal[] = [];
+  const safeCrewCollapse = crewCollapse ?? DEFAULT_CREW_COLLAPSE;
+
+  if (safeCrewCollapse.level === "collapsing") {
+    signals.push({
+      level: "red",
+      title: "Support layer collapsed",
+      body: safeCrewCollapse.summary,
+    });
+  } else if (safeCrewCollapse.level === "thinning") {
+    signals.push({
+      level: "orange",
+      title: "Crew support thinning",
+      body: safeCrewCollapse.summary,
+    });
+  }
 
   if (!live?.active) {
     signals.push({
       level: "blue",
-      title: "Standby state",
-      body: "TwinMe is calm right now, but your pattern memory is still ready the moment activity starts.",
+      title: "TwinMe on standby",
+      body: "Party Mode is not active, so predictive signals are quiet right now.",
     });
     return signals;
   }
@@ -1219,7 +1412,13 @@ function getPredictiveSignals(
     signals.push({
       level: "red",
       title: "High-risk window opening",
-      body: "Your current pace, position, and state are compounding. The next few minutes matter most.",
+      body: "Your current pace and pattern suggest a higher-risk state is about to compound.",
+    });
+  } else if (trajectory.riskWindow === "approaching") {
+    signals.push({
+      level: "orange",
+      title: "Pressure building",
+      body: "Your pace is trending upward. If this continues, risk is likely to rise soon.",
     });
   }
 
@@ -1227,90 +1426,87 @@ function getPredictiveSignals(
     signals.push({
       level: "red",
       title: "Crew separation detected",
-      body: "You are no longer moving in line with your crew’s rhythm or position.",
+      body: "You are clearly out of sync with your crew’s pace or position.",
     });
   } else if (desyncLevel === "drifting") {
     signals.push({
       level: "orange",
       title: "Crew drift building",
-      body: "You are starting to move outside your group’s pace. Correcting early keeps the night cleaner.",
+      body: "You are beginning to move out of alignment with your crew.",
     });
   }
 
   if (driftLevel === "prolonged") {
     signals.push({
-      level: "red",
-      title: "Prolonged activation",
-      body: "Your internal pace has stayed elevated longer than usual. This is where nights start choosing for people.",
+      level: "orange",
+      title: "Prolonged elevation",
+      body: "You have been elevated longer than your usual rhythm.",
     });
-  } else if (driftLevel === "elevated" || driftLevel === "rising") {
+  } else if (driftLevel === "elevated") {
     signals.push({
       level: "orange",
-      title: "Internal pace rising",
-      body: "Your current state is running above baseline. Slow corrections now are stronger than late ones.",
+      title: "Elevation above baseline",
+      body: "Your internal pace is above your normal pattern right now.",
     });
   }
 
   if (noSupportActive) {
     signals.push({
       level: "orange",
-      title: "Support coverage thin",
-      body: "TwinMe is seeing low human or environmental support around you right now.",
+      title: "Low support coverage",
+      body: "You do not currently have active crew or visible support around you.",
     });
   }
 
-  if (environmentLevel === "unsafe" || environmentLevel === "volatile") {
+  if (environmentLevel === "unsafe") {
     signals.push({
-      level: environmentLevel === "unsafe" ? "red" : "orange",
-      title: "Environment pressure",
-      body: "Your surroundings are not giving you a stable layer right now. Safer positioning would lower risk fast.",
+      level: "red",
+      title: "Unsafe environment signal",
+      body: "Risk is present without a strong nearby safe-zone layer.",
+    });
+  } else if (environmentLevel === "volatile") {
+    signals.push({
+      level: "orange",
+      title: "Volatile environment",
+      body: "Hotspots and risk are mixing in your environment.",
+    });
+  }
+
+  if (movementLevel === "drifting" && minutes > 10) {
+    signals.push({
+      level: "orange",
+      title: "Movement drift",
+      body: "Your movement pattern is spreading out instead of staying intentional.",
+    });
+  }
+
+  if (awareness.level === "critical") {
+    signals.push({
+      level: "red",
+      title: "Critical awareness state",
+      body: "Multiple signals are stacking right now. Slow down and simplify your next move.",
+    });
+  } else if (awareness.level === "elevated") {
+    signals.push({
+      level: "orange",
+      title: "Elevated awareness state",
+      body: "Your state needs more deliberate decisions right now.",
     });
   }
 
   if (
-    movementLevel === "moving" &&
-    (live.status === "Drinking" || live.status === "At club")
+    learnMe.label === "pattern seen" ||
+    learnMe.label === "recurring pattern" ||
+    learnMe.label === "above normal"
   ) {
     signals.push({
-      level: "orange",
-      title: "Movement + energy mix",
-      body: "You are moving while already in a high-energy state. That usually reduces control before people notice it.",
-    });
-  }
-
-  if (awareness.level === "critical" || awareness.score >= 80) {
-    signals.push({
-      level: "red",
-      title: "Pressure stacking",
-      body: "Multiple signals are stacking at once. This is the moment to simplify, not add more stimulation.",
-    });
-  }
-
-  if (minutes >= 25 && trajectory.riskWindow === "approaching") {
-    signals.push({
-      level: "orange",
-      title: "Escalation window approaching",
-      body: "You have been active long enough that your next decisions matter more than your last ones.",
-    });
-  }
-
-  if (learnMe.label === "pattern seen" || learnMe.label === "above normal") {
-    signals.push({
       level: "blue",
-      title: "Pattern memory engaged",
+      title: "Pattern recognized",
       body: learnMe.summary,
     });
   }
 
-  if (signals.length === 0) {
-    signals.push({
-      level: "blue",
-      title: "System steady",
-      body: "No major predictive concerns are stacking right now. Stay intentional and keep the next move clean.",
-    });
-  }
-
-  return signals.slice(0, 3);
+  return signals.slice(0, 6);
 }
 
 /* -------------------------
@@ -1371,70 +1567,30 @@ I’m here with you — keep this moment steady.`;
   }
 
   if (desyncLevel === "separated") {
-    return `You are clearly out of sync with your crew right now.
+    return `You are out of sync with your crew right now.
 
-• Slow your pace down
-• Reduce random movement
-• Reconnect before making your next decision
+• Reconnect before doing anything extra
+• Reduce movement
+• Make the next move the cleanest one
 
 Alignment matters more than momentum right now.`;
   }
 
   if (desyncLevel === "drifting") {
-    return `You are starting to drift out of sync with your crew.
+    return `You are starting to drift away from your crew.
 
-• Pause before changing position again
-• Re-align with your group
-• Do not let distance or pace grow casually
+• Correct it early
+• Do not stack more movement
+• Get back to alignment before the gap grows
 
-The earlier you correct drift, the easier the night stays.`;
-  }
-
-  if (environmentLevel === "unsafe") {
-    return `Your environment does not look supportive right now.
-
-• Prioritize safer ground over momentum
-• Do not drift deeper into weak-support areas
-• Make your next move about stability, not excitement
-
-Safer options matter more than vibe right now.`;
-  }
-
-  if (environmentLevel === "volatile") {
-    return `This area looks unstable.
-
-• Hotspots and risk are mixing
-• Slow down before changing locations
-• Pick the safer option even if it feels less exciting
-
-You do not need more stimulation right now — you need control.`;
-  }
-
-  if (movementLevel === "drifting") {
-    return `You’ve been drifting across positions.
-
-• Pause before making your next move
-• Re-orient to where you actually want to be
-• Avoid letting the night move you more than you move the night
-
-Stability matters more than momentum right now.`;
-  }
-
-  if (movementLevel === "moving" && live?.active) {
-    return `You are moving right now.
-
-• Keep your direction clear
-• Slow your pace enough to stay aware
-• Make sure your next move is chosen, not drifted into
-
-Control matters more than motion.`;
+Small corrections now prevent bigger problems later.`;
   }
 
   if (
-    live?.active &&
-    (live.status === "Drinking" || live.status === "At club")
+    spots?.selectedTone === "risk" &&
+    (text.includes("go") || text.includes("move") || text.includes("where"))
   ) {
-    return `You are in a high-energy environment.
+    return `This environment is carrying more risk right now.
 
 • Stay close to your crew
 • Slow your decisions
@@ -1478,6 +1634,26 @@ This turns TwinMe from a moment-reader into a rhythm-reader.`;
 What benefits you most tonight?`;
   }
 
+  if (movementLevel === "moving" || movementLevel === "drifting") {
+    return `${learnMe.summary}
+
+• Slow your pace enough to stay aware
+• Choose direction on purpose
+• Do not let movement become noise
+
+What is your cleanest next move?`;
+  }
+
+  if (environmentLevel === "unsafe" || environmentLevel === "volatile") {
+    return `${learnMe.summary}
+
+• Prioritize the safer option
+• Reduce unnecessary movement
+• Choose clarity over stimulation
+
+Protect the next few minutes.`;
+  }
+
   return `${learnMe.summary}
 
 • Choose alignment over noise
@@ -1500,7 +1676,9 @@ function getStateCheckSpeech(
 ) {
   const actionText = microGuidance.actions.slice(0, 2).join(". ");
 
-  return `TwinMe state check. Awareness score ${awareness.score}. Current state ${awareness.level}. ${nudge} ${learnMe.summary} ${noSupportActive ? "Support around you looks thin right now." : ""} Next best moves: ${actionText}.`;
+  return `TwinMe state check. Awareness score ${awareness.score}. Current state ${awareness.level}. ${nudge} ${learnMe.summary} ${
+    noSupportActive ? "Support around you looks thin right now." : ""
+  } Next best moves: ${actionText}.`;
 }
 
 function getAutoVoiceMessage(
@@ -1510,9 +1688,18 @@ function getAutoVoiceMessage(
   driftLevel: DriftLevel,
   noSupportActive: boolean,
   trajectory: TrajectoryInsight,
-  microGuidance: MicroGuidance
+  microGuidance: MicroGuidance,
+  crewCollapse: CrewCollapseInsight
 ) {
   const firstAction = microGuidance.actions[0] ?? "Keep your next move simple.";
+
+  if (crewCollapse.level === "collapsing") {
+    return `TwinMe check. Your crew support has dropped away. Do not move like you still have the same coverage. ${firstAction}`;
+  }
+
+  if (crewCollapse.level === "thinning") {
+    return `TwinMe check. Your crew layer is getting thinner. Get ahead of that early. ${firstAction}`;
+  }
 
   if (!live?.active) {
     return null;
@@ -1592,217 +1779,133 @@ function getAmbientTheme(
       card: "linear-gradient(180deg,#1a1010,#0c0b0b)",
       badge: "bg-red-500/15 text-red-100 border-red-400/25",
       border: "border-red-500/20",
-      pulse: "shadow-[0_0_26px_rgba(248,113,113,0.16)]",
-      beam: "from-red-400/30 via-orange-300/20 to-transparent",
+      glow: "shadow-[0_0_50px_rgba(239,68,68,0.15)]",
     };
   }
 
   if (
     awarenessLevel === "elevated" ||
-    environmentLevel === "volatile" ||
-    desyncLevel === "drifting" ||
-    driftLevel === "elevated"
+    driftLevel === "prolonged" ||
+    noSupportActive ||
+    environmentLevel === "volatile"
   ) {
     return {
       pageBg:
-        "radial-gradient(circle at top, rgba(249,115,22,0.16), rgba(10,10,11,1) 58%)",
-      orbA: "rgba(249,115,22,0.15)",
-      orbB: "rgba(251,191,36,0.08)",
-      card: "linear-gradient(180deg,#18120d,#0a0b0e)",
+        "radial-gradient(circle at top, rgba(251,146,60,0.15), rgba(10,10,11,1) 58%)",
+      orbA: "rgba(251,146,60,0.16)",
+      orbB: "rgba(245,158,11,0.08)",
+      card: "linear-gradient(180deg,#17110a,#0c0b0b)",
       badge: "bg-orange-500/15 text-orange-100 border-orange-400/25",
       border: "border-orange-500/20",
-      pulse: "shadow-[0_0_24px_rgba(251,146,60,0.14)]",
-      beam: "from-orange-400/25 via-amber-300/15 to-transparent",
-    };
-  }
-
-  if (
-    noSupportActive ||
-    environmentLevel === "thin" ||
-    awarenessLevel === "guarded" ||
-    desyncLevel === "watch" ||
-    driftLevel === "rising"
-  ) {
-    return {
-      pageBg:
-        "radial-gradient(circle at top, rgba(59,130,246,0.16), rgba(10,10,11,1) 58%)",
-      orbA: "rgba(59,130,246,0.14)",
-      orbB: "rgba(6,182,212,0.08)",
-      card: "linear-gradient(180deg,#101722,#090c11)",
-      badge: "bg-sky-500/15 text-sky-100 border-sky-400/25",
-      border: "border-sky-500/20",
-      pulse: "shadow-[0_0_24px_rgba(96,165,250,0.12)]",
-      beam: "from-sky-400/25 via-cyan-300/12 to-transparent",
+      glow: "shadow-[0_0_45px_rgba(251,146,60,0.12)]",
     };
   }
 
   return {
     pageBg:
-      "radial-gradient(circle at top, rgba(148,163,184,0.12), rgba(10,10,11,1) 58%)",
-    orbA: "rgba(148,163,184,0.10)",
-    orbB: "rgba(59,130,246,0.06)",
-    card: "linear-gradient(180deg,#12141a,#0a0b0e)",
-    badge: "bg-white/10 text-white/85 border-white/15",
+      "radial-gradient(circle at top, rgba(59,130,246,0.14), rgba(10,10,11,1) 58%)",
+    orbA: "rgba(59,130,246,0.14)",
+    orbB: "rgba(99,102,241,0.08)",
+    card: "linear-gradient(180deg,#0f1625,#0a0b10)",
+    badge: "bg-blue-500/15 text-blue-100 border-blue-400/25",
     border: "border-white/10",
-    pulse: "shadow-[0_0_20px_rgba(255,255,255,0.06)]",
-    beam: "from-white/10 via-slate-300/6 to-transparent",
+    glow: "shadow-[0_0_40px_rgba(59,130,246,0.08)]",
   };
 }
 
-function getPulseDurationMs(
-  heartbeatBpm: number | undefined,
-  awarenessLevel: AwarenessLevel,
-  environmentLevel: string,
-  desyncLevel: DesyncLevel,
-  driftLevel: DriftLevel,
-  noSupportActive: boolean,
-  trajectory: TrajectoryInsight
-) {
-  if (
-    desyncLevel === "separated" ||
-    driftLevel === "prolonged" ||
-    trajectory.riskWindow === "imminent"
-  ) {
-    return 800;
-  }
-  if (awarenessLevel === "critical") return 900;
-  if (
-    desyncLevel === "drifting" ||
-    awarenessLevel === "elevated" ||
-    driftLevel === "elevated" ||
-    trajectory.riskWindow === "approaching"
-  ) {
-    return 1100;
-  }
-  if (noSupportActive) return 1700;
-  if ((heartbeatBpm || 0) >= 115) return 1000;
-  if ((heartbeatBpm || 0) >= 100) return 1250;
-  if (environmentLevel === "supported") return 2200;
-  return 1800;
-}
+/* -------------------------
+   SMALL UI HELPERS
+--------------------------*/
 
-function badgeTone(tone: MicroGuidance["tone"]) {
-  if (tone === "protective")
-    return "border-red-400/25 bg-red-500/10 text-red-100";
-  if (tone === "supportive")
-    return "border-sky-400/25 bg-sky-500/10 text-sky-100";
-  return "border-white/15 bg-white/5 text-white/85";
-}
-
-function predictiveToneClasses(level: PredictiveSignal["level"]) {
+function chipClass(level: PredictiveSignal["level"]) {
   if (level === "red") {
-    return "border-red-400/20 bg-red-500/10 text-red-50";
+    return "border border-red-400/30 bg-red-500/10 text-red-100";
   }
   if (level === "orange") {
-    return "border-orange-400/20 bg-orange-500/10 text-orange-50";
+    return "border border-orange-400/30 bg-orange-500/10 text-orange-100";
   }
-  return "border-sky-400/20 bg-sky-500/10 text-sky-50";
+  return "border border-blue-400/30 bg-blue-500/10 text-blue-100";
+}
+
+function levelClass(level: AwarenessLevel) {
+  if (level === "critical") return "text-red-300";
+  if (level === "elevated") return "text-orange-300";
+  if (level === "guarded") return "text-yellow-200";
+  return "text-blue-200";
 }
 
 /* -------------------------
-   COMPONENT
+   PAGE
 --------------------------*/
 
 export default function TwinMePage() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 1,
-      role: "twin",
-      text: "TwinMe is now crew-aware, movement-aware, environment-aware, sync-aware, learning your rhythm over time, and able to speak up when risk rises.",
-    },
-  ]);
-
-  const [input, setInput] = useState("");
+  const [displayName, setDisplayName] = useState("Neo");
   const [live, setLive] = useState<PartyLive | null>(null);
   const [crew, setCrew] = useState<CrewStatus[]>([]);
   const [spots, setSpots] = useState<SpotsSnapshot | null>(null);
-  const [minutes, setMinutes] = useState(0);
-  const [positionHistory, setPositionHistory] = useState<PositionPoint[]>([]);
-  const [scanTick, setScanTick] = useState(false);
-
-  const [voiceSupported, setVoiceSupported] = useState(false);
+  const [history, setHistory] = useState<PositionPoint[]>([]);
+ const [messages, setMessages] = useState<Message[]>([
+  {
+    id: 1,
+    role: "twin",
+    text: "TwinMe is here. Ask for a state check, help thinking something through, or say what tonight feels like.",
+  },
+]);
+  const [input, setInput] = useState("");
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [voiceStatus, setVoiceStatus] = useState("Voice mode ready when you are.");
-  const [speakReplies, setSpeakReplies] = useState(false);
-  const [autoVoiceEnabled, setAutoVoiceEnabled] = useState(true);
-  const [autoVoiceLastLabel, setAutoVoiceLastLabel] = useState("idle");
-  const [autoVoiceLastSpokenAt, setAutoVoiceLastSpokenAt] = useState(0);
-
+const [hasHydrated, setHasHydrated] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
-  const nextMessageId = useRef(2);
-  const autoVoiceInitialPassRef = useRef(false);
+  const autoVoiceCooldownRef = useRef<number>(0);
 
+useEffect(() => {
+  setHasHydrated(true);
+  const storedMessages = readJson<Message[]>(TWINCORE_MESSAGES_KEY, [
+    {
+      id: 1,
+      role: "twin",
+      text: "TwinMe is here. Ask for a state check, help thinking something through, or say what tonight feels like.",
+    },
+  ]);
+  setMessages(storedMessages);
+}, []);
+  
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    const name = getDisplayName();
+    setDisplayName(name);
 
-    const supported = !!(
-      window.SpeechRecognition || window.webkitSpeechRecognition
-    );
-    setVoiceSupported(supported);
-
-    const readSnapshots = () => {
+    const refresh = async () => {
       const nextLive = getLiveContext();
-      const nextCrew = getCrewContext();
       const nextSpots = getSpotsContext();
+      const nextCrew = await getCrewContext(name);
 
       setLive(nextLive);
-      setCrew(nextCrew);
       setSpots(nextSpots);
-      setMinutes(getMinutesActive(nextLive));
-      setScanTick((prev) => !prev);
+      setCrew(nextCrew);
 
-      if (
-        nextLive?.active &&
-        typeof nextLive.heartbeatBpm === "number" &&
-        nextLive.heartbeatBpm > 0 &&
-        nextLive.heartbeatBpm < 105
-      ) {
+      updatePositionHistory(nextLive);
+      setHistory(getPositionHistory());
+
+      if (nextLive?.active && typeof nextLive.heartbeatBpm === "number") {
         updateBaselineSnapshot(nextLive.heartbeatBpm);
-      }
-
-      if (
-        nextLive?.active &&
-        typeof nextLive.latitude === "number" &&
-        typeof nextLive.longitude === "number" &&
-        typeof nextLive.timestamp === "string"
-      ) {
-        const nextPoint: PositionPoint = {
-          latitude: nextLive.latitude,
-          longitude: nextLive.longitude,
-          timestamp: nextLive.timestamp,
-        };
-
-        setPositionHistory((prev) => {
-          const last = prev[prev.length - 1];
-          const isDuplicate =
-            !!last &&
-            last.latitude === nextPoint.latitude &&
-            last.longitude === nextPoint.longitude &&
-            last.timestamp === nextPoint.timestamp;
-
-          if (isDuplicate) return prev;
-          return [...prev.slice(-7), nextPoint];
-        });
-      }
-
-      if (!nextLive?.active) {
-        setPositionHistory([]);
       }
     };
 
-    readSnapshots();
+    refresh();
+    const timer = window.setInterval(refresh, 8000);
 
-    const interval = window.setInterval(readSnapshots, 3000);
-
-    return () => window.clearInterval(interval);
+    return () => window.clearInterval(timer);
   }, []);
 
-  const movementLevel = useMemo(
-    () => getMovementInsight(positionHistory),
-    [positionHistory]
-  );
+  useEffect(() => {
+  if (!hasHydrated) return;
+  writeJson(TWINCORE_MESSAGES_KEY, messages.slice(-20));
+}, [hasHydrated, messages]);
+
+  const minutes = useMemo(() => getMinutesActive(live), [live]);
 
   const crewLevel = useMemo(() => getCrewInsight(crew), [crew]);
+  const movementLevel = useMemo(() => getMovementInsight(history), [history]);
   const environmentLevel = useMemo(() => getEnvironmentInsight(spots), [spots]);
 
   const drift = useMemo(
@@ -1833,10 +1936,14 @@ export default function TwinMePage() {
   );
 
   useEffect(() => {
-    updateLearningProfile(live, minutes, drift.level, noSupport.active);
-  }, [live?.active, live?.heartbeatBpm, minutes, drift.level, noSupport.active]);
+  if (!hasHydrated) return;
+  updateLearningProfile(live, minutes, drift.level, noSupport.active);
+}, [hasHydrated, live, minutes, drift.level, noSupport.active]);
 
-  const learningProfile = useMemo(() => getLearningProfile(), [scanTick, minutes]);
+  const learningProfile = useMemo(() => {
+  if (!hasHydrated) return null;
+  return getLearningProfile();
+}, [hasHydrated, live, minutes]);
 
   const learnMe = useMemo(
     () =>
@@ -1848,6 +1955,11 @@ export default function TwinMePage() {
         drift.level
       ),
     [learningProfile, live, minutes, trajectory, drift.level]
+  );
+
+  const crewCollapse = useMemo(
+    () => getCrewCollapseInsight(live, crew, minutes),
+    [live, crew, minutes]
   );
 
   const microGuidance = useMemo(
@@ -1900,7 +2012,12 @@ export default function TwinMePage() {
     ]
   );
 
-  const liveNudge = useMemo(
+  const awarenessSummary = useMemo(
+    () => getAwarenessSummary(awareness.level),
+    [awareness.level]
+  );
+
+  const nudge = useMemo(
     () =>
       getLiveNudge(
         live,
@@ -1954,48 +2071,6 @@ export default function TwinMePage() {
     ]
   );
 
-  const theme = useMemo(
-    () =>
-      getAmbientTheme(
-        awareness.level,
-        environmentLevel,
-        desync.level,
-        drift.level,
-        noSupport.active,
-        trajectory
-      ),
-    [
-      awareness.level,
-      environmentLevel,
-      desync.level,
-      drift.level,
-      noSupport.active,
-      trajectory,
-    ]
-  );
-
-  const pulseMs = useMemo(
-    () =>
-      getPulseDurationMs(
-        live?.heartbeatBpm,
-        awareness.level,
-        environmentLevel,
-        desync.level,
-        drift.level,
-        noSupport.active,
-        trajectory
-      ),
-    [
-      live?.heartbeatBpm,
-      awareness.level,
-      environmentLevel,
-      desync.level,
-      drift.level,
-      noSupport.active,
-      trajectory,
-    ]
-  );
-
   const predictiveSignals = useMemo(
     () =>
       getPredictiveSignals(
@@ -2008,7 +2083,8 @@ export default function TwinMePage() {
         drift.level,
         noSupport.active,
         trajectory,
-        learnMe
+        learnMe,
+        crewCollapse
       ),
     [
       live,
@@ -2021,691 +2097,265 @@ export default function TwinMePage() {
       noSupport.active,
       trajectory,
       learnMe,
+      crewCollapse,
     ]
   );
 
-  const autoVoiceLabel = useMemo(() => {
-    if (!live?.active) return "idle";
-    if (trajectory.riskWindow === "imminent") return "imminent";
-    if (desync.level === "separated") return "separated";
-    if (drift.level === "prolonged") return "prolonged";
-    if (awareness.level === "critical") return "critical";
-    if (trajectory.riskWindow === "approaching") return "approaching";
-    if (desync.level === "drifting") return "drifting";
-    if (drift.level === "elevated") return "elevated";
-    if (drift.level === "rising") return "rising";
-    if (noSupport.active) return "no_support";
-    if (awareness.level === "guarded") return "guarded";
-    return "stable";
-  }, [
-    live,
-    trajectory.riskWindow,
-    desync.level,
-    drift.level,
-    awareness.level,
-    noSupport.active,
-  ]);
+  const stateCheckSpeech = useMemo(
+    () =>
+      getStateCheckSpeech(
+        awareness,
+        nudge,
+        microGuidance,
+        noSupport.active,
+        learnMe
+      ),
+    [awareness, nudge, microGuidance, noSupport.active, learnMe]
+  );
 
-  useEffect(() => {
-    if (!autoVoiceEnabled || typeof window === "undefined") return;
-    if (!("speechSynthesis" in window)) return;
-
-    const message = getAutoVoiceMessage(
+  const autoVoiceMessage = useMemo(
+  () =>
+    getAutoVoiceMessage(
       live,
       awareness,
       desync.level,
       drift.level,
       noSupport.active,
       trajectory,
-      microGuidance
-    );
+      microGuidance,
+      crewCollapse
+    ),
+    [
+      live,
+      awareness,
+      desync.level,
+      drift.level,
+      noSupport.active,
+      trajectory,
+      microGuidance,
+      crewCollapse
+    ]
+  );
 
-    if (!autoVoiceInitialPassRef.current) {
-      autoVoiceInitialPassRef.current = true;
-      setAutoVoiceLastLabel(autoVoiceLabel);
-      return;
-    }
-
-    if (!message) {
-      setAutoVoiceLastLabel(autoVoiceLabel);
-      return;
-    }
+  useEffect(() => {
+    if (!voiceEnabled || !autoVoiceMessage) return;
 
     const now = Date.now();
-    const cooldownMs =
-      autoVoiceLabel === "imminent" ||
-      autoVoiceLabel === "separated" ||
-      autoVoiceLabel === "critical"
-        ? 12000
-        : 20000;
+    if (now - autoVoiceCooldownRef.current < 30000) return;
 
-    const labelChanged = autoVoiceLabel !== autoVoiceLastLabel;
-    const cooldownPassed = now - autoVoiceLastSpokenAt > cooldownMs;
+    autoVoiceCooldownRef.current = now;
+    speakText(autoVoiceMessage);
+  }, [voiceEnabled, autoVoiceMessage]);
 
-    if (!labelChanged && !cooldownPassed) {
-      return;
-    }
-
-    speakText(message);
-    setVoiceStatus(`Auto voice: ${autoVoiceLabel.replaceAll("_", " ")}`);
-    setAutoVoiceLastLabel(autoVoiceLabel);
-    setAutoVoiceLastSpokenAt(now);
-
-    setMessages((prev) => {
-      const nextMessage: Message = {
-        id: nextMessageId.current++,
-        role: "twin",
-        text: message,
-      };
-
-      const last = prev[prev.length - 1];
-      if (last?.role === "twin" && last.text === message) {
-        return prev;
-      }
-
-      return [...prev, nextMessage];
-    });
-  }, [
-    autoVoiceEnabled,
-    autoVoiceLabel,
-    autoVoiceLastLabel,
-    autoVoiceLastSpokenAt,
-    live,
-    awareness,
-    desync.level,
-    drift.level,
-    noSupport.active,
-    trajectory,
-    microGuidance,
-  ]);
-
-  const sendMessage = (text: string) => {
-    const clean = text.trim();
-    if (!clean) return;
-
-    const userMessage: Message = {
-      id: nextMessageId.current++,
-      role: "user",
-      text: clean,
-    };
-
-    const twinReply: Message = {
-      id: nextMessageId.current++,
-      role: "twin",
-      text: buildReply(
-        clean,
-        live,
-        movementLevel,
-        environmentLevel,
-        spots,
-        desync.level,
-        noSupport.active,
-        trajectory,
-        learnMe
-      ),
-    };
-
-    setMessages((prev) => [...prev, userMessage, twinReply]);
-    setInput("");
-
-    if (speakReplies) {
-      speakText(twinReply.text.replace(/\n/g, " "));
-    }
-  };
-
-  const startListening = () => {
-    if (!voiceSupported || typeof window === "undefined") return;
+  useEffect(() => {
+    if (typeof window === "undefined") return;
 
     const Recognition =
       window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!Recognition) return;
 
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-      recognitionRef.current = null;
-    }
+    if (!Recognition) return;
 
     const recognition = new Recognition();
     recognition.continuous = false;
-    recognition.interimResults = true;
+    recognition.interimResults = false;
     recognition.lang = "en-US";
 
-    recognition.onstart = () => {
-      setIsListening(true);
-      setVoiceStatus("Listening...");
-    };
-
-    recognition.onerror = (event) => {
-      setIsListening(false);
-      setVoiceStatus(
-        event?.error
-          ? `Voice error: ${event.error}`
-          : "Voice recognition ran into an issue."
-      );
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-      setVoiceStatus("Voice mode ready when you are.");
-    };
+    recognition.onstart = () => setIsListening(true);
+    recognition.onend = () => setIsListening(false);
+    recognition.onerror = () => setIsListening(false);
 
     recognition.onresult = (event) => {
-      let transcript = "";
-
-      for (let i = event.resultIndex; i < event.results.length; i += 1) {
-        transcript += event.results[i][0].transcript;
-      }
+      const transcript =
+        event.results?.[event.resultIndex]?.[0]?.transcript?.trim() || "";
+      if (!transcript) return;
 
       setInput(transcript);
 
-      const lastIndex = event.results.length - 1;
-      const lastResult = event.results[lastIndex];
-      const isFinal = !!lastResult?.isFinal;
+      const lowered = transcript.toLowerCase();
 
-      if (isFinal && transcript.trim()) {
-        sendMessage(transcript.trim());
+      if (
+        lowered.includes("state check") ||
+        lowered.includes("check me") ||
+        lowered.startsWith("twin")
+      ) {
+        handleSend(transcript);
       }
     };
 
     recognitionRef.current = recognition;
-    recognition.start();
-  };
 
-  const stopListening = () => {
-    recognitionRef.current?.stop();
-    recognitionRef.current = null;
-    setIsListening(false);
-    setVoiceStatus("Voice mode stopped.");
-  };
+    return () => {
+      recognition.stop();
+    };
+  }, []);
 
-  const speakStateCheck = () => {
-    const speech = getStateCheckSpeech(
+  function toggleListening() {
+    const recognition = recognitionRef.current;
+    if (!recognition) return;
+
+    if (isListening) {
+      recognition.stop();
+      return;
+    }
+
+    try {
+      recognition.start();
+    } catch {
+      // ignore repeated start errors
+    }
+  }
+
+     const handleSend = (forcedInput?: string) => {
+    const text = forcedInput ?? input;
+    if (!text.trim()) return;
+
+    const userMessage: Message = {
+      id: Date.now(),
+      role: "user",
+      text,
+    };
+
+    const twinReplyText = generateTwinResponse({
+      input: text,
+      live,
       awareness,
-      liveNudge,
-      microGuidance,
-      noSupport.active,
-      learnMe
-    );
-    speakText(speech);
+      trajectory,
+      desync,
+      drift,
+      learnMe,
+      noSupport,
+    });
+
+    const twinMessage: Message = {
+      id: Date.now() + 1,
+      role: "twin",
+      text: twinReplyText,
+    };
+
+    setMessages((prev) => [...prev, userMessage, twinMessage].slice(-20));
+    setInput("");
+
+    if (voiceEnabled) {
+      speakText(twinReplyText);
+    }
   };
+
+  const theme = getAmbientTheme(
+    awareness.level,
+    environmentLevel,
+    desync.level,
+    drift.level,
+    noSupport.active,
+    trajectory
+  );
 
   return (
-    <main
-      className="min-h-screen overflow-x-hidden text-white"
-      style={{ background: theme.pageBg }}
-    >
-      <div className="relative mx-auto flex min-h-screen w-full max-w-md flex-col px-4 py-8">
-        <div
-          className="pointer-events-none absolute inset-x-0 top-0 h-72 blur-3xl"
-          style={{
-            background: `radial-gradient(circle at 30% 20%, ${theme.orbA}, transparent 55%), radial-gradient(circle at 70% 20%, ${theme.orbB}, transparent 50%)`,
-          }}
-        />
-        <div
-          className={`pointer-events-none absolute inset-x-[-10%] top-16 h-24 bg-gradient-to-r ${theme.beam} blur-2xl`}
-          style={{
-            animation:
-              awareness.level === "critical"
-                ? "twincoreSweep 2.6s linear infinite"
-                : awareness.level === "elevated"
-                ? "twincoreSweep 4.8s linear infinite"
-                : "twincoreSweep 9s linear infinite",
-          }}
-        />
-
-        <header className="relative mb-6">
-          <div className="mb-2 text-xs tracking-[0.3em] text-white/50">
-            TWINCORE
-          </div>
-          <h1 className="text-4xl font-semibold tracking-tight">TwinMe</h1>
-          <p className="mt-2 text-sm text-white/60">
-            Crew-aware, movement-aware, environment-aware, sync-aware, learning
-            your rhythm, and speaking up when pressure rises.
+    <main className="min-h-screen text-white" style={{ background: theme.pageBg }}>
+      <div className="w-full max-w-[1280px] mx-auto space-y-8 px-4 md:px-6 xl:px-8 pt-6">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight">TwinMe</h1>
+          <p className="text-white/50 text-sm">
+            Predictive support for {displayName}
           </p>
-        </header>
+        </div>
 
-        <section
-          className={`relative mb-4 overflow-hidden rounded-3xl border p-4 ${theme.border} ${theme.pulse}`}
-          style={{ background: theme.card }}
-        >
-          <div className="absolute inset-x-0 top-0 h-1 bg-white/5">
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4 mb-2">
+          {[
+            { label: "Awareness", value: awareness.score, sub: awareness.level },
+            { label: "Heartbeat", value: live?.heartbeatBpm || 0, sub: `${minutes} min` },
+            { label: "Desync", value: desync.level, sub: desync.summary },
+            { label: "LearnMe", value: learnMe.label, sub: learnMe.summary },
+          ].map((item) => (
             <div
-              className="h-full rounded-full bg-gradient-to-r from-white/70 via-white/40 to-white/10 transition-all duration-500"
-              style={{ width: `${awareness.score}%` }}
-            />
-          </div>
-
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div>
-              <div className="text-[11px] uppercase tracking-[0.18em] text-white/55">
-                Awareness Score
-              </div>
-              <div className="mt-1 text-3xl font-semibold">
-                {awareness.score}
-              </div>
-            </div>
-
-            <div className="text-right">
-              <div
-                className={`inline-flex rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${theme.badge}`}
-              >
-                {awareness.level}
-              </div>
-              <div className="mt-2 text-xs text-white/50">
-                {getAwarenessSummary(awareness.level)}
-              </div>
-            </div>
-          </div>
-
-          <div className="mb-4 flex items-center justify-center">
-            <div
-              className="relative flex h-40 w-40 items-center justify-center rounded-full border border-white/10 bg-white/5"
-              style={{
-                boxShadow: `0 0 0 0 rgba(255,255,255,0.08)`,
-                animation: `twincorePulse ${pulseMs}ms ease-in-out infinite`,
-              }}
+              key={item.label}
+              className="rounded-2xl bg-white/5 p-3 border border-white/10 min-h-[96px]"
             >
-              <div
-                className="absolute inset-[-10px] rounded-full border border-white/10"
-                style={{
-                  animation:
-                    awareness.level === "critical" ||
-                    trajectory.riskWindow === "imminent"
-                      ? "twincoreHalo 1.5s ease-out infinite"
-                      : awareness.level === "elevated"
-                      ? "twincoreHalo 2.4s ease-out infinite"
-                      : "twincoreHalo 4.2s ease-out infinite",
-                }}
+              <div className="text-xs text-white/50">{item.label}</div>
+              <div className="text-lg md:text-2xl font-semibold leading-tight">
+                {item.value}
+              </div>
+              <div className="text-[11px] leading-4 text-white/45 mt-1">
+                {item.sub}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[320px_minmax(0,1fr)] xl:items-start">
+          <div className="space-y-5 lg:sticky lg:top-6 self-start">
+            <div className="rounded-2xl bg-white/5 p-3 md:p-4 border border-white/10 min-h-[110px]">
+              <h3 className="font-semibold mb-2">State</h3>
+              <p className="text-sm text-white/60">{nudge}</p>
+            </div>
+
+            <div className="rounded-2xl bg-white/5 p-3 border border-white/10 min-h-[92px]">
+              <h3 className="font-semibold mb-2">{microGuidance.title}</h3>
+              <ul className="text-sm text-white/60 space-y-1">
+                {microGuidance.actions.map((a, i) => (
+                  <li key={i}>• {a}</li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-sm text-white/50">Predictive signals</h3>
+              {predictiveSignals.map((s, i) => (
+                <div
+                  key={i}
+                  className={`rounded-xl p-3 border ${
+                    s.level === "red"
+                      ? "border-red-400/30 bg-red-500/10"
+                      : s.level === "orange"
+                      ? "border-orange-400/30 bg-orange-500/10"
+                      : "border-blue-400/30 bg-blue-500/10"
+                  }`}
+                >
+                  <div className="font-medium text-sm">{s.title}</div>
+                  <div className="text-xs text-white/60">{s.body}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-white/5 p-4 md:p-5 border border-white/10 w-full min-w-0">
+            <h3 className="font-semibold mb-3 text-base md:text-lg">
+              Talk to TwinMe
+            </h3>
+
+            <div className="w-full rounded-2xl border border-white/10 bg-black/10 p-3 md:p-4 min-h-[220px] max-h-[320px] overflow-y-auto space-y-3">
+              {messages.map((m) => (
+                <div
+                  key={m.id}
+                  className={`p-3 rounded-xl max-w-[88%] md:max-w-[80%] ${
+                    m.role === "twin"
+                      ? "bg-blue-500/10 border border-blue-400/20"
+                      : "bg-white/10 ml-auto"
+                  }`}
+                >
+                  <p className="text-sm whitespace-pre-wrap break-words">
+                    {m.text}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 flex flex-col sm:grid sm:grid-cols-[minmax(0,1fr)_auto] gap-3 items-stretch sm:items-end">
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Tell TwinMe what’s going on..."
+                className="w-full min-h-[84px] max-h-[140px] resize-none rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/35 outline-none leading-5"
               />
-              <div className="absolute inset-2 rounded-full border border-white/10" />
-              <div className="text-center">
-                <div className="text-[11px] uppercase tracking-[0.2em] text-white/45">
-                  {live?.active ? "live" : "idle"}
-                </div>
-                <div className="mt-1 text-3xl font-semibold">
-                  {live?.heartbeatBpm ?? "--"}
-                </div>
-                <div className="text-xs text-white/50">bpm</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-              <div className="text-[11px] uppercase tracking-[0.16em] text-white/45">
-                Sync Status
-              </div>
-              <div className="mt-1 font-medium">{desync.level}</div>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-              <div className="text-[11px] uppercase tracking-[0.16em] text-white/45">
-                Internal Drift
-              </div>
-              <div className="mt-1 font-medium">{drift.level}</div>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-              <div className="text-[11px] uppercase tracking-[0.16em] text-white/45">
-                Trajectory
-              </div>
-              <div className="mt-1 font-medium">{trajectory.riskWindow}</div>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-              <div className="text-[11px] uppercase tracking-[0.16em] text-white/45">
-                Minutes Active
-              </div>
-              <div className="mt-1 font-medium">{minutes}</div>
-            </div>
-          </div>
-        </section>
-
-        <section className="mb-4 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#11141a,#0b0d11)] p-4">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div>
-              <div className="text-[11px] uppercase tracking-[0.18em] text-white/55">
-                Predictive Layer
-              </div>
-              <div className="mt-1 text-2xl font-semibold text-white">
-                {trajectory.riskWindow === "imminent"
-                  ? "intervene now"
-                  : trajectory.riskWindow === "approaching"
-                  ? "watch closely"
-                  : "stable read"}
-              </div>
-            </div>
-
-            <span
-              className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.16em] ${theme.badge}`}
-            >
-              {trajectory.direction}
-            </span>
-          </div>
-
-          <div className="space-y-2">
-            {predictiveSignals.map((signal) => (
-              <div
-                key={`${signal.level}-${signal.title}`}
-                className={`rounded-2xl border p-3 ${predictiveToneClasses(signal.level)}`}
-              >
-                <div className="text-[11px] uppercase tracking-[0.16em] opacity-80">
-                  {signal.level}
-                </div>
-                <div className="mt-1 font-medium">{signal.title}</div>
-                <p className="mt-1 text-sm leading-6 opacity-90">
-                  {signal.body}
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="mb-4 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#11141a,#0b0d11)] p-4">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div>
-              <div className="text-[11px] uppercase tracking-[0.18em] text-white/55">
-                Voice Mode
-              </div>
-              <div className="mt-1 text-2xl font-semibold text-white">
-                {voiceSupported ? "ready" : "unsupported"}
-              </div>
-            </div>
-
-            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-white/80">
-              {isListening ? "listening" : "idle"}
-            </span>
-          </div>
-
-          <p className="text-sm leading-6 text-white/75">{voiceStatus}</p>
-
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              onClick={startListening}
-              disabled={!voiceSupported || isListening}
-              className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/15 disabled:opacity-40"
-            >
-              Start Listening
-            </button>
-
-            <button
-              onClick={stopListening}
-              disabled={!voiceSupported || !isListening}
-              className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/10 disabled:opacity-40"
-            >
-              Stop
-            </button>
-
-            <button
-              onClick={speakStateCheck}
-              className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/10"
-            >
-              Speak State Check
-            </button>
-
-            <button
-              onClick={() => setSpeakReplies((prev) => !prev)}
-              className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/10"
-            >
-              {speakReplies ? "Speak TwinMe: On" : "Speak TwinMe: Off"}
-            </button>
-
-            <button
-              onClick={() => setAutoVoiceEnabled((prev) => !prev)}
-              className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/10"
-            >
-              {autoVoiceEnabled ? "Auto Voice: On" : "Auto Voice: Off"}
-            </button>
-          </div>
-        </section>
-
-        <section className="mb-4 rounded-3xl border border-white/10 bg-white/5 p-4">
-          <div className="mb-2 text-[11px] uppercase tracking-[0.18em] text-white/55">
-            Live Nudge
-          </div>
-          <p className="text-sm leading-6 text-white/80">{liveNudge}</p>
-          {alert ? (
-            <div className="mt-3 rounded-2xl border border-red-400/20 bg-red-500/10 px-3 py-3 text-sm text-red-100">
-              {alert}
-            </div>
-          ) : null}
-        </section>
-
-        <section className="mb-4 rounded-3xl border border-white/10 bg-white/5 p-4">
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <div className="text-[11px] uppercase tracking-[0.18em] text-white/55">
-              Learn Me
-            </div>
-            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-white/80">
-              {learnMe.label}
-            </span>
-          </div>
-
-          <p className="text-sm leading-6 text-white/80">{learnMe.summary}</p>
-
-          <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-            <div className="rounded-2xl border border-white/10 bg-black/10 p-3">
-              <div className="text-[11px] uppercase tracking-[0.16em] text-white/45">
-                Observations
-              </div>
-              <div className="mt-1 font-medium">
-                {learningProfile?.observations ?? 0}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-black/10 p-3">
-              <div className="text-[11px] uppercase tracking-[0.16em] text-white/45">
-                Avg Active BPM
-              </div>
-              <div className="mt-1 font-medium">
-                {learningProfile?.avgActiveBpm ?? "--"}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-black/10 p-3">
-              <div className="text-[11px] uppercase tracking-[0.16em] text-white/45">
-                Avg Active Min
-              </div>
-              <div className="mt-1 font-medium">
-                {learningProfile?.avgActiveMinutes ?? "--"}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-black/10 p-3">
-              <div className="text-[11px] uppercase tracking-[0.16em] text-white/45">
-                Escalation Minute
-              </div>
-              <div className="mt-1 font-medium">
-                {learningProfile?.typicalEscalationMinute ?? "--"}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="mb-4 rounded-3xl border border-white/10 bg-white/5 p-4">
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <div className="text-[11px] uppercase tracking-[0.18em] text-white/55">
-              Micro-Guidance
-            </div>
-            <span
-              className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.16em] ${badgeTone(
-                microGuidance.tone
-              )}`}
-            >
-              {microGuidance.tone}
-            </span>
-          </div>
-
-          <div className="text-lg font-semibold">{microGuidance.title}</div>
-
-          <ul className="mt-3 space-y-2 text-sm text-white/80">
-            {microGuidance.actions.map((action) => (
-              <li
-                key={action}
-                className="rounded-2xl border border-white/10 bg-black/10 px-3 py-3"
-              >
-                {action}
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        <section className="mb-4 grid grid-cols-2 gap-3">
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-            <div className="text-[11px] uppercase tracking-[0.16em] text-white/45">
-              Crew
-            </div>
-            <div className="mt-1 text-lg font-semibold">{crewLevel}</div>
-            <div className="mt-2 text-sm text-white/60">
-              {crew.length} connected
-            </div>
-          </div>
-
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-            <div className="text-[11px] uppercase tracking-[0.16em] text-white/45">
-              Movement
-            </div>
-            <div className="mt-1 text-lg font-semibold">{movementLevel}</div>
-            <div className="mt-2 text-sm text-white/60">position-aware</div>
-          </div>
-
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-            <div className="text-[11px] uppercase tracking-[0.16em] text-white/45">
-              Environment
-            </div>
-            <div className="mt-1 text-lg font-semibold">{environmentLevel}</div>
-            <div className="mt-2 text-sm text-white/60">
-              safe {spots?.safeCount ?? 0} · risk {spots?.riskCount ?? 0}
-            </div>
-          </div>
-
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-            <div className="text-[11px] uppercase tracking-[0.16em] text-white/45">
-              Support Mode
-            </div>
-            <div className="mt-1 text-lg font-semibold">
-              {noSupport.active ? "closer" : "guided"}
-            </div>
-            <div className="mt-2 text-sm text-white/60">
-              {noSupport.summary}
-            </div>
-          </div>
-        </section>
-
-        <section className="mb-4 rounded-3xl border border-white/10 bg-white/5 p-4">
-          <div className="mb-3 text-[11px] uppercase tracking-[0.18em] text-white/55">
-            Quick Prompts
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {STARTER_PROMPTS.map((prompt) => (
               <button
-                key={prompt}
-                onClick={() => sendMessage(prompt)}
-                className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/85 transition hover:bg-white/10"
+                onClick={() => handleSend()}
+                className="h-[52px] sm:h-[84px] rounded-2xl bg-white px-5 text-sm font-medium text-black transition hover:opacity-90"
               >
-                {prompt}
+                Send
               </button>
-            ))}
+            </div>
           </div>
-        </section>
-
-        <section className="mb-4 flex-1 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#11141a,#0b0d11)] p-4">
-          <div className="mb-3 text-[11px] uppercase tracking-[0.18em] text-white/55">
-            Conversation
-          </div>
-
-          <div className="space-y-3">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`max-w-[88%] rounded-3xl px-4 py-3 text-sm leading-6 ${
-                  message.role === "twin"
-                    ? "border border-white/10 bg-white/8 text-white"
-                    : "ml-auto border border-sky-400/20 bg-sky-500/10 text-sky-50"
-                }`}
-              >
-                <div className="mb-1 text-[10px] uppercase tracking-[0.18em] text-white/40">
-                  {message.role === "twin" ? "TwinMe" : "You"}
-                </div>
-                <div className="whitespace-pre-wrap">{message.text}</div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="sticky bottom-0 mt-2 rounded-3xl border border-white/10 bg-[rgba(10,10,11,0.88)] p-3 backdrop-blur">
-          <div className="flex items-end gap-2">
-            <textarea
-              value={input}
-              onChange={(event) => setInput(event.target.value)}
-              placeholder="Talk to TwinMe..."
-              rows={2}
-              className="min-h-[56px] flex-1 resize-none rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none placeholder:text-white/35"
-            />
-            <button
-              onClick={() => sendMessage(input)}
-              className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/15"
-            >
-              Send
-            </button>
-          </div>
-
-          <div className="mt-3 flex items-center justify-between text-xs text-white/45">
-            <Link href="/" className="transition hover:text-white/75">
-              Dashboard
-            </Link>
-            <Link href="/party" className="transition hover:text-white/75">
-              Party Mode
-            </Link>
-            <Link href="/crew" className="transition hover:text-white/75">
-              Crew
-            </Link>
-            <Link href="/spots" className="transition hover:text-white/75">
-              Spots
-            </Link>
-          </div>
-        </section>
+        </div>
       </div>
-
-      <style jsx global>{`
-        @keyframes twincorePulse {
-          0% {
-            transform: scale(1);
-            box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.1);
-          }
-          50% {
-            transform: scale(1.038);
-            box-shadow: 0 0 0 18px rgba(255, 255, 255, 0);
-          }
-          100% {
-            transform: scale(1);
-            box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
-          }
-        }
-
-        @keyframes twincoreHalo {
-          0% {
-            opacity: 0.55;
-            transform: scale(0.96);
-          }
-          100% {
-            opacity: 0;
-            transform: scale(1.22);
-          }
-        }
-
-        @keyframes twincoreSweep {
-          0% {
-            transform: translateX(-12%);
-            opacity: 0.2;
-          }
-          50% {
-            opacity: 0.55;
-          }
-          100% {
-            transform: translateX(12%);
-            opacity: 0.2;
-          }
-        }
-      `}</style>
     </main>
   );
 }
