@@ -4375,7 +4375,7 @@ export default function TwinMePage() {
   }, [hasHydrated, live, minutes, drift.level, twinSyncSnapshot.noSupport?.active]);
 
   const learningProfile = useMemo(() => {
-    if (!hasHydrated) return null;
+    if (!hasHydrated) return;
     return getLearningProfile();
   }, [hasHydrated, live, minutes]);
 
