@@ -1,5 +1,5 @@
 "use client";
-
+import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -12,7 +12,6 @@ import {
   Users,
   Activity,
 } from "lucide-react";
-import { usePathname } from "next/navigation";
 
 type TwinMeSurface = {
   tone: "blue" | "orange" | "emerald" | "red";
@@ -315,7 +314,15 @@ function AmbientLayer({ tone }: { tone: TwinMeSurface["tone"] }) {
 }
 
 export default function TwinMeGlobal() {
+  
   const pathname = usePathname();
+
+const hideDashboard =
+  pathname === "/onboarding" ||
+  pathname === "/auth";
+
+if (hideDashboard) return null;
+
   const [expanded, setExpanded] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [signals, setSignals] = useState<LocalSignals>({

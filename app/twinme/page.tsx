@@ -23,6 +23,35 @@ declare global {
     __twinConversationProfile?: any;
   }
 }
+import { getPassiveAwareness } from "@/lib/twinme/passive-awareness";
+
+import { shapeIntervention } from "@/lib/twinme/interventions";
+
+import { decideAutonomousIntervention } from "@/lib/twinme/autonomy";
+
+import {
+  getInitialTwinMemory,
+  updateTwinMemory as updateTwinMemoryState,
+} from "@/lib/twinme/memory";
+
+import { getPredictiveForecast } from "@/lib/twinme/predictive";
+
+import { getEcosystemSyncEvent } from "@/lib/twinme/sync";
+
+import {
+  getSubscriptionState,
+} from "@/lib/subscription/storage";
+
+import {
+  canAccessFeature,
+  hasFullTwinCoreAccess,
+} from "@/lib/subscription/access";
+
+import UpgradePrompt from "@/components/subscription/UpgradePrompt";
+
+import { activateLocalPremium } from "@/lib/subscription/storage";
+
+import { getUserSubscriptionFromSupabase } from "@/lib/subscription/supabase";
 
 /* -------------------------
    TYPES
@@ -4235,14 +4264,50 @@ export default function TwinMePage() {
   const [history, setHistory] = useState<PositionPoint[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const lastUserMessageTimeRef = useRef<number>(Date.now());
-  const lastPredictiveNudgeRef = useRef<number>(0);
-  const lastTwinMessageTimeRef = useRef<number>(0);
-  const lastPredictiveMessageRef = useRef<string | null>(null);
-  const predictiveEscalationRef = useRef<number>(0);
-  const lastPredictiveRiskRef = useRef<string | null>(null);
+const lastTwinMessageTimeRef = useRef<number>(0);
+
+const lastPredictiveNudgeRef = useRef<number>(0);
+const lastPredictiveMessageRef = useRef<string | null>(null);
+const predictiveEscalationRef = useRef<number>(0);
+const lastPredictiveRiskRef = useRef<string | null>(null);
+
+const lastPassiveInterventionRef = useRef<number>(0);
+const lastAutonomousMessageRef = useRef<string | null>(null);
+const lastEcosystemSignalRef = useRef<string | null>(null);
+const lastEcosystemSyncAtRef = useRef<number>(0);
+const passiveReasonCountsRef = useRef<Record<string, number>>({});
+
+const interventionCountsRef = useRef<Record<string, number>>({});
+const twinMemoryRef = useRef(getInitialTwinMemory());
+const [subscriptionState, setSubscriptionState] =
+  useState(getSubscriptionState()); 
+const hasFullAccess =
+  hasFullTwinCoreAccess(subscriptionState);
+
+const predictiveAccess = canAccessFeature(
+  subscriptionState,
+  "predictive_guidance"
+);
+
+const passiveAccess = canAccessFeature(
+  subscriptionState,
+  "passive_awareness"
+);
+
+const voiceAccess = canAccessFeature(
+  subscriptionState,
+  "hands_free_voice"
+);
   const [input, setInput] = useState("");
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [voiceOutputEnabled, setVoiceOutputEnabled] = useState(true);
+  const [showUpgradePrompt, setShowUpgradePrompt] =
+  useState(false);
+  const [handsFreeEnabled, setHandsFreeEnabled] = useState(false);
+  const handsFreeRef = useRef(false);
+  const [voiceSupported, setVoiceSupported] = useState(true);
+  const [browserName, setBrowserName] = useState("this browser");
   const [guidedState, setGuidedState] = useState<GuidedState>({
     step: "idle",
   });
@@ -4291,6 +4356,45 @@ export default function TwinMePage() {
 
     setMessages(normalized);
   }, []);
+
+  useEffect(() => {
+  const loadSubscription = async () => {
+    const supabaseState = await getUserSubscriptionFromSupabase();
+
+    if (supabaseState.status === "active") {
+      setSubscriptionState(supabaseState);
+      return;
+    }
+
+    setSubscriptionState(getSubscriptionState());
+  };
+
+  loadSubscription();
+}, []);
+
+useEffect(() => {
+  if (typeof window === "undefined") return;
+
+  const params = new URLSearchParams(window.location.search);
+
+  const checkoutStatus = params.get("checkout");
+
+  if (checkoutStatus !== "success") return;
+
+  activateLocalPremium();
+
+  window.history.replaceState(
+    {},
+    "",
+    "/twinme"
+  );
+}, []);
+
+  useEffect(() => {
+  handsFreeRef.current = handsFreeEnabled;
+  }, [handsFreeEnabled]);
+
+  
 
   useEffect(() => {
     const name = getDisplayName();
@@ -4382,7 +4486,7 @@ export default function TwinMePage() {
   const learnMe = useMemo(
     () =>
       getLearnMeInsight(
-        learningProfile,
+        learningProfile?? null,
         live,
         minutes,
         trajectory,
@@ -4935,6 +5039,273 @@ export default function TwinMePage() {
     twinSyncSnapshot.noSupport?.active,
   ]);
 
+useEffect(() => {
+  if (!hasHydrated) return;
+  if (isThinking) return;
+
+  const interval = window.setInterval(() => {
+    const now = Date.now();
+
+    const lastUserMessage = [...messages].reverse().find((m) => m.role === "user");
+
+    const result = getPassiveAwareness({
+      now,
+      lastInteractionAt: lastTwinMessageTimeRef.current,
+      awarenessLevel: awareness.level,
+      driftLevel: drift.level,
+      desyncLevel: twinSyncSnapshot.desync?.level,
+      noSupportActive: twinSyncSnapshot.noSupport?.active,
+      crewCollapseActive: crewCollapse?.active,
+      isPartyActive: live?.active,
+      isListening,
+      isThinking,
+      recentUserText: lastUserMessage?.text,
+    });
+
+  if (!result.shouldIntervene || !result.message) return;
+
+const interventionKey = result.reason;
+
+passiveReasonCountsRef.current[interventionKey] =
+  (passiveReasonCountsRef.current[interventionKey] || 0) + 1;
+
+const repeatCount =
+  passiveReasonCountsRef.current[interventionKey] - 1;
+
+const autonomyDecision = decideAutonomousIntervention({
+  now,
+  lastUserMessageAt: lastUserMessageTimeRef.current,
+  lastTwinMessageAt: lastTwinMessageTimeRef.current,
+  lastPassiveInterventionAt: lastPassiveInterventionRef.current,
+  isThinking,
+  isListening,
+  handsFreeEnabled,
+  awarenessLevel: awareness.level,
+  driftLevel: drift.level,
+  desyncLevel: twinSyncSnapshot.desync?.level,
+  noSupportActive: twinSyncSnapshot.noSupport?.active,
+  crewCollapseActive: crewCollapse?.active,
+  isPartyActive: live?.active,
+  repeatCount,
+  recentReason: result.reason,
+});
+
+if (!autonomyDecision.shouldIntervene) return;
+
+const intervention = shapeIntervention({
+  reason:
+    result.reason === "none"
+      ? "loop"
+      : result.reason,
+  baseMessage: result.message,
+  repeatCount,
+  awarenessLevel: awareness.level,
+  driftLevel: drift.level,
+  desyncLevel: twinSyncSnapshot.desync?.level,
+  noSupportActive: twinSyncSnapshot.noSupport?.active,
+  isPartyActive: live?.active,
+});
+
+if (
+  lastAutonomousMessageRef.current === intervention.message
+) {
+  return;
+}
+
+const twinMessage: Message = {
+  id: makeMessageId(),
+  role: "twin",
+  text: intervention.message,
+};
+
+setMessages((prev) => [...prev, twinMessage].slice(-20));
+
+lastTwinReplyRef.current = intervention.message;
+lastTwinMessageTimeRef.current = now;
+lastPassiveInterventionRef.current = now;
+
+lastAutonomousMessageRef.current = intervention.message;
+
+speak(intervention.message);
+  }, 30 * 1000);
+
+  return () => window.clearInterval(interval);
+}, [
+  hasHydrated,
+  isThinking,
+  messages,
+  awareness.level,
+  drift.level,
+  twinSyncSnapshot.desync?.level,
+  twinSyncSnapshot.noSupport?.active,
+  crewCollapse?.active,
+  live?.active,
+  isListening,
+]);
+
+useEffect(() => {
+  if (!hasHydrated) return;
+  if (isThinking) return;
+
+  const interval = window.setInterval(() => {
+    const now = Date.now();
+
+    const lastUserMessage = [...messages]
+      .reverse()
+      .find((m) => m.role === "user");
+
+    const forecast = getPredictiveForecast({
+      now,
+      lastUserMessageAt: lastUserMessageTimeRef.current,
+      lastTwinMessageAt: lastTwinMessageTimeRef.current,
+      recentUserText: lastUserMessage?.text,
+      awarenessLevel: awareness.level,
+      driftLevel: drift.level,
+      desyncLevel: twinSyncSnapshot.desync?.level,
+      noSupportActive: twinSyncSnapshot.noSupport?.active,
+      crewCollapseActive: crewCollapse?.active,
+      isPartyActive: live?.active,
+      repeatCount:
+        interventionCountsRef.current["drift"] || 0,
+      uncertaintyCount:
+        getPersistentCounts().uncertainty || 0,
+      overwhelmCount:
+        getPersistentCounts().overwhelm || 0,
+    });
+
+    if (!forecast.shouldNudge || !forecast.message) return;
+
+    const cooldownMs =
+      forecast.urgency === "urgent"
+        ? 45000
+        : forecast.urgency === "elevated"
+        ? 90000
+        : 180000;
+
+    if (
+      now - lastPredictiveNudgeRef.current <
+      cooldownMs
+    ) {
+      return;
+    }
+
+    if (
+      lastPredictiveMessageRef.current ===
+      forecast.message
+    ) {
+      predictiveEscalationRef.current += 1;
+    } else {
+      predictiveEscalationRef.current = 0;
+    }
+
+    lastPredictiveMessageRef.current =
+      forecast.message;
+
+    const twinMessage: Message = {
+      id: makeMessageId(),
+      role: "twin",
+      text:
+        predictiveEscalationRef.current >= 2
+          ? `${forecast.message} Stay intentional.`
+          : forecast.message,
+    };
+
+    setMessages((prev) =>
+      [...prev, twinMessage].slice(-20)
+    );
+
+    lastTwinReplyRef.current = twinMessage.text;
+    lastTwinMessageTimeRef.current = now;
+    lastPredictiveNudgeRef.current = now;
+
+    speak(twinMessage.text);
+  }, 45000);
+
+  return () => window.clearInterval(interval);
+}, [
+  hasHydrated,
+  isThinking,
+  messages,
+  awareness.level,
+  drift.level,
+  twinSyncSnapshot.desync?.level,
+  twinSyncSnapshot.noSupport?.active,
+  crewCollapse?.active,
+  live?.active,
+]);
+
+useEffect(() => {
+  if (!hasHydrated) return;
+  if (isThinking) return;
+
+  const interval = window.setInterval(() => {
+    const now = Date.now();
+
+    const syncEvent = getEcosystemSyncEvent({
+      isPartyActive: live?.active,
+      minutesActive: minutes,
+      movementLevel,
+      awarenessLevel: awareness.level,
+      driftLevel: drift.level,
+      desyncLevel: twinSyncSnapshot.desync?.level,
+      noSupportActive: twinSyncSnapshot.noSupport?.active,
+      crewCollapseActive: crewCollapse?.active,
+      spotsSelectedName: spots?.selectedName,
+      spotsRiskCount: spots?.riskCount,
+      spotsSafeCount: spots?.safeCount,
+      spotsNearbyCount: spots?.nearbyCount,
+      exitActive: false,
+      exitHeadingHome: false,
+      exitAlone: false,
+    });
+
+    if (!syncEvent.shouldNotify || !syncEvent.message) return;
+
+    if (syncEvent.signalKey === lastEcosystemSignalRef.current) return;
+
+    const cooldownMs =
+      syncEvent.urgency === "urgent"
+        ? 45 * 1000
+        : syncEvent.urgency === "elevated"
+        ? 90 * 1000
+        : 3 * 60 * 1000;
+
+    if (now - lastEcosystemSyncAtRef.current < cooldownMs) return;
+
+    const twinMessage: Message = {
+      id: makeMessageId(),
+      role: "twin",
+      text: syncEvent.message,
+    };
+
+    setMessages((prev) => [...prev, twinMessage].slice(-20));
+
+    lastTwinReplyRef.current = twinMessage.text;
+    lastTwinMessageTimeRef.current = now;
+    lastEcosystemSignalRef.current = syncEvent.signalKey;
+    lastEcosystemSyncAtRef.current = now;
+
+    speak(twinMessage.text);
+  }, 30000);
+
+  return () => window.clearInterval(interval);
+}, [
+  hasHydrated,
+  isThinking,
+  live?.active,
+  minutes,
+  movementLevel,
+  awareness.level,
+  drift.level,
+  twinSyncSnapshot.desync?.level,
+  twinSyncSnapshot.noSupport?.active,
+  crewCollapse?.active,
+  spots?.selectedName,
+  spots?.riskCount,
+  spots?.safeCount,
+  spots?.nearbyCount,
+]);
+
   function detectDecisionLockIn(text: string) {
     const clean = text.toLowerCase();
 
@@ -4954,6 +5325,8 @@ export default function TwinMePage() {
     if (!trimmed) return;
 
     lastUserMessageTimeRef.current = Date.now();
+
+    lastAutonomousMessageRef.current = null;
 
     // 🔥 reset predictive cooldown when user engages
     lastPredictiveNudgeRef.current = 0;
@@ -5035,6 +5408,15 @@ export default function TwinMePage() {
 
     try {
 
+   const lowerTrimmed = trimmed.toLowerCase();
+
+   const memoryUpdate = updateTwinMemoryState({
+    now: Date.now(),
+    userText: trimmed,
+    previous: twinMemoryRef.current,
+});
+
+twinMemoryRef.current = memoryUpdate.memory;
 
       let twinText = generateTwinResponse({
         input: trimmed,
@@ -5051,8 +5433,15 @@ export default function TwinMePage() {
         crewCollapse,
         spots,
       });
+      
+      if (
+  memoryUpdate.shouldCarryForward &&
+  memoryUpdate.carryForwardMessage
+) {
+  twinText = `${memoryUpdate.carryForwardMessage}\n\n${twinText}`;
+}
 
-      const lowerTrimmed = trimmed.toLowerCase();
+    
 
       const isDecisionLocked = detectDecisionLockIn(lowerTrimmed);
 
@@ -5063,6 +5452,17 @@ export default function TwinMePage() {
       ) {
         window.__twinMemoryCount = 0;
       }
+      
+ if (
+  lowerTrimmed.includes("i will") ||
+  lowerTrimmed.includes("i'm going to") ||
+  lowerTrimmed.includes("im going to") ||
+  lowerTrimmed.includes("i decided") ||
+  lowerTrimmed.includes("i choose")
+) {
+  interventionCountsRef.current = {};
+  passiveReasonCountsRef.current = {};
+}
 
       const counts = getPersistentCounts();
 
@@ -5125,8 +5525,11 @@ export default function TwinMePage() {
         lowerTrimmed.includes("no plan");
 
       const soundsLikeIsolation =
-        lowerTrimmed.includes("alone") ||
-        lowerTrimmed.includes("by myself");
+  lowerTrimmed.includes("alone") ||
+  lowerTrimmed.includes("by myself") ||
+  lowerTrimmed.includes("go alone") ||
+  lowerTrimmed.includes("leave alone") ||
+  lowerTrimmed.includes("walk alone");
 
       const soundsLikeRiskyMove =
         lowerTrimmed.includes("somewhere new") ||
@@ -5295,25 +5698,86 @@ export default function TwinMePage() {
         let preRiskReply = "";
 
         if (soundsLikeDrift) {
-          preRiskReply =
-            convo.indecisionCount > 2
-              ? `You've been uncertain for a few steps now. If you move without a destination, you'll drift fast. Pick something controlled like ${adaptiveMove.safestChoice} before you move.`
-              : `If you move without a destination right now, you'll drift. Choose ${adaptiveMove.safestChoice} or something equally controlled before you move.`;
-        }
+  const interventionKey = "drift";
 
-        if (soundsLikeIsolation) {
-          preRiskReply =
-            adaptiveMove.toneMode === "protective"
-              ? `Being alone right now reduces your safety margin. Stay connected or move somewhere visible and controlled like ${adaptiveMove.safestChoice}.`
-              : `Going alone makes things less predictable. Stay somewhere visible or connected.`;
-        }
+  interventionCountsRef.current[interventionKey] =
+    (interventionCountsRef.current[interventionKey] || 0) + 1;
 
-        if (soundsLikeRiskyMove) {
-          preRiskReply =
-            adaptiveMove.toneMode === "protective"
-              ? `You're about to add unpredictability. A new spot right now will make things harder to control. Stay with ${adaptiveMove.safestChoice} or something equally familiar and easy to leave from.`
-              : `A new spot adds risk right now. Keep it familiar, visible, and easy to exit.`;
-        }
+  const repeatCount =
+    interventionCountsRef.current[interventionKey] - 1;
+
+  const baseMessage =
+    convo.indecisionCount > 2
+      ? `You've been uncertain for a few steps now. If you move without a destination, you'll drift fast. Pick something controlled like ${adaptiveMove.safestChoice} before you move.`
+      : `If you move without a destination right now, you'll drift. Choose ${adaptiveMove.safestChoice} or something equally controlled before you move.`;
+
+  const intervention = shapeIntervention({
+    reason: "drift",
+    baseMessage,
+    repeatCount,
+    awarenessLevel: awareness.level,
+    driftLevel,
+    desyncLevel,
+    noSupportActive,
+    isPartyActive: live?.active,
+  });
+
+  preRiskReply = intervention.message;
+}
+
+       if (soundsLikeIsolation) {
+  const interventionKey = "isolation";
+
+  interventionCountsRef.current[interventionKey] =
+    (interventionCountsRef.current[interventionKey] || 0) + 1;
+
+  const repeatCount = interventionCountsRef.current[interventionKey] - 1;
+
+  const baseMessage =
+    adaptiveMove.toneMode === "protective"
+      ? `Being alone right now reduces your safety margin. Stay connected or move somewhere visible and controlled like ${adaptiveMove.safestChoice}.`
+      : `Going alone makes things less predictable. Stay somewhere visible or connected.`;
+
+  const intervention = shapeIntervention({
+    reason: "isolation",
+    baseMessage,
+    repeatCount,
+    awarenessLevel: awareness.level,
+    driftLevel,
+    desyncLevel,
+    noSupportActive,
+    isPartyActive: live?.active,
+  });
+
+  preRiskReply = intervention.message;
+}
+
+       if (soundsLikeRiskyMove) {
+  const interventionKey = "risk";
+
+  interventionCountsRef.current[interventionKey] =
+    (interventionCountsRef.current[interventionKey] || 0) + 1;
+
+  const repeatCount = interventionCountsRef.current[interventionKey] - 1;
+
+  const baseMessage =
+    adaptiveMove.toneMode === "protective"
+      ? `You're about to add unpredictability. A new spot right now will make things harder to control. Stay with ${adaptiveMove.safestChoice} or something equally familiar and easy to leave from.`
+      : `A new spot adds risk right now. Keep it familiar, visible, and easy to exit.`;
+
+  const intervention = shapeIntervention({
+    reason: "risk",
+    baseMessage,
+    repeatCount,
+    awarenessLevel: awareness.level,
+    driftLevel,
+    desyncLevel,
+    noSupportActive,
+    isPartyActive: live?.active,
+  });
+
+  preRiskReply = intervention.message;
+}
 
         const guidance = window.__twinGuidanceState || {};
 
@@ -5350,6 +5814,7 @@ export default function TwinMePage() {
 
           setMessages((prev) => [...prev, twinMessage].slice(-20));
           lastTwinReplyRef.current = followUpReply;
+          speak(twinMessage.text);
 
           lastTwinMessageTimeRef.current = Date.now();
 
@@ -5367,6 +5832,7 @@ export default function TwinMePage() {
 
         setMessages((prev) => [...prev, twinMessage].slice(-20));
         lastTwinReplyRef.current = preRiskReply;
+        speak(twinMessage.text);
 
         lastTwinMessageTimeRef.current = Date.now();
 
@@ -5516,6 +5982,7 @@ export default function TwinMePage() {
 
           setMessages((prev) => [...prev, twinMessage].slice(-20));
           lastTwinReplyRef.current = alt;
+          speak(twinMessage.text);
 
           lastTwinMessageTimeRef.current = Date.now();
 
@@ -5531,6 +5998,7 @@ export default function TwinMePage() {
 
         setMessages((prev) => [...prev, twinMessage].slice(-20));
         lastTwinReplyRef.current = spotReply;
+        speak(twinMessage.text);
 
         lastTwinMessageTimeRef.current = Date.now();
 
@@ -5543,6 +6011,16 @@ export default function TwinMePage() {
         role: "twin",
         text: twinText ?? "I'm here with you. Tell me what's happening.",
       };
+
+      setMessages((prev) => [...prev, twinMessage].slice(-20));
+
+      lastTwinReplyRef.current = twinMessage.text;
+
+      speak(twinMessage.text);
+
+      lastTwinMessageTimeRef.current = Date.now();
+
+      setIsThinking(false);
 
     } catch (err) {
       console.error("🔥 FULL ERROR:", err);
@@ -5563,51 +6041,113 @@ export default function TwinMePage() {
         ].slice(-20)
       );
 
+       speak(`Error: ${errorText}`);
+
       lastTwinMessageTimeRef.current = Date.now();
-    } 
+        } finally {
+      setIsThinking(false);
+    }
+  }
 
+ useEffect(() => {
+  if (typeof window === "undefined") return;
 
-    useEffect(() => {
-      if (typeof window === "undefined") return;
+  const Recognition =
+    window.SpeechRecognition || window.webkitSpeechRecognition;
 
-      const Recognition =
-        window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!Recognition) {
+  setVoiceSupported(false);
 
-      if (!Recognition) return;
+  const userAgent = window.navigator.userAgent.toLowerCase();
 
-      const recognition = new Recognition();
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.lang = "en-US";
+  if (userAgent.includes("firefox")) {
+    setBrowserName("Firefox");
+  } else if (userAgent.includes("safari") && !userAgent.includes("chrome")) {
+    setBrowserName("Safari");
+  } else {
+    setBrowserName("this browser");
+  }
 
-      recognition.onstart = () => setIsListening(true);
-      recognition.onend = () => setIsListening(false);
-      recognition.onerror = () => setIsListening(false);
+  return;
+}
 
-      recognition.onresult = (event) => {
-        const transcript =
-          event.results?.[event.resultIndex]?.[0]?.transcript?.trim() || "";
-        if (!transcript) return;
+  const recognition = new Recognition();
+  recognition.continuous = true;
+  recognition.interimResults = false;
+  recognition.lang = "en-US";
 
-        setInput(transcript);
+  recognition.onstart = () => setIsListening(true);
+  
+  recognition.onerror = () => setIsListening(false);
 
-        const lowered = transcript.toLowerCase();
+recognition.onend = () => {
+  setIsListening(false);
 
-        if (
-          lowered.includes("state check") ||
-          lowered.includes("check me") ||
-          lowered.startsWith("twin")
-        ) {
-          handleSend(transcript);
-        }
-      };
+  if (handsFreeRef.current && recognitionRef.current) {
+    setTimeout(() => {
+      try {
+        recognitionRef.current?.start();
+      } catch {
+        // ignore repeated start errors
+      }
+    }, 600);
+  }
+};
 
-      recognitionRef.current = recognition;
+recognition.onresult = (event) => {
+  const transcript =
+    event.results?.[event.resultIndex]?.[0]?.transcript?.trim() || "";
 
-      return () => {
-        recognition.stop();
-      };
-    }, [input, isThinking, messages, displayName, twinSignals, twinSyncSnapshot, environmentLevel, movementLevel]);
+  console.log("🎤 heard:", transcript);
+
+  if (!transcript) return;
+
+  setInput(transcript);
+
+  const lowered = transcript.toLowerCase();
+
+  if (handsFreeRef.current) {
+  console.log("🤖 hands-free sending:", transcript);
+
+  setTimeout(() => {
+    handleSend(transcript);
+  }, 100);
+
+  return;
+}
+
+  if (
+    lowered.includes("state check") ||
+    lowered.includes("check me") ||
+    lowered.startsWith("twin")
+  ) {
+    handleSend(transcript);
+  }
+};
+
+  recognitionRef.current = recognition;
+
+  return () => {
+    recognition.stop();
+  };
+}, []);
+
+function speak(text: string) {
+  if (typeof window === "undefined") return;
+  if (!voiceOutputEnabled) return;
+
+  const synth = window.speechSynthesis;
+  if (!synth) return;
+
+  const utterance = new SpeechSynthesisUtterance(text);
+
+  utterance.rate = 1;
+  utterance.pitch = 1;
+  utterance.volume = 1;
+
+  synth.cancel();
+  synth.speak(utterance);
+}
 
     function toggleListening() {
       const recognition = recognitionRef.current;
@@ -5823,6 +6363,15 @@ export default function TwinMePage() {
                 )}
               </div>
 
+ {!voiceSupported && (
+  <div className="rounded-2xl border border-yellow-400/20 bg-yellow-500/10 px-3 py-2 mt-3 mb-2 text-center">
+    <p className="text-xs text-yellow-100">
+      Voice is not supported in {browserName}. Open TwinMe in Chrome to use voice.
+    </p>
+  </div>
+)}
+
+
               <div className="sticky bottom-0 left-0 right-0 pt-3 pb-2 mt-3 bg-gradient-to-t from-[#0A0A0B] to-transparent">
                 <div className="flex flex-col gap-3">
                   <textarea
@@ -5838,25 +6387,72 @@ export default function TwinMePage() {
                     placeholder="Tell TwinMe what's going on..."
                     className="w-full min-h-[72px] resize-none rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/35 outline-none focus:ring-2 focus:ring-white/20 transition"
                   />
+<div className="grid grid-cols-2 gap-3">
+  <button
+    onClick={() => handleSend()}
+    className="w-full h-[52px] rounded-2xl bg-white text-black font-medium shadow-lg hover:opacity-90 transition"
+  >
+    Send
+  </button>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      onClick={() => handleSend()}
-                      className="w-full h-[52px] rounded-2xl bg-white text-black font-medium shadow-lg hover:opacity-90 transition"
-                    >
-                      Send
-                    </button>
+  <button
+    onClick={voiceSupported ? toggleListening : undefined}
+    className={`w-full h-[52px] rounded-2xl border font-medium transition ${
+      isListening
+        ? "border-red-400/40 bg-red-500/10 text-red-100"
+        : "border-white/10 bg-white/5 text-white"
+    }`}
+  >
+    {isListening ? "Listening..." : "Voice"}
+  </button>
 
-                    <button
-                      onClick={toggleListening}
-                      className={`w-full h-[52px] rounded-2xl border font-medium transition ${isListening
-                        ? "border-red-400/40 bg-red-500/10 text-red-100"
-                        : "border-white/10 bg-white/5 text-white"
-                        }`}
-                    >
-                      {isListening ? "Listening..." : "Voice"}
-                    </button>
-                  </div>
+  <button
+    onClick={() => setVoiceOutputEnabled((prev) => !prev)}
+    className={`w-full h-[52px] rounded-2xl border font-medium transition ${
+      voiceOutputEnabled
+        ? "border-green-400/40 bg-green-500/10 text-green-100"
+        : "border-white/10 bg-white/5 text-white"
+    }`}
+  >
+    {voiceOutputEnabled ? "Voice ON" : "Voice OFF"}
+  </button>
+
+  <button
+   onClick={() => {
+  if (!voiceSupported) return;
+
+  if (!voiceAccess.allowed) {
+  setShowUpgradePrompt(true);  
+    return;
+  }
+
+  setHandsFreeEnabled((prev) => {
+    const next = !prev;
+
+    if (next && recognitionRef.current && !isListening) {
+      try {
+        recognitionRef.current.start();
+      } catch {
+        // ignore repeated start errors
+      }
+    }
+
+    if (!next && recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+        
+    return next;
+  });
+}}
+    className={`w-full h-[52px] rounded-2xl border font-medium transition ${
+      handsFreeEnabled
+        ? "border-purple-400/40 bg-purple-500/10 text-purple-100"
+        : "border-white/10 bg-white/5 text-white"
+    }`}
+  >
+    {handsFreeEnabled ? "Hands-Free ON" : "Hands-Free"}
+  </button>
+</div>
                 </div>
               </div>
             </div>
@@ -5874,8 +6470,23 @@ export default function TwinMePage() {
             }
           }
         `}</style>
-        </div>
+               </div>
+
+               {showUpgradePrompt && (
+  <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 px-5 backdrop-blur-md">
+    <div className="w-full max-w-md">
+      <UpgradePrompt />
+
+      <button
+        type="button"
+        onClick={() => setShowUpgradePrompt(false)}
+        className="mt-4 w-full rounded-2xl border border-white/10 bg-white/5 py-3 text-sm text-white/70"
+      >
+        Maybe Later
+      </button>
+    </div>
+  </div>
+)}
       </main>
-);
-}
+    );
 }
