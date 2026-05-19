@@ -56,10 +56,17 @@ export default function JoinPage() {
         .select();
 
       if (error) {
-        console.error("SUPABASE INSERT ERROR:", error);
-        setStatusMessage(`Supabase error: ${error.message}`);
-        return;
-      }
+  console.error("SUPABASE INSERT ERROR MESSAGE:", error.message);
+  console.error("SUPABASE INSERT ERROR DETAILS:", error.details);
+  console.error("SUPABASE INSERT ERROR HINT:", error.hint);
+  console.error("SUPABASE INSERT ERROR CODE:", error.code);
+
+  setStatusMessage(
+    `Supabase error: ${error.message || error.details || error.code || "Unknown error"}`
+  );
+
+  return;
+}
 
       console.log("INSERT SUCCESS:", data);
       setCreatedLink(link);
