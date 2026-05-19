@@ -21,6 +21,7 @@ import {
   Volume2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import AuthGuard from "@/components/auth/AuthGuard";
 const STORAGE_KEY = "twincore_profile";
 const PARTY_AUDIO_SRC = "/party-mode.mp3";
 const JOINED_CREW_KEY = "twincore_joined_crew";
@@ -1178,7 +1179,8 @@ export default function PartyPage() {
     return getFriendlyLocationName(lastCoords);
   }, [lastCoords]);
   return (
-    <main className="min-h-screen overflow-hidden bg-[#0A0A0B] text-white">
+    <AuthGuard>
+      <main className="min-h-screen overflow-hidden bg-[#0A0A0B] text-white">
       <audio
         ref={audioRef}
         src={PARTY_AUDIO_SRC}
@@ -1696,5 +1698,6 @@ export default function PartyPage() {
         </div>
       </div>
     </main>
+       </AuthGuard>
   );
 }

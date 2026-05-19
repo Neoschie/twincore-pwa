@@ -146,7 +146,7 @@ function detectRisk(input: PredictiveInput): {
 
   if (recentSilenceAfterUser && risk !== "none") {
     score += 2;
-    if (risk === "none") risk = "hesitation";
+    if (!risk) risk = "hesitation";
   }
 
   return { risk, score };

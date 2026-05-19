@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
+import AuthGuard from "@/components/auth/AuthGuard";
+
 type SpotTone = "lit" | "safe" | "risk" | "chill";
 
 type CrewStatusRow = {
@@ -777,6 +779,7 @@ export default function SpotsPage() {
 ]);
 
   return (
+    <AuthGuard>
     <main className="min-h-screen overflow-hidden bg-[#0A0A0B] text-white">
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className={`absolute inset-0 ${ambientClasses.top}`} />
@@ -853,6 +856,8 @@ export default function SpotsPage() {
               {trustedOnly ? "TRUSTED ONLY" : `${trustedVisibleCount} TRUSTED`}
             </span>
           </div>
+
+
 
           {locationError ? (
             <div className="mt-4 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-100">
@@ -1216,6 +1221,7 @@ export default function SpotsPage() {
           </Link>
         </nav>
       </div>
-    </main>
+        </main>
+  </AuthGuard>
   );
 }

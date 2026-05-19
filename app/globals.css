@@ -301,4 +301,18 @@ button {
     animation: none !important;
     transition: none !important;
   }
+  :root {
+  --safe-top: env(safe-area-inset-top);
+  --safe-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-screen {
+  min-height: 100dvh;
+  padding-top: max(1rem, var(--safe-top));
+  padding-bottom: max(1rem, var(--safe-bottom));
+}
+
+.safe-bottom-pad {
+  padding-bottom: max(1rem, calc(var(--safe-bottom) + 1rem));
+}
 }

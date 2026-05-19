@@ -19,6 +19,8 @@ import PageHeader from "../_components/page-header";
 import GlobalStatusBar from "../_components/global-status-bar";
 import AnimatedCard from "../_components/animated-card";
 
+import AuthGuard from "@/components/auth/AuthGuard";
+
 const STORAGE_KEY = "twincore_profile";
 
 type CrewStatusRow = {
@@ -333,6 +335,7 @@ export default function CrewPage() {
   const radarRows = filteredRows.slice(0, 6);
 
   return (
+     <AuthGuard>
     <main className="min-h-screen overflow-hidden bg-[#0A0A0B] text-white">
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.12),transparent_34%),radial-gradient(circle_at_bottom,rgba(34,197,94,0.08),transparent_34%)]" />
@@ -587,6 +590,7 @@ export default function CrewPage() {
         </div>
       </div>
     </main>
+     </AuthGuard>
   );
 }
 
@@ -622,6 +626,8 @@ function MiniInfo({
   value: string;
 }) {
   return (
+    <AuthGuard>
+    <main>
     <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
       <div className="mb-1 flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-white/45">
         <Icon className="h-3.5 w-3.5" />
@@ -629,5 +635,7 @@ function MiniInfo({
       </div>
       <div className="truncate text-sm font-medium text-white/85">{value}</div>
     </div>
+    </main>
+  </AuthGuard>
   );
 }

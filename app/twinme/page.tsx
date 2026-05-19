@@ -53,6 +53,14 @@ import { activateLocalPremium } from "@/lib/subscription/storage";
 
 import { getUserSubscriptionFromSupabase } from "@/lib/subscription/supabase";
 
+import AuthGuard from "@/components/auth/AuthGuard";
+
+import {
+  hasPredictiveAccess,
+} from "@/lib/subscription/entitlements";
+
+
+import ErrorBoundary from "@/components/system/ErrorBoundary";
 /* -------------------------
    TYPES
 --------------------------*/
@@ -4254,34 +4262,53 @@ function getAutoVoiceMessage(
    COMPONENT
 --------------------------*/
 export default function TwinMePage() {
+  
   const [displayName, setDisplayName] = useState("Neo");
+  
   const [live, setLive] = useState<PartyLive | null>(null);
+ 
   const [crew, setCrew] = useState<CrewStatus[]>([]);
 
   const lastTwinReplyRef = useRef<string | null>(null);
+  
   const lastUserIntentRef = useRef<string | null>(null);
+  
   const [spots, setSpots] = useState<SpotsSnapshot | null>(null);
+  
   const [history, setHistory] = useState<PositionPoint[]>([]);
+  
   const [messages, setMessages] = useState<Message[]>([]);
+  
   const lastUserMessageTimeRef = useRef<number>(Date.now());
-const lastTwinMessageTimeRef = useRef<number>(0);
+
+  const lastTwinMessageTimeRef = useRef<number>(0);
 
 const lastPredictiveNudgeRef = useRef<number>(0);
+
 const lastPredictiveMessageRef = useRef<string | null>(null);
+
 const predictiveEscalationRef = useRef<number>(0);
+
 const lastPredictiveRiskRef = useRef<string | null>(null);
 
 const lastPassiveInterventionRef = useRef<number>(0);
+
 const lastAutonomousMessageRef = useRef<string | null>(null);
+
 const lastEcosystemSignalRef = useRef<string | null>(null);
+
 const lastEcosystemSyncAtRef = useRef<number>(0);
+
 const passiveReasonCountsRef = useRef<Record<string, number>>({});
 
 const interventionCountsRef = useRef<Record<string, number>>({});
+
 const twinMemoryRef = useRef(getInitialTwinMemory());
+
 const [subscriptionState, setSubscriptionState] =
   useState(getSubscriptionState()); 
-const hasFullAccess =
+ 
+  const hasFullAccess =
   hasFullTwinCoreAccess(subscriptionState);
 
 const predictiveAccess = canAccessFeature(
@@ -5039,272 +5066,180 @@ useEffect(() => {
     twinSyncSnapshot.noSupport?.active,
   ]);
 
-useEffect(() => {
-  if (!hasHydrated) return;
-  if (isThinking) return;
+  const crewCollapseActive = crewCollapse?.level !== "stable";
 
-  const interval = window.setInterval(() => {
-    const now = Date.now();
+  useEffect(() => {
+    if (!hasHydrated) return;
+    if (isThinking) return;
 
-    const lastUserMessage = [...messages].reverse().find((m) => m.role === "user");
+    const interval = window.setInterval(() => {
+      const now = Date.now();
 
-    const result = getPassiveAwareness({
-      now,
-      lastInteractionAt: lastTwinMessageTimeRef.current,
-      awarenessLevel: awareness.level,
-      driftLevel: drift.level,
-      desyncLevel: twinSyncSnapshot.desync?.level,
-      noSupportActive: twinSyncSnapshot.noSupport?.active,
-      crewCollapseActive: crewCollapse?.active,
-      isPartyActive: live?.active,
-      isListening,
-      isThinking,
-      recentUserText: lastUserMessage?.text,
-    });
+      if (!passiveAccess.allowed) return;
 
-  if (!result.shouldIntervene || !result.message) return;
+      const lastUserMessage = [...messages].reverse().find((m) => m.role === "user");
 
-const interventionKey = result.reason;
+      const result = getPassiveAwareness({
+        now,
+        lastInteractionAt: lastTwinMessageTimeRef.current,
+        awarenessLevel: awareness.level,
+        driftLevel: drift.level,
+        desyncLevel: twinSyncSnapshot.desync?.level,
+        noSupportActive: twinSyncSnapshot.noSupport?.active,
+        crewCollapseActive,
+        isPartyActive: live?.active,
+        isListening,
+        isThinking,
+        recentUserText: lastUserMessage?.text,
+      });
 
-passiveReasonCountsRef.current[interventionKey] =
-  (passiveReasonCountsRef.current[interventionKey] || 0) + 1;
+      if (!result.shouldIntervene || !result.message) return;
 
-const repeatCount =
-  passiveReasonCountsRef.current[interventionKey] - 1;
+      const interventionKey = result.reason;
 
-const autonomyDecision = decideAutonomousIntervention({
-  now,
-  lastUserMessageAt: lastUserMessageTimeRef.current,
-  lastTwinMessageAt: lastTwinMessageTimeRef.current,
-  lastPassiveInterventionAt: lastPassiveInterventionRef.current,
-  isThinking,
-  isListening,
-  handsFreeEnabled,
-  awarenessLevel: awareness.level,
-  driftLevel: drift.level,
-  desyncLevel: twinSyncSnapshot.desync?.level,
-  noSupportActive: twinSyncSnapshot.noSupport?.active,
-  crewCollapseActive: crewCollapse?.active,
-  isPartyActive: live?.active,
-  repeatCount,
-  recentReason: result.reason,
-});
+      passiveReasonCountsRef.current[interventionKey] =
+        (passiveReasonCountsRef.current[interventionKey] || 0) + 1;
 
-if (!autonomyDecision.shouldIntervene) return;
+      const repeatCount = passiveReasonCountsRef.current[interventionKey] - 1;
 
-const intervention = shapeIntervention({
-  reason:
-    result.reason === "none"
-      ? "loop"
-      : result.reason,
-  baseMessage: result.message,
-  repeatCount,
-  awarenessLevel: awareness.level,
-  driftLevel: drift.level,
-  desyncLevel: twinSyncSnapshot.desync?.level,
-  noSupportActive: twinSyncSnapshot.noSupport?.active,
-  isPartyActive: live?.active,
-});
+      const autonomyDecision = decideAutonomousIntervention({
+        now,
+        lastUserMessageAt: lastUserMessageTimeRef.current,
+        lastTwinMessageAt: lastTwinMessageTimeRef.current,
+        lastPassiveInterventionAt: lastPassiveInterventionRef.current,
+        isThinking,
+        isListening,
+        handsFreeEnabled,
+        awarenessLevel: awareness.level,
+        driftLevel: drift.level,
+        desyncLevel: twinSyncSnapshot.desync?.level,
+        noSupportActive: twinSyncSnapshot.noSupport?.active,
+        crewCollapseActive,
+        isPartyActive: live?.active,
+        repeatCount,
+        recentReason: result.reason,
+      });
 
-if (
-  lastAutonomousMessageRef.current === intervention.message
-) {
-  return;
-}
+      if (!autonomyDecision.shouldIntervene) return;
 
-const twinMessage: Message = {
-  id: makeMessageId(),
-  role: "twin",
-  text: intervention.message,
-};
+      const intervention = shapeIntervention({
+        reason: result.reason === "none" || result.reason === "silence" ? "loop" : result.reason,
+        baseMessage: result.message,
+        repeatCount,
+        awarenessLevel: awareness.level,
+        driftLevel: drift.level,
+        desyncLevel: twinSyncSnapshot.desync?.level,
+        noSupportActive: twinSyncSnapshot.noSupport?.active,
+        isPartyActive: live?.active,
+      });
 
-setMessages((prev) => [...prev, twinMessage].slice(-20));
+      if (lastAutonomousMessageRef.current === intervention.message) return;
 
-lastTwinReplyRef.current = intervention.message;
-lastTwinMessageTimeRef.current = now;
-lastPassiveInterventionRef.current = now;
+      const twinMessage: Message = {
+        id: makeMessageId(),
+        role: "twin",
+        text: intervention.message,
+      };
 
-lastAutonomousMessageRef.current = intervention.message;
+      setMessages((prev) => [...prev, twinMessage].slice(-20));
 
-speak(intervention.message);
-  }, 30 * 1000);
+      lastTwinReplyRef.current = intervention.message;
+      lastTwinMessageTimeRef.current = now;
+      lastPassiveInterventionRef.current = now;
+      lastAutonomousMessageRef.current = intervention.message;
 
-  return () => window.clearInterval(interval);
-}, [
-  hasHydrated,
-  isThinking,
-  messages,
-  awareness.level,
-  drift.level,
-  twinSyncSnapshot.desync?.level,
-  twinSyncSnapshot.noSupport?.active,
-  crewCollapse?.active,
-  live?.active,
-  isListening,
-]);
+      speak(intervention.message);
+    }, 30 * 1000);
 
-useEffect(() => {
-  if (!hasHydrated) return;
-  if (isThinking) return;
+    return () => window.clearInterval(interval);
+  }, [
+    hasHydrated,
+    isThinking,
+    passiveAccess.allowed,
+    awareness.level,
+    drift.level,
+    twinSyncSnapshot.desync?.level,
+    twinSyncSnapshot.noSupport?.active,
+    crewCollapseActive,
+    live?.active,
+    isListening,
+    messages,
+    handsFreeEnabled,
+  ]);
 
-  const interval = window.setInterval(() => {
-    const now = Date.now();
+  useEffect(() => {
+    if (!hasHydrated) return;
+    if (isThinking) return;
 
-    const lastUserMessage = [...messages]
-      .reverse()
-      .find((m) => m.role === "user");
+    const interval = window.setInterval(() => {
+      const now = Date.now();
 
-    const forecast = getPredictiveForecast({
-      now,
-      lastUserMessageAt: lastUserMessageTimeRef.current,
-      lastTwinMessageAt: lastTwinMessageTimeRef.current,
-      recentUserText: lastUserMessage?.text,
-      awarenessLevel: awareness.level,
-      driftLevel: drift.level,
-      desyncLevel: twinSyncSnapshot.desync?.level,
-      noSupportActive: twinSyncSnapshot.noSupport?.active,
-      crewCollapseActive: crewCollapse?.active,
-      isPartyActive: live?.active,
-      repeatCount:
-        interventionCountsRef.current["drift"] || 0,
-      uncertaintyCount:
-        getPersistentCounts().uncertainty || 0,
-      overwhelmCount:
-        getPersistentCounts().overwhelm || 0,
-    });
+      if (!predictiveAccess.allowed) return;
 
-    if (!forecast.shouldNudge || !forecast.message) return;
+      const syncEvent = getEcosystemSyncEvent({
+        isPartyActive: live?.active,
+        minutesActive: minutes,
+        movementLevel,
+        awarenessLevel: awareness.level,
+        driftLevel: drift.level,
+        desyncLevel: twinSyncSnapshot.desync?.level,
+        noSupportActive: twinSyncSnapshot.noSupport?.active,
+        crewCollapseActive,
+        spotsSelectedName: spots?.selectedName,
+        spotsRiskCount: spots?.riskCount,
+        spotsSafeCount: spots?.safeCount,
+        spotsNearbyCount: spots?.nearbyCount,
+        exitActive: false,
+        exitHeadingHome: false,
+        exitAlone: false,
+      });
 
-    const cooldownMs =
-      forecast.urgency === "urgent"
-        ? 45000
-        : forecast.urgency === "elevated"
-        ? 90000
-        : 180000;
+      if (!syncEvent.shouldNotify || !syncEvent.message) return;
+      if (syncEvent.signalKey === lastEcosystemSignalRef.current) return;
 
-    if (
-      now - lastPredictiveNudgeRef.current <
-      cooldownMs
-    ) {
-      return;
-    }
+      const cooldownMs =
+        syncEvent.urgency === "urgent"
+          ? 45 * 1000
+          : syncEvent.urgency === "elevated"
+          ? 90 * 1000
+          : 3 * 60 * 1000;
 
-    if (
-      lastPredictiveMessageRef.current ===
-      forecast.message
-    ) {
-      predictiveEscalationRef.current += 1;
-    } else {
-      predictiveEscalationRef.current = 0;
-    }
+      if (now - lastEcosystemSyncAtRef.current < cooldownMs) return;
 
-    lastPredictiveMessageRef.current =
-      forecast.message;
+      const twinMessage: Message = {
+        id: makeMessageId(),
+        role: "twin",
+        text: syncEvent.message,
+      };
 
-    const twinMessage: Message = {
-      id: makeMessageId(),
-      role: "twin",
-      text:
-        predictiveEscalationRef.current >= 2
-          ? `${forecast.message} Stay intentional.`
-          : forecast.message,
-    };
+      setMessages((prev) => [...prev, twinMessage].slice(-20));
 
-    setMessages((prev) =>
-      [...prev, twinMessage].slice(-20)
-    );
+      lastTwinReplyRef.current = twinMessage.text;
+      lastTwinMessageTimeRef.current = now;
+      lastEcosystemSignalRef.current = syncEvent.signalKey;
+      lastEcosystemSyncAtRef.current = now;
 
-    lastTwinReplyRef.current = twinMessage.text;
-    lastTwinMessageTimeRef.current = now;
-    lastPredictiveNudgeRef.current = now;
+      speak(twinMessage.text);
+    }, 30000);
 
-    speak(twinMessage.text);
-  }, 45000);
-
-  return () => window.clearInterval(interval);
-}, [
-  hasHydrated,
-  isThinking,
-  messages,
-  awareness.level,
-  drift.level,
-  twinSyncSnapshot.desync?.level,
-  twinSyncSnapshot.noSupport?.active,
-  crewCollapse?.active,
-  live?.active,
-]);
-
-useEffect(() => {
-  if (!hasHydrated) return;
-  if (isThinking) return;
-
-  const interval = window.setInterval(() => {
-    const now = Date.now();
-
-    const syncEvent = getEcosystemSyncEvent({
-      isPartyActive: live?.active,
-      minutesActive: minutes,
-      movementLevel,
-      awarenessLevel: awareness.level,
-      driftLevel: drift.level,
-      desyncLevel: twinSyncSnapshot.desync?.level,
-      noSupportActive: twinSyncSnapshot.noSupport?.active,
-      crewCollapseActive: crewCollapse?.active,
-      spotsSelectedName: spots?.selectedName,
-      spotsRiskCount: spots?.riskCount,
-      spotsSafeCount: spots?.safeCount,
-      spotsNearbyCount: spots?.nearbyCount,
-      exitActive: false,
-      exitHeadingHome: false,
-      exitAlone: false,
-    });
-
-    if (!syncEvent.shouldNotify || !syncEvent.message) return;
-
-    if (syncEvent.signalKey === lastEcosystemSignalRef.current) return;
-
-    const cooldownMs =
-      syncEvent.urgency === "urgent"
-        ? 45 * 1000
-        : syncEvent.urgency === "elevated"
-        ? 90 * 1000
-        : 3 * 60 * 1000;
-
-    if (now - lastEcosystemSyncAtRef.current < cooldownMs) return;
-
-    const twinMessage: Message = {
-      id: makeMessageId(),
-      role: "twin",
-      text: syncEvent.message,
-    };
-
-    setMessages((prev) => [...prev, twinMessage].slice(-20));
-
-    lastTwinReplyRef.current = twinMessage.text;
-    lastTwinMessageTimeRef.current = now;
-    lastEcosystemSignalRef.current = syncEvent.signalKey;
-    lastEcosystemSyncAtRef.current = now;
-
-    speak(twinMessage.text);
-  }, 30000);
-
-  return () => window.clearInterval(interval);
-}, [
-  hasHydrated,
-  isThinking,
-  live?.active,
-  minutes,
-  movementLevel,
-  awareness.level,
-  drift.level,
-  twinSyncSnapshot.desync?.level,
-  twinSyncSnapshot.noSupport?.active,
-  crewCollapse?.active,
-  spots?.selectedName,
-  spots?.riskCount,
-  spots?.safeCount,
-  spots?.nearbyCount,
-]);
+    return () => window.clearInterval(interval);
+  }, [
+    hasHydrated,
+    isThinking,
+    predictiveAccess.allowed,
+    live?.active,
+    minutes,
+    movementLevel,
+    awareness.level,
+    drift.level,
+    twinSyncSnapshot.desync?.level,
+    twinSyncSnapshot.noSupport?.active,
+    crewCollapseActive,
+    spots?.selectedName,
+    spots?.riskCount,
+    spots?.safeCount,
+    spots?.nearbyCount,
+  ]);
 
   function detectDecisionLockIn(text: string) {
     const clean = text.toLowerCase();
@@ -6211,9 +6146,11 @@ function speak(text: string) {
       ]
     );
 
-    return (
-      <main
-        className="min-h-screen flex justify-center items-start px-4 pt-6 text-white"
+return (
+  <ErrorBoundary>
+    <AuthGuard>
+    <main
+      className="safe-screen flex justify-center items-start px-4 pt-6 text-white"
         style={{ background: theme.pageBg }}
       >
         <div className="w-full max-w-md space-y-6 px-4 pt-6 pb-10">
@@ -6276,8 +6213,7 @@ function speak(text: string) {
 
               <div
                 ref={chatScrollRef}
-                className="w-full rounded-2xl border border-white/10 bg-black/20 p-3 pt-4 min-h-[280px] max-h-[380px] overflow-y-auto space-y-3"
-              >
+                className="w-full rounded-2xl border border-white/10 bg-black/20 p-3 pt-4 min-h-[280px] max-h-[380px] overflow-y-auto overscroll-contain scroll-smooth pb-32 space-y-3"              >
                 {messages.map((m, i) => {
                   const isLatest = i === messages.length - 1;
 
@@ -6372,12 +6308,17 @@ function speak(text: string) {
 )}
 
 
-              <div className="sticky bottom-0 left-0 right-0 pt-3 pb-2 mt-3 bg-gradient-to-t from-[#0A0A0B] to-transparent">
+              <div className="sticky bottom-0 left-0 right-0 pt-3 safe-bottom-pad mt-3 bg-gradient-to-t from-[#0A0A0B] to-transparent">
                 <div className="flex flex-col gap-3">
                   <textarea
                     ref={inputRef}
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
+                    rows={1}
+                    enterKeyHint="send"
+                    autoCapitalize="sentences"
+                    autoCorrect="on"
+                    spellCheck
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
@@ -6385,7 +6326,7 @@ function speak(text: string) {
                       }
                     }}
                     placeholder="Tell TwinMe what's going on..."
-                    className="w-full min-h-[72px] resize-none rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/35 outline-none focus:ring-2 focus:ring-white/20 transition"
+                    className="w-full min-h-[72px] resize-none touch-manipulation rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/35 outline-none focus:ring-2 focus:ring-white/20 transition"
                   />
 <div className="grid grid-cols-2 gap-3">
   <button
@@ -6487,6 +6428,9 @@ function speak(text: string) {
     </div>
   </div>
 )}
-      </main>
-    );
+
+ </main>
+    </AuthGuard>
+  </ErrorBoundary>
+);
 }
