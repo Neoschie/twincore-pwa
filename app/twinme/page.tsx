@@ -69,7 +69,67 @@ type GuidedState = {
   step: "idle" | "narrow" | "choose" | "confirm";
 };
 
+type TwinIdentityPreferences = {
+  name?: string;
+  pronouns?: "she/her" | "he/him" | "they/them" | "custom";
+  customPronouns?: string;
+  genderIdentity?: string;
+  voiceStyle?: "soft" | "balanced" | "direct" | "playful";
+};
+
 type TwinMode = "casual" | "reflective" | "decision" | "safety";
+
+type EmotionalState =
+  | "grounded"
+  | "social"
+  | "drained"
+  | "uncertain"
+  | "overwhelmed"
+  | "reflective"
+  | "guarded"
+  | "escalating";
+
+type TwinResponseIntent =
+  | "grounding"
+  | "clarifying"
+  | "protective"
+  | "supportive"
+  | "reflective"
+  | "challenging";
+
+type TwinEmotionalState =
+  | "grounded"
+  | "overwhelmed"
+  | "uncertain"
+  | "frustrated"
+  | "isolated"
+  | "reflective";
+
+type ConversationEnergyState =
+  | "grounded"
+  | "stable"
+  | "fading"
+  | "detached"
+  | "reactive"
+  | "overwhelmed";
+
+type ConversationIntent =
+  | "casual"
+  | "social"
+  | "low-energy"
+  | "uncertain"
+  | "reflective"
+  | "decision"
+  | "safety";
+
+type ConversationState = {
+  recentEmotion?: EmotionalState;
+  recentIntent?: ConversationIntent;
+  emotionalMomentum?: "rising" | "falling" | "stable";
+  unresolvedState?: boolean;
+  socialMode?: "solo" | "crew" | "meeting";
+  updatedAt?: string;
+};
 
 type Message = {
   id: string;
@@ -118,11 +178,15 @@ type SpotsSnapshot = {
 };
 
 type AwarenessLevel = "low" | "guarded" | "elevated" | "critical";
-type DesyncLevel = "synced" | "watch" | "drifting" | "separated";
+type TrajectoryRiskWindow = "none" | "approaching" | "imminent";
 type DriftLevel = "none" | "stable" | "rising" | "elevated" | "prolonged";
 type TrajectoryDirection = "stable" | "rising" | "accelerating" | "dropping";
-type TrajectoryRiskWindow = "none" | "approaching" | "imminent";
 type TrajectoryLevel = "low" | "watch" | "elevated" | "critical";
+type DesyncLevel =
+  | "synced"
+  | "watch"
+  | "drifting"
+  | "separated";
 
 type TrajectoryState = {
   direction: TrajectoryDirection;
@@ -198,6 +262,9 @@ type TwinMemory = {
   lowEnergyCount: number;
   overwhelmCount: number;
   uncertaintyCount: number;
+  withdrawalCount?: number;
+  indecisionCount?: number;
+  reactivityCount?: number;
   lastThemes: string[];
   updatedAt?: string;
 };
@@ -293,8 +360,899 @@ function writeJson<T>(key: string, value: T): void {
   }
 }
 
-function getTwinMemory(): TwinMemory | null {
-  return readJson<TwinMemory | null>(TWINCORE_MEMORY_KEY, null);
+function getTwinMemory(): TwinMemory {
+  return readJson<TwinMemory | null>(TWINCORE_MEMORY_KEY, null) ?? {
+    lowEnergyCount: 0,
+    overwhelmCount: 0,
+    uncertaintyCount: 0,
+    withdrawalCount: 0,
+    indecisionCount: 0,
+    reactivityCount: 0,
+    lastThemes: [],
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+const TWINCORE_VALUE_MEMORY_KEY = "twincore_value_memory";
+
+function getValueMemory(): ValueMemory {
+  return readJson<ValueMemory | null>(
+    TWINCORE_VALUE_MEMORY_KEY,
+    null
+  ) ?? {
+    values: [],
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function saveValueMemory(memory: ValueMemory): void {
+  writeJson(TWINCORE_VALUE_MEMORY_KEY, memory);
+}
+
+const TWINCORE_GOAL_MEMORY_KEY = "twincore_goal_memory";
+
+function getGoalMemory(): GoalMemory {
+  return readJson<GoalMemory | null>(
+    TWINCORE_GOAL_MEMORY_KEY,
+    null
+  ) ?? {
+    goals: [],
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function saveGoalMemory(memory: GoalMemory): void {
+  writeJson(TWINCORE_GOAL_MEMORY_KEY, memory);
+}
+
+const TWINCORE_NARRATIVE_MEMORY_KEY =
+  "twincore_narrative_memory";
+
+function getNarrativeMemory(): NarrativeMemory {
+  return readJson<NarrativeMemory | null>(
+    TWINCORE_NARRATIVE_MEMORY_KEY,
+    null
+  ) ?? {
+    chapters: [],
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function saveNarrativeMemory(
+  memory: NarrativeMemory
+): void {
+  writeJson(
+    TWINCORE_NARRATIVE_MEMORY_KEY,
+    memory
+  );
+}
+
+function updateNarrativeMemory(
+  identityNarrative: IdentityNarrative
+): void {
+  if (!identityNarrative.dominantStory) {
+    return;
+  }
+
+  const currentMemory =
+    getNarrativeMemory();
+
+  const chapter: NarrativeChapter = {
+    title: identityNarrative.dominantStory,
+    createdAt: new Date().toISOString(),
+  };
+
+  saveNarrativeMemory({
+    chapters: [
+      ...currentMemory.chapters,
+      chapter,
+    ].slice(-25),
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+function getIdentityArchetype({
+  timelineInsight,
+  identityMomentum,
+  narrativeMemory,
+}: {
+  timelineInsight: TimelineInsight;
+  identityMomentum: IdentityMomentum;
+  narrativeMemory: NarrativeMemory;
+}): IdentityArchetype {
+  const recentNarratives = narrativeMemory.chapters
+    .slice(-10)
+    .map((chapter) => chapter.title.toLowerCase())
+    .join(" ");
+
+  const patternText = [
+    ...timelineInsight.dominantGoals,
+    ...timelineInsight.dominantValues,
+    ...identityMomentum.recurringPatterns,
+    recentNarratives,
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  if (
+    patternText.includes("twincore") ||
+    patternText.includes("build") ||
+    patternText.includes("building") ||
+    patternText.includes("launch")
+  ) {
+    return { dominantArchetype: "builder" };
+  }
+
+  if (
+    patternText.includes("create") ||
+    patternText.includes("creative") ||
+    patternText.includes("story") ||
+    patternText.includes("book")
+  ) {
+    return { dominantArchetype: "creator" };
+  }
+
+  if (
+    patternText.includes("safe") ||
+    patternText.includes("protect") ||
+    patternText.includes("boundary") ||
+    patternText.includes("pressure")
+  ) {
+    return { dominantArchetype: "protector" };
+  }
+
+  if (
+    patternText.includes("recover") ||
+    patternText.includes("healing") ||
+    patternText.includes("keep going") ||
+    patternText.includes("persistence")
+  ) {
+    return { dominantArchetype: "recoverer" };
+  }
+
+  if (
+    patternText.includes("explore") ||
+    patternText.includes("new") ||
+    patternText.includes("move") ||
+    patternText.includes("travel")
+  ) {
+    return { dominantArchetype: "explorer" };
+  }
+
+  return { dominantArchetype: null };
+}
+
+function getIdentityArchetypeOpening(
+  identityArchetype: IdentityArchetype
+): string | null {
+  if (!identityArchetype.dominantArchetype) {
+    return null;
+  }
+
+  const lines: Record<
+    NonNullable<IdentityArchetype["dominantArchetype"]>,
+    string
+  > = {
+    builder:
+      "The Builder pattern is becoming dominant. You keep returning to creating, shaping, and moving something forward.",
+
+    creator:
+      "The Creator pattern is showing up. You keep returning to expression, imagination, and making something that carries your voice.",
+
+    protector:
+      "The Protector pattern is active. You keep noticing pressure, safety, and boundaries before they fully take over.",
+
+    recoverer:
+      "The Recoverer pattern is showing up. You keep finding your way back after uncertainty or drift.",
+
+    explorer:
+      "The Explorer pattern is showing up. You keep moving toward change, possibility, and new direction.",
+  };
+
+  return lines[identityArchetype.dominantArchetype];
+}
+
+function getPredictiveIdentity({
+  identityNarrative,
+  identityArchetype,
+  identityMomentum,
+  longTermIdentityEvolution,
+  timelineInsight,
+}: {
+  identityNarrative: IdentityNarrative;
+  identityArchetype: IdentityArchetype;
+  identityMomentum: IdentityMomentum;
+  longTermIdentityEvolution: LongTermIdentityEvolution;
+  timelineInsight: TimelineInsight;
+}): PredictiveIdentity {
+  const strongestDirection =
+    longTermIdentityEvolution.emergingDirections[0] ??
+    identityMomentum.recurringPatterns[0] ??
+    timelineInsight.dominantGoals[0] ??
+    timelineInsight.dominantValues[0] ??
+    null;
+
+  if (!strongestDirection) {
+    return {
+      predictedDirection: null,
+    };
+  }
+
+  if (identityArchetype.dominantArchetype === "builder") {
+    return {
+      predictedDirection: `If this pattern continues, ${strongestDirection} is likely to become one of your strongest building directions.`,
+    };
+  }
+
+  if (identityNarrative.dominantStory) {
+    return {
+      predictedDirection: `If this pattern continues, ${strongestDirection} may keep shaping the story you're building around yourself.`,
+    };
+  }
+
+  return {
+    predictedDirection: `If this pattern continues, ${strongestDirection} may become a stronger part of your direction.`,
+  };
+}
+
+function getPredictiveIdentityOpening(
+  predictiveIdentity: PredictiveIdentity
+): string | null {
+  return predictiveIdentity.predictedDirection;
+}
+
+
+function getNarrativeSynthesis({
+  identityNarrative,
+  identityArchetype,
+  predictiveIdentity,
+  timelineInsight,
+  valueEvolution,
+  goalEvolution,
+}: {
+  identityNarrative: IdentityNarrative;
+  identityArchetype: IdentityArchetype;
+  predictiveIdentity: PredictiveIdentity;
+  timelineInsight: TimelineInsight;
+  valueEvolution: ValueEvolution;
+  goalEvolution: GoalEvolution;
+}): NarrativeSynthesis {
+  const coreDirection =
+    timelineInsight.dominantGoals[0] ??
+    timelineInsight.dominantValues[0] ??
+    goalEvolution.strengtheningGoals[0] ??
+    valueEvolution.strengtheningValues[0] ??
+    null;
+
+  if (!coreDirection) {
+    return {
+      synthesis: null,
+    };
+  }
+
+  const parts: string[] = [];
+
+  if (identityNarrative.dominantStory) {
+    parts.push(identityNarrative.dominantStory);
+  }
+
+  if (identityArchetype.dominantArchetype === "builder") {
+    parts.push(
+      "The Builder pattern is becoming visible in how you keep returning to what you are creating."
+    );
+  }
+
+  if (predictiveIdentity.predictedDirection) {
+    parts.push(predictiveIdentity.predictedDirection);
+  }
+
+  if (parts.length === 0) {
+    return {
+      synthesis: null,
+    };
+  }
+
+  return {
+    synthesis: parts.join(" "),
+  };
+}
+
+function getNarrativeSynthesisOpening(
+  narrativeSynthesis: NarrativeSynthesis
+): string | null {
+  return narrativeSynthesis.synthesis;
+}
+
+const TWINCORE_BOUNDARY_MEMORY_KEY = "twincore_boundary_memory";
+
+function getBoundaryMemory(): BoundaryMemory {
+  return readJson<BoundaryMemory | null>(
+    TWINCORE_BOUNDARY_MEMORY_KEY,
+    null
+  ) ?? {
+    triggers: [],
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function saveBoundaryMemory(memory: BoundaryMemory): void {
+  writeJson(TWINCORE_BOUNDARY_MEMORY_KEY, memory);
+}
+
+const TWINCORE_IDENTITY_TIMELINE_KEY = "twincore_identity_timeline";
+
+function getIdentityTimeline(): IdentityTimeline {
+  return readJson<IdentityTimeline | null>(
+    TWINCORE_IDENTITY_TIMELINE_KEY,
+    null
+  ) ?? {
+    entries: [],
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function saveIdentityTimeline(timeline: IdentityTimeline): void {
+
+  writeJson(TWINCORE_IDENTITY_TIMELINE_KEY, timeline);
+
+}
+
+function updateIdentityTimeline(
+  entry: IdentityTimelineEntry
+): void {
+  const currentTimeline = getIdentityTimeline();
+
+  const nextEntries = [
+    ...currentTimeline.entries,
+    entry,
+  ].slice(-50);
+
+  saveIdentityTimeline({
+    entries: nextEntries,
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+function getIdentityMomentum(
+  identityTimeline: IdentityTimeline
+): IdentityMomentum {
+  const recentEntries =
+    identityTimeline.entries.slice(-10);
+
+  const recurringPatterns: string[] = [];
+
+  const goalHits = recentEntries.flatMap(
+    (entry) => entry.activeGoals
+  );
+
+  const valueHits = recentEntries.flatMap(
+    (entry) => entry.activeValues
+  );
+
+  const boundaryHits = recentEntries.flatMap(
+    (entry) => entry.activeBoundaryTriggers
+  );
+
+  const counts = new Map<string, number>();
+
+  [...goalHits, ...valueHits, ...boundaryHits]
+    .forEach((item) => {
+      counts.set(
+        item,
+        (counts.get(item) ?? 0) + 1
+      );
+    });
+
+  counts.forEach((count, item) => {
+    if (count >= 3) {
+      recurringPatterns.push(item);
+    }
+  });
+
+  return {
+    strengtheningDirection:
+      recurringPatterns.length > 0,
+
+    weakeningDirection: false,
+
+    recurringPatterns,
+  };
+}
+
+function getIdentityMomentumOpening(
+  identityMomentum: IdentityMomentum
+): string | null {
+  if (
+    identityMomentum.recurringPatterns.length === 0
+  ) {
+    return null;
+  }
+
+  const patternPhrase =
+    identityMomentum.recurringPatterns
+      .slice(0, 2)
+      .join(" and ");
+
+  return `${patternPhrase} keeps appearing in your recent pattern. That direction may be becoming more important than you realize.`;
+}
+
+
+function getTimelineInsight(
+  identityTimeline: IdentityTimeline
+): TimelineInsight {
+  const recentEntries = identityTimeline.entries.slice(-20);
+
+  const countItems = (items: string[]) => {
+    const counts = new Map<string, number>();
+
+    items.forEach((item) => {
+      counts.set(item, (counts.get(item) ?? 0) + 1);
+    });
+
+    return Array.from(counts.entries())
+      .filter(([, count]) => count >= 2)
+      .sort((a, b) => b[1] - a[1])
+      .map(([item]) => item);
+  };
+
+  return {
+    dominantValues: countItems(
+      recentEntries.flatMap((entry) => entry.activeValues)
+    ),
+
+    dominantGoals: countItems(
+      recentEntries.flatMap((entry) => entry.activeGoals)
+    ),
+
+    dominantBoundaryTriggers: countItems(
+      recentEntries.flatMap((entry) => entry.activeBoundaryTriggers)
+    ),
+  };
+}
+
+function getTimelineInsightOpening(
+  timelineInsight: TimelineInsight
+): string | null {
+  if (timelineInsight.dominantBoundaryTriggers.length > 0) {
+    const triggers = timelineInsight.dominantBoundaryTriggers
+      .slice(0, 2)
+      .join(" and ");
+
+    return `${triggers} has been showing up repeatedly in your recent timeline. This may be one of the pressure points shaping your state.`;
+  }
+
+  if (timelineInsight.dominantGoals.length > 0) {
+    const goals = timelineInsight.dominantGoals
+      .slice(0, 2)
+      .join(" and ");
+
+    return `${goals} has been showing up repeatedly in your recent direction. This may be becoming a stronger focus.`;
+  }
+
+  if (timelineInsight.dominantValues.length > 0) {
+    const values = timelineInsight.dominantValues
+      .slice(0, 2)
+      .join(" and ");
+
+    return `${values} has been showing up repeatedly in what matters to you lately.`;
+  }
+
+  return null;
+}
+
+function getIdentityStrengthening({
+  identityTimeline,
+  valueEvolution,
+  goalEvolution,
+  identityMomentum,
+}: {
+  identityTimeline: IdentityTimeline;
+  valueEvolution: ValueEvolution;
+  goalEvolution: GoalEvolution;
+  identityMomentum: IdentityMomentum;
+}): IdentityStrengthening {
+  const strengtheningAreas = Array.from(
+    new Set([
+      ...valueEvolution.strengtheningValues,
+      ...goalEvolution.strengtheningGoals,
+      ...identityMomentum.recurringPatterns,
+    ])
+  );
+
+  return {
+    strengtheningAreas,
+  };
+}
+
+function getIdentityStrengtheningOpening(
+  identityStrengthening: IdentityStrengthening
+): string | null {
+  if (identityStrengthening.strengtheningAreas.length === 0) {
+    return null;
+  }
+
+  const areaPhrase = identityStrengthening.strengtheningAreas
+    .slice(0, 2)
+    .join(" and ");
+
+  return `${areaPhrase} has been showing up consistently in your recent direction. That part of you appears to be strengthening.`;
+}
+
+function getIdentityRegression({
+  valueDrift,
+  goalDrift,
+  timelineInsight,
+  identityMomentum,
+}: {
+  valueDrift: ValueDrift;
+  goalDrift: GoalDrift;
+  timelineInsight: TimelineInsight;
+  identityMomentum: IdentityMomentum;
+}): IdentityRegression {
+  const drifting =
+    valueDrift.movingAwayFromValues ||
+    goalDrift.movingAwayFromGoals;
+
+  if (!drifting) {
+    return {
+      regressionAreas: [],
+    };
+  }
+
+  const regressionAreas = Array.from(
+    new Set([
+      ...timelineInsight.dominantValues,
+      ...timelineInsight.dominantGoals,
+      ...identityMomentum.recurringPatterns,
+    ])
+  );
+
+  return {
+    regressionAreas,
+  };
+}
+
+function getIdentityRegressionOpening(
+  identityRegression: IdentityRegression
+): string | null {
+  if (identityRegression.regressionAreas.length === 0) {
+    return null;
+  }
+
+  const areaPhrase = identityRegression.regressionAreas
+    .slice(0, 2)
+    .join(" and ");
+
+  return `You're moving away from ${areaPhrase}, even though it keeps showing up as important. Notice the distance before it becomes a habit.`;
+}
+
+function getLongTermIdentityEvolution(
+  identityTimeline: IdentityTimeline
+): LongTermIdentityEvolution {
+  const entries = identityTimeline.entries;
+
+  if (entries.length < 6) {
+    return {
+      emergingDirections: [],
+      fadingDirections: [],
+    };
+  }
+
+  const midpoint = Math.floor(entries.length / 2);
+
+  const olderEntries = entries.slice(0, midpoint);
+  const newerEntries = entries.slice(midpoint);
+
+  const countItems = (items: string[]) => {
+    const counts = new Map<string, number>();
+
+    items.forEach((item) => {
+      counts.set(
+        item,
+        (counts.get(item) ?? 0) + 1
+      );
+    });
+
+    return counts;
+  };
+
+  const olderCounts = countItems(
+    olderEntries.flatMap((entry) => [
+      ...entry.activeValues,
+      ...entry.activeGoals,
+    ])
+  );
+
+  const newerCounts = countItems(
+    newerEntries.flatMap((entry) => [
+      ...entry.activeValues,
+      ...entry.activeGoals,
+    ])
+  );
+
+  const emergingDirections: string[] = [];
+  const fadingDirections: string[] = [];
+
+  newerCounts.forEach((newCount, item) => {
+    const oldCount =
+      olderCounts.get(item) ?? 0;
+
+    if (newCount > oldCount) {
+      emergingDirections.push(item);
+    }
+  });
+
+  olderCounts.forEach((oldCount, item) => {
+    const newCount =
+      newerCounts.get(item) ?? 0;
+
+    if (oldCount > newCount) {
+      fadingDirections.push(item);
+    }
+  });
+
+  return {
+    emergingDirections,
+    fadingDirections,
+  };
+}
+
+function getLongTermIdentityEvolutionOpening(
+  evolution: LongTermIdentityEvolution
+): string | null {
+  if (evolution.emergingDirections.length > 0) {
+    const directionPhrase =
+      evolution.emergingDirections
+        .slice(0, 2)
+        .join(" and ");
+
+    return `${directionPhrase} has become increasingly central across your recent timeline. This appears to be more than a temporary focus.`;
+  }
+
+  if (evolution.fadingDirections.length > 0) {
+    const directionPhrase =
+      evolution.fadingDirections
+        .slice(0, 2)
+        .join(" and ");
+
+    return `${directionPhrase} has appeared less often across your recent timeline. Notice whether your priorities are changing.`;
+  }
+
+  return null;
+}
+
+function getIdentityNarrative({
+  timelineInsight,
+  identityMomentum,
+  identityStrengthening,
+  identityRegression,
+  longTermIdentityEvolution,
+}: {
+  timelineInsight: TimelineInsight;
+  identityMomentum: IdentityMomentum;
+  identityStrengthening: IdentityStrengthening;
+  identityRegression: IdentityRegression;
+  longTermIdentityEvolution: LongTermIdentityEvolution;
+}): IdentityNarrative {
+  const dominantDirection =
+    identityStrengthening.strengtheningAreas[0] ??
+    identityMomentum.recurringPatterns[0] ??
+    timelineInsight.dominantGoals[0] ??
+    timelineInsight.dominantValues[0] ??
+    null;
+
+  if (!dominantDirection) {
+    return {
+      dominantStory: null,
+    };
+  }
+
+  if (identityRegression.regressionAreas.includes(dominantDirection)) {
+    return {
+      dominantStory: `You keep returning to ${dominantDirection}, but your recent pattern also shows distance from it. That tension is becoming part of the story.`,
+    };
+  }
+
+  if (longTermIdentityEvolution.emergingDirections.includes(dominantDirection)) {
+    return {
+      dominantStory: `${dominantDirection} has been becoming more central over time. This looks less like a passing interest and more like a direction forming.`,
+    };
+  }
+
+  return {
+    dominantStory: `You keep returning to ${dominantDirection}. That persistence is becoming part of your pattern.`,
+  };
+}
+
+function getIdentityNarrativeOpening(
+  identityNarrative: IdentityNarrative
+): string | null {
+  return identityNarrative.dominantStory;
+}
+
+function extractBoundaryTriggersFromText(latestText: string): string[] {
+  const text = latestText
+    .toLowerCase()
+    .replaceAll("’", "'");
+
+  const detectedTriggers: string[] = [];
+
+  if (
+    text.includes("they ignored me") ||
+    text.includes("being ignored") ||
+    text.includes("ignored")
+  ) {
+    detectedTriggers.push("being ignored");
+  }
+
+  if (
+    text.includes("they keep asking") ||
+    text.includes("pressure") ||
+    text.includes("pressuring me")
+  ) {
+    detectedTriggers.push("pressure");
+  }
+
+  if (
+    text.includes("i can't say no") ||
+    text.includes("i cant say no") ||
+    text.includes("they'll be upset if i say no") ||
+    text.includes("they will be upset if i say no")
+  ) {
+    detectedTriggers.push("difficulty saying no");
+  }
+
+  if (
+    text.includes("work") ||
+    text.includes("job") ||
+    text.includes("hospital")
+  ) {
+    detectedTriggers.push("work pressure");
+  }
+
+  if (
+    text.includes("money") ||
+    text.includes("rent") ||
+    text.includes("bills") ||
+    text.includes("debt")
+  ) {
+    detectedTriggers.push("financial pressure");
+  }
+
+  return [...new Set(detectedTriggers)];
+}
+
+function updateBoundaryMemory(latestText: string): void {
+  const detectedTriggers = extractBoundaryTriggersFromText(latestText);
+
+  if (detectedTriggers.length === 0) return;
+
+  const currentMemory = getBoundaryMemory();
+
+  const nextTriggers = Array.from(
+    new Set([
+      ...currentMemory.triggers,
+      ...detectedTriggers,
+    ])
+  );
+
+  saveBoundaryMemory({
+    triggers: nextTriggers,
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+function extractGoalsFromText(latestText: string): string[] {
+  const text = latestText
+    .toLowerCase()
+    .replaceAll("’", "'");
+
+  const detectedGoals: string[] = [];
+
+  if (
+    text.includes("finish twincore") ||
+    text.includes("build twincore") ||
+    text.includes("launch twincore")
+  ) {
+    detectedGoals.push("TwinCore");
+  }
+
+  if (
+    text.includes("pass nursing") ||
+    text.includes("nursing school") ||
+    text.includes("become a nurse") ||
+    text.includes("rn")
+  ) {
+    detectedGoals.push("nursing");
+  }
+
+  if (
+    text.includes("financial freedom") ||
+    text.includes("save money") ||
+    text.includes("pay off debt") ||
+    text.includes("make more money")
+  ) {
+    detectedGoals.push("financial freedom");
+  }
+
+  if (
+    text.includes("get fit") ||
+    text.includes("lose weight") ||
+    text.includes("build muscle") ||
+    text.includes("go gym")
+  ) {
+    detectedGoals.push("fitness");
+  }
+
+  return [...new Set(detectedGoals)];
+}
+
+function updateGoalMemory(latestText: string): void {
+  const detectedGoals = extractGoalsFromText(latestText);
+
+  if (detectedGoals.length === 0) return;
+
+  const currentMemory = getGoalMemory();
+
+  const nextGoals = Array.from(
+    new Set([
+      ...currentMemory.goals,
+      ...detectedGoals,
+    ])
+  );
+
+  saveGoalMemory({
+    goals: nextGoals,
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+function extractValuesFromText(latestText: string): string[] {
+  const text = latestText.toLowerCase();
+
+  const detectedValues: string[] = [];
+
+  if (text.includes("health") || text.includes("fitness") || text.includes("gym")) {
+    detectedValues.push("health");
+  }
+
+  if (text.includes("family") || text.includes("kids") || text.includes("partner")) {
+    detectedValues.push("family");
+  }
+
+  if (text.includes("nursing") || text.includes("rn") || text.includes("hospital")) {
+    detectedValues.push("nursing");
+  }
+
+  if (text.includes("twincore") || text.includes("twinme")) {
+    detectedValues.push("TwinCore");
+  }
+
+  if (text.includes("money") || text.includes("financial") || text.includes("freedom")) {
+    detectedValues.push("financial freedom");
+  }
+
+  return [...new Set(detectedValues)];
+}
+
+function updateValueMemory(latestText: string): void {
+  const detectedValues = extractValuesFromText(latestText);
+
+  if (detectedValues.length === 0) return;
+
+  const currentMemory = getValueMemory();
+
+  const nextValues = Array.from(
+    new Set([
+      ...currentMemory.values,
+      ...detectedValues,
+    ])
+  );
+
+  saveValueMemory({
+    values: nextValues,
+    updatedAt: new Date().toISOString(),
+  });
 }
 
 function getLastResponses(): string[] {
@@ -356,11 +1314,34 @@ function updateTwinMemory(latestText: string): void {
     pushTheme("uncertainty");
   }
 
+ const nextMemory: TwinMemory = {
+  lowEnergyCount,
+  overwhelmCount,
+  uncertaintyCount,
+  withdrawalCount: getTwinMemory()?.withdrawalCount ?? 0,
+  indecisionCount: getTwinMemory()?.indecisionCount ?? 0,
+  reactivityCount: getTwinMemory()?.reactivityCount ?? 0,
+  lastThemes: nextThemes,
+  updatedAt: new Date().toISOString(),
+};
+
+  writeJson(TWINCORE_MEMORY_KEY, nextMemory);
+}
+
+function updateIdentityMemory(identityShift: IdentityShift): void {
+  const memory = getTwinMemory();
+
   const nextMemory: TwinMemory = {
-    lowEnergyCount,
-    overwhelmCount,
-    uncertaintyCount,
-    lastThemes: nextThemes,
+    ...memory,
+    withdrawalCount:
+      (memory.withdrawalCount ?? 0) +
+      (identityShift.unusualWithdrawal ? 1 : 0),
+    indecisionCount:
+      (memory.indecisionCount ?? 0) +
+      (identityShift.unusualIndecision ? 1 : 0),
+    reactivityCount:
+      (memory.reactivityCount ?? 0) +
+      (identityShift.unusualReactivity ? 1 : 0),
     updatedAt: new Date().toISOString(),
   };
 
@@ -723,7 +1704,7 @@ function updateLearningProfile(
   if (
     (driftLevel === "rising" ||
       driftLevel === "elevated" ||
-      driftLevel === "prolonged" ||
+      (driftLevel as DriftLevel) === "prolonged" ||
       live.heartbeatBpm >= 100) &&
     minutes > 0
   ) {
@@ -744,7 +1725,7 @@ function updateLearningProfile(
     avgActiveMinutes: nextAvgActiveMinutes,
     typicalEscalationMinute: nextTypicalEscalationMinute,
     prolongedMoments:
-      existing.prolongedMoments + (driftLevel === "prolonged" ? 1 : 0),
+      existing.prolongedMoments + ((driftLevel as DriftLevel) === "prolonged" ? 1 : 0),
     noSupportMoments:
       existing.noSupportMoments + (noSupportActive ? 1 : 0),
     updatedAt: new Date().toISOString(),
@@ -790,7 +1771,7 @@ function getLearnMeInsight(
     };
   }
 
-  if (driftLevel === "prolonged" && profile.prolongedMoments >= 3) {
+  if ((driftLevel as DriftLevel) === "prolonged" && profile.prolongedMoments >= 3) {
     return {
       label: "recurring pattern",
       summary:
@@ -1106,7 +2087,7 @@ function getTrajectoryLevel(
   if (!live?.active || typeof live.heartbeatBpm !== "number") {
     return {
       direction: "stable",
-      riskWindow: "none",
+      riskWindow: "none" as TrajectoryRiskWindow as TrajectoryRiskWindow,
       summary: "No active trajectory. TwinMe is in standby.",
     };
   }
@@ -1120,7 +2101,7 @@ function getTrajectoryLevel(
     direction = "rising";
   }
 
-  if (driftLevel === "elevated" || driftLevel === "prolonged") {
+  if (driftLevel === "elevated" || (driftLevel as DriftLevel) === "prolonged") {
     direction = "accelerating";
   } else if (driftLevel === "rising" && direction === "stable") {
     direction = "rising";
@@ -1129,7 +2110,7 @@ function getTrajectoryLevel(
   if (
     direction === "accelerating" &&
     (desyncLevel === "drifting" ||
-      desyncLevel === "separated" ||
+      (desyncLevel as DesyncLevel) === "separated" ||
       movementLevel === "drifting")
   ) {
     riskWindow = "imminent";
@@ -1185,7 +2166,7 @@ function getMicroGuidance(
     };
   }
 
-  if (trajectory.riskWindow === "imminent") {
+  if ((trajectory.riskWindow as TrajectoryRiskWindow) === "approaching") {
     return {
       title: "Slow It Down",
       tone: "protective",
@@ -1197,7 +2178,7 @@ function getMicroGuidance(
     };
   }
 
-  if (noSupportActive || desyncLevel === "separated") {
+  if (noSupportActive || (desyncLevel as DesyncLevel) === "separated") {
     return {
       title: "Re-Anchor",
       tone: "protective",
@@ -1209,7 +2190,7 @@ function getMicroGuidance(
     };
   }
 
-  if (driftLevel === "prolonged" || movementLevel === "drifting") {
+  if ((driftLevel as DriftLevel) === "prolonged" || movementLevel === "drifting") {
     return {
       title: "Reset Your Pace",
       tone: "steady",
@@ -1336,7 +2317,7 @@ function getAwarenessScore(
     score += 8;
   } else if (desyncLevel === "drifting") {
     score += 15;
-  } else if (desyncLevel === "separated") {
+  } else if ((desyncLevel as DesyncLevel) === "separated") {
     score += 24;
   }
 
@@ -1344,7 +2325,7 @@ function getAwarenessScore(
     score += 4;
   } else if (driftLevel === "elevated") {
     score += 8;
-  } else if (driftLevel === "prolonged") {
+  } else if ((driftLevel as DriftLevel) === "prolonged") {
     score += 12;
   }
 
@@ -1352,9 +2333,9 @@ function getAwarenessScore(
     score += 10;
   }
 
-  if (trajectory.riskWindow === "approaching") {
+  if ((trajectory.riskWindow as TrajectoryRiskWindow) === "approaching") {
     score += 6;
-  } else if (trajectory.riskWindow === "imminent") {
+  } else if ((trajectory.riskWindow as TrajectoryRiskWindow) === "approaching") {
     score += 12;
   }
 
@@ -1404,15 +2385,15 @@ function getLiveNudge(
     return "TwinMe is standing by. Turn Party Mode on when your night starts moving.";
   }
 
-  if (trajectory.riskWindow === "imminent") {
+  if ((trajectory.riskWindow as TrajectoryRiskWindow) === "approaching") {
     return "If you continue at this pace, you're about to enter a high-risk state. Slow down now and stabilize your position.";
   }
 
-  if (trajectory.riskWindow === "approaching") {
+  if ((trajectory.riskWindow as TrajectoryRiskWindow) === "approaching") {
     return "You're trending toward a higher-risk state. Stay intentional with your next few moves.";
   }
 
-  if (noSupportActive && driftLevel === "prolonged") {
+  if (noSupportActive && (driftLevel as DriftLevel) === "prolonged") {
     return "You have been elevated for a while and you do not have active support around you. Let's slow this moment down and keep your next move simple.";
   }
 
@@ -1420,11 +2401,14 @@ function getLiveNudge(
     return "You do not have crew or visible support around you right now. Stay grounded, reduce movement, and choose the safest nearby option.";
   }
 
-  if (noSupportActive) {
+  if (
+    noSupportActive &&
+    (driftLevel as DriftLevel) === "prolonged"
+  ) {
     return "I'm staying closer with you right now. Keep your movement simple, stay aware of your surroundings, and do not let the moment rush you.";
   }
 
-  if (desyncLevel === "separated") {
+  if ((desyncLevel as DesyncLevel) === "separated") {
     return "You are clearly out of sync with your crew. Slow down, reduce movement, and reconnect before you go deeper into the night.";
   }
 
@@ -1432,7 +2416,7 @@ function getLiveNudge(
     return "You're drifting away from your crew's pace or position. Regroup before the gap gets wider.";
   }
 
-  if (driftLevel === "prolonged") {
+  if ((driftLevel as DriftLevel) === "prolonged") {
     return "You have been elevated longer than your usual pace. Slow this moment down before it starts choosing for you.";
   }
 
@@ -1543,10 +2527,257 @@ function compressForCritical(
   return short;
 }
 
+function isSimpleGreeting(input: string) {
+  const clean = input.trim().toLowerCase();
+
+  return [
+    "hi",
+    "hello",
+    "hey",
+    "yo",
+    "sup",
+    "what's up",
+    "wyd",
+    "good morning",
+    "goodnight",
+  ].includes(clean);
+}
+
+function getAdaptiveEnergyReply({
+  displayName,
+  awareness,
+  voiceStyle,
+}: {
+  displayName: string;
+  awareness: { level: AwarenessLevel };
+  voiceStyle: TwinIdentityPreferences["voiceStyle"];
+}) {
+  if (awareness.level === "critical") {
+    return "Your energy is low and things may be stacking. Don’t push through it — slow down and make the next move simple.";
+  }
+
+  if (voiceStyle === "direct") {
+    return "Your energy dipped. Don’t force momentum. Are you physically tired or mentally tired?";
+  }
+
+  if (voiceStyle === "playful") {
+    return `Okay${displayName ? ` ${displayName}` : ""}, battery looking low. Is this sleepy tired or people-drained tired?`;
+  }
+
+  if (voiceStyle === "soft") {
+    return "I hear the tiredness. Let’s not rush it — is this your body tired, or your mind tired?";
+  }
+
+  return "Yeah… your energy feels lower right now. Physical tired or mental tired?";
+}
+
+function getConversationIntent(text: string) {
+
+  function detectEmotionalState({
+    text,
+    awareness,
+    trajectory,
+    driftLevel,
+    desyncLevel,
+  }: {
+    text: string;
+    awareness: { level: AwarenessLevel };
+    trajectory: TrajectoryState;
+    driftLevel: DriftLevel;
+    desyncLevel: DesyncLevel;
+  }): EmotionalState {
+    const clean = text.toLowerCase();
+
+    const lowEnergy =
+      clean.includes("tired") ||
+      clean.includes("drained") ||
+      clean.includes("exhausted") ||
+      clean.includes("burnt out") ||
+      clean.includes("sleepy");
+
+    const uncertain =
+      clean.includes("idk") ||
+      clean.includes("unsure") ||
+      clean.includes("don't know") ||
+      clean.includes("dont know");
+
+    const overwhelmed =
+      clean.includes("overwhelmed") ||
+      clean.includes("too much") ||
+      clean.includes("stressed") ||
+      clean.includes("pressure");
+
+    const reflective =
+      clean.includes("feel") ||
+      clean.includes("thinking") ||
+      clean.includes("why") ||
+      clean.includes("stuck");
+
+    const social =
+      clean.includes("party") ||
+      clean.includes("club") ||
+      clean.includes("outside") ||
+      clean.includes("vibe");
+
+    const escalating =
+      awareness.level === "critical" ||
+      (trajectory.riskWindow as TrajectoryRiskWindow) === "approaching";
+
+    const guarded =
+      (driftLevel as DriftLevel) === "prolonged" ||
+      (desyncLevel as DesyncLevel) === "separated";
+
+    if (escalating) return "escalating";
+    if (guarded) return "guarded";
+    if (lowEnergy) return "drained";
+    if (overwhelmed) return "overwhelmed";
+    if (uncertain) return "uncertain";
+    if (reflective) return "reflective";
+    if (social) return "social";
+
+    return "grounded";
+  }
+
+  const clean = text.trim().toLowerCase();
+
+  const asksQuestion =
+    clean.includes("?") ||
+    clean.startsWith("what") ||
+    clean.startsWith("where") ||
+    clean.startsWith("how") ||
+    clean.startsWith("should") ||
+    clean.startsWith("do");
+
+  const asksGuidance =
+    asksQuestion &&
+    (
+      clean.includes("suggest") ||
+      clean.includes("recommend") ||
+      clean.includes("should") ||
+      clean.includes("do")
+    );
+
+  const uncertain =
+    clean.includes("don't know") ||
+    clean.includes("dont know") ||
+    clean.includes("idk") ||
+    clean.includes("unsure");
+
+  const socialEnergy =
+    clean.includes("party") ||
+    clean.includes("vibe") ||
+    clean.includes("outside") ||
+    clean.includes("club");
+
+  const reciprocal =
+    clean.includes("you tell me") ||
+    clean.includes("you first") ||
+    clean.includes("what about you");
+
+  const lowEnergy =
+    clean.includes("tired") ||
+    clean.includes("drained") ||
+    clean.includes("exhausted") ||
+    clean.includes("sleepy") ||
+    clean.includes("burnt out") ||
+    clean.includes("low energy");
+
+  const reflective =
+    clean.includes("feel") ||
+    clean.includes("overwhelmed") ||
+    clean.includes("stuck") ||
+    clean.includes("anxious") ||
+    clean.includes("sad");
+
+  const riskLanguage =
+    clean.includes("unsafe") ||
+    clean.includes("scared") ||
+    clean.includes("danger") ||
+    clean.includes("help");
+
+  if (riskLanguage) return "safety";
+  if (asksGuidance) return "decision";
+  if (uncertain) return "uncertain";
+  if (reciprocal) return "casual";
+  if (socialEnergy) return "social";
+  if (lowEnergy) return "low-energy";
+  if (reflective) return "reflective";
+  if (asksQuestion) return "casual";
+
+  return "casual";
+}
+
+function detectEmotionalState({
+  text,
+  awareness,
+  trajectory,
+  driftLevel,
+  desyncLevel,
+}: {
+  text: string;
+  awareness: { level: AwarenessLevel };
+  trajectory: TrajectoryState;
+  driftLevel: DriftLevel;
+  desyncLevel: DesyncLevel;
+}): EmotionalState {
+  const clean = text.toLowerCase();
+
+  const lowEnergy =
+    clean.includes("tired") ||
+    clean.includes("drained") ||
+    clean.includes("exhausted") ||
+    clean.includes("burnt out") ||
+    clean.includes("sleepy");
+
+  const uncertain =
+    clean.includes("idk") ||
+    clean.includes("unsure") ||
+    clean.includes("don't know") ||
+    clean.includes("dont know");
+
+  const overwhelmed =
+    clean.includes("overwhelmed") ||
+    clean.includes("too much") ||
+    clean.includes("stressed") ||
+    clean.includes("pressure");
+
+  const reflective =
+    clean.includes("feel") ||
+    clean.includes("thinking") ||
+    clean.includes("why") ||
+    clean.includes("stuck");
+
+  const social =
+    clean.includes("party") ||
+    clean.includes("club") ||
+    clean.includes("outside") ||
+    clean.includes("vibe");
+
+  const escalating =
+    awareness.level === "critical" ||
+    (trajectory.riskWindow as TrajectoryRiskWindow) === "approaching";
+
+  const guarded =
+    (driftLevel as DriftLevel) === "prolonged" ||
+    (desyncLevel as DesyncLevel) === "separated";
+
+  if (escalating) return "escalating";
+  if (guarded) return "guarded";
+  if (lowEnergy) return "drained";
+  if (overwhelmed) return "overwhelmed";
+  if (uncertain) return "uncertain";
+  if (reflective) return "reflective";
+  if (social) return "social";
+
+  return "grounded";
+}
+
 function detectTwinMode(text: string, isRisky: boolean): TwinMode {
   const clean = text.toLowerCase();
 
-  if (isRisky) return "safety";
+  if (isRisky && !isSimpleGreeting(text)) {
+    return "safety";
+  }
 
   if (
     clean.includes("should") ||
@@ -1796,31 +3027,34 @@ function getPreTypePrediction({
   driftLevel: DriftLevel;
   desyncLevel: DesyncLevel;
 }) {
+
   const riskIsStacking =
     awareness.level === "critical" ||
-    trajectory.riskWindow === "imminent" ||
-    noSupportActive ||
-    driftLevel === "prolonged" ||
-    desyncLevel === "separated";
+    (trajectory.riskWindow as TrajectoryRiskWindow) === "approaching" ||
+    ((driftLevel as DriftLevel) === "prolonged" &&
+      awareness.level !== "low") ||
+    ((desyncLevel as DesyncLevel) === "separated" &&
+      awareness.level !== "low");
 
   if (profile.riskTolerance >= 3 && riskIsStacking) {
     return "You may be about to choose something unpredictable. Keep this controlled before you move.";
   }
 
-  if (profile.decisiveness <= -2 && riskIsStacking) {
+  if (
+    profile.decisiveness <= -2 &&
+    riskIsStacking &&
+    awareness.level !== "low" &&
+    trajectory.riskWindow !== "none"
+  ) {
     return "You may be about to stall here. Pick one controlled move instead of circling.";
   }
 
-  if (profile.resistance >= 3 && noSupportActive) {
+  if (
+    profile.resistance >= 3 &&
+    noSupportActive &&
+    awareness.level !== "low"
+  ) {
     return "You may push away the stable option right now. Keep your choice, but do not downgrade your safety.";
-  }
-
-  if (profile.sensitivity >= 3 && awareness.level === "elevated") {
-    return "Pressure may be building faster than it feels. Slow the next choice down.";
-  }
-
-  if (profile.consistency <= -2 && driftLevel === "prolonged") {
-    return "Your pattern looks unsettled right now. Stop adding movement and simplify.";
   }
 
   return null;
@@ -1861,19 +3095,30 @@ function getPredictiveNudge({
   const idleTime = now - lastUserMessageTime;
 
   const isHighRisk =
-    trajectory.riskWindow === "imminent" ||
-    desyncLevel === "separated" ||
-    driftLevel === "prolonged" ||
+    (trajectory.riskWindow as TrajectoryRiskWindow) === "approaching" ||
+    (desyncLevel as DesyncLevel) === "separated" ||
+    (driftLevel as DriftLevel) === "prolonged" ||
     noSupportActive;
+
+  const trueHighRisk =
+    (trajectory.riskWindow as TrajectoryRiskWindow) === "approaching" ||
+    (desyncLevel as DesyncLevel) === "separated" ||
+    (driftLevel as DriftLevel) === "prolonged" ||
+    awareness.level === "critical";
+
+  const emotionallySoftState =
+    driftLevel !== "prolonged" &&
+    desyncLevel !== "separated" &&
+    trajectory.riskWindow !== "imminent";
 
   const profile = getPersistentProfile();
   const prediction = getDecisionPrediction(profile);
 
-  const idleThreshold = isHighRisk ? 12000 : 25000;
+  const idleThreshold = trueHighRisk ? 12000 : 25000;
   if (idleTime < idleThreshold) return null;
 
   // 🔴 IMMINENT RISK
-  if (trajectory.riskWindow === "imminent") {
+  if ((trajectory.riskWindow as TrajectoryRiskWindow) === "approaching") {
     return applyEmotionalTone(
       "Stay with me for a second. Things are stacking right now. Slow your next move down on purpose.",
       awareness.level,
@@ -1881,19 +3126,21 @@ function getPredictiveNudge({
     );
   }
 
-  // 🟠 NO SUPPORT
-  if (noSupportActive) {
+  // 🟠 NO SUPPORT — only speak when isolation is paired with true escalation
+  if (
+    noSupportActive &&
+    (trajectory.riskWindow as TrajectoryRiskWindow) === "approaching" &&
+    (driftLevel as DriftLevel) === "prolonged"
+  ) {
     return applyEmotionalTone(
-      isHighRisk
-        ? "You're on your own right now. Stay visible and don't make unpredictable moves."
-        : "You're a bit on your own right now. Stay visible and keep your next move simple.",
+      "You're on your own right now. Stay visible and don't make unpredictable moves.",
       awareness.level,
-      isHighRisk
+      true
     );
   }
 
   // 🔵 DESYNC
-  if (desyncLevel === "separated") {
+  if ((desyncLevel as DesyncLevel) === "separated") {
     return applyEmotionalTone(
       isHighRisk
         ? "You're out of sync right now. Reconnect or stabilize before you move."
@@ -1903,11 +3150,14 @@ function getPredictiveNudge({
     );
   }
 
-  // 🟣 DRIFT
-  if (driftLevel === "prolonged") {
+  // 🟣 DRIFT — only interrupt when prolonged drift becomes imminent
+  if (
+    (driftLevel as DriftLevel) === "prolonged" &&
+    (trajectory.riskWindow as TrajectoryRiskWindow) === "approaching"
+  ) {
     return applyEmotionalTone(
       isHighRisk
-        ? "You've been elevated for a while. This is where things start slipping. Slow this down."
+        ? "Your energy's been running high for a while now. Ease the pace a little before the night starts feeling heavier than it should."
         : "You've been a bit elevated. Take a second and reset your pace.",
       awareness.level,
       isHighRisk
@@ -2070,6 +3320,1418 @@ function handleActionFlow({
 /* -------------------------
    GENERATE RESPONSE (partial safety fixes)
 --------------------------*/
+function getConversationEnergyState({
+  latestText,
+  recentUserMessages,
+  passiveLoopCount,
+}: {
+  latestText: string;
+  recentUserMessages: string[];
+  passiveLoopCount: number;
+}): ConversationEnergyState {
+  let score = 0;
+
+  const shortPassive =
+    latestText.length <= 12 ||
+    latestText.includes("idk") ||
+    latestText.includes("whatever") ||
+    latestText.includes("fine") ||
+    latestText.includes("maybe") ||
+    latestText.includes("i guess");
+
+  const reactive =
+    latestText.includes("leave me") ||
+    latestText.includes("stop") ||
+    latestText.includes("shut up") ||
+    latestText.includes("don't care");
+
+  const grounded =
+    latestText.includes("i need") ||
+    latestText.includes("i want") ||
+    latestText.includes("i should") ||
+    latestText.includes("help me") ||
+    latestText.includes("what should i do") ||
+    latestText.includes("i feel");
+
+  if (shortPassive) score -= 2;
+  if (reactive) score -= 3;
+  if (grounded) score += 3;
+  if (passiveLoopCount >= 3) score -= 3;
+
+  const recentShortCount = recentUserMessages.filter(
+    (msg) => msg.trim().length <= 12
+  ).length;
+
+  if (recentShortCount >= 3) score -= 2;
+
+  if (score <= -6) return "detached";
+  if (score <= -4) return "fading";
+  if (reactive) return "reactive";
+  if (score >= 3) return "grounded";
+
+  return "stable";
+}
+
+function getTwinEmotionalState({
+  latestText,
+  conversationEnergyState,
+  passiveLoopCount,
+  supportWeakening,
+  ecosystemPressure,
+}: {
+  latestText: string;
+  conversationEnergyState: ConversationEnergyState;
+  passiveLoopCount: number;
+  supportWeakening: boolean;
+  ecosystemPressure: boolean;
+}): TwinEmotionalState {
+  const frustrationWords =
+    latestText.includes("stop") ||
+    latestText.includes("leave me") ||
+    latestText.includes("shut up") ||
+    latestText.includes("annoying") ||
+    latestText.includes("whatever");
+
+  const overwhelmWords =
+    latestText.includes("too much") ||
+    latestText.includes("overwhelmed") ||
+    latestText.includes("can't") ||
+    latestText.includes("cant") ||
+    latestText.includes("stressed") ||
+    latestText.includes("tired");
+
+  const reflectiveWords =
+    latestText.includes("i feel") ||
+    latestText.includes("i think") ||
+    latestText.includes("maybe") ||
+    latestText.includes("i need") ||
+    latestText.includes("i should");
+
+  if (frustrationWords) return "frustrated";
+  if (overwhelmWords || ecosystemPressure) return "overwhelmed";
+
+if (
+  latestText.includes("whatever") ||
+  latestText.includes("fine")
+) {
+  return "frustrated";
+}
+
+if (
+  latestText.includes("idk") ||
+  latestText.includes("i guess") ||
+  latestText.includes("maybe")
+) {
+  return "uncertain";
+}
+
+  if (
+  supportWeakening &&
+  passiveLoopCount < 3
+) {
+  return "isolated";
+}
+
+  if (reflectiveWords) return "reflective";
+  if (passiveLoopCount >= 3 || conversationEnergyState === "detached") {
+    return "uncertain";
+  }
+
+  return "grounded";
+}
+
+function getTwinResponseIntent({
+  emotionalState,
+  ecosystemPressure,
+  supportWeakening,
+  passiveLoopCount,
+}: {
+  emotionalState: TwinEmotionalState;
+  ecosystemPressure: boolean;
+  supportWeakening: boolean;
+  passiveLoopCount: number;
+}): TwinResponseIntent {
+  const scores: Record<TwinResponseIntent, number> = {
+    grounding: 0,
+    clarifying: 0,
+    protective: 0,
+    supportive: 0,
+    reflective: 0,
+    challenging: 0,
+  };
+
+  if (ecosystemPressure) scores.protective += 5;
+
+  if (supportWeakening) scores.supportive += 2;
+
+  if (passiveLoopCount >= 2) scores.clarifying += 1;
+  if (passiveLoopCount >= 3) scores.challenging += 2;
+  if (passiveLoopCount >= 5) scores.challenging += 2;
+
+  if (emotionalState === "isolated") scores.supportive += 2;
+  if (emotionalState === "frustrated") scores.challenging += 3;
+  if (emotionalState === "uncertain") scores.clarifying += 3;
+  if (emotionalState === "overwhelmed") scores.clarifying += 2;
+  if (emotionalState === "overwhelmed") scores.grounding += 2;
+  if (emotionalState === "reflective") scores.reflective += 4;
+  if (emotionalState === "grounded") scores.grounding += 3;
+
+  if (supportWeakening && passiveLoopCount >= 4) {
+    scores.challenging += 1;
+  }
+
+  const orderedIntents: TwinResponseIntent[] = [
+    "protective",
+    "clarifying",
+    "supportive",
+    "reflective",
+    "grounding",
+    "challenging",
+  ];
+
+  return orderedIntents.reduce((best, intent) =>
+    scores[intent] > scores[best] ? intent : best
+  );
+}
+
+type IdentityShift = {
+  unusualIndecision: boolean;
+  unusualWithdrawal: boolean;
+  unusualReactivity: boolean;
+};
+
+type IdentityAwareResponseContext = {
+  identityShift: IdentityShift;
+  emotionalState: TwinEmotionalState;
+  conversationEnergyState: ConversationEnergyState;
+  intent: TwinResponseIntent;
+};
+
+type BaselineDrift = {
+  engagementDrop: boolean;
+  decisivenessDrop: boolean;
+  emotionalEscalation: boolean;
+};
+
+type SelfTrajectory = {
+  improving: boolean;
+  stable: boolean;
+  deteriorating: boolean;
+};
+
+type ResponsePriority =
+  | "recovery"
+  | "contradiction"
+  | "protection"
+  | "boundary"
+  | "boundaryEvolution"
+  | "value"
+  | "valueEvolution"
+  | "goalEvolution"
+  | "goal"
+  | "evolution"
+  | "memory"
+  | "trajectory"
+  | "baseline"
+  | "identity"
+  | "emotion"
+  | "default"
+  | "regression"
+  | "synthesis"
+  | "narrative"
+  | "archetype"
+  | "predictive"
+  | "longTermEvolution"
+  | "strengthening"
+  | "momentum"
+  | "timelineInsight";
+
+type MemoryTrajectory = {
+  recurringWithdrawal: boolean;
+  recurringIndecision: boolean;
+  recurringEscalation: boolean;
+};
+
+type MemoryWeight = {
+  escalationWeight: "none" | "light" | "strong";
+  indecisionWeight: "none" | "light" | "strong";
+  withdrawalWeight: "none" | "light" | "strong";
+};
+
+type IdentityEvolution = {
+  decisivenessDeclining: boolean;
+  engagementDeclining: boolean;
+  emotionalVolatilityIncreasing: boolean;
+};
+
+type InternalContradiction = {
+  emotionalMismatch: boolean;
+  confidenceMismatch: boolean;
+  engagementMismatch: boolean;
+};
+
+type RecoverySignal = {
+  clarityReturning: boolean;
+  engagementReturning: boolean;
+  emotionalSettling: boolean;
+};
+
+type GoalDrift = {
+  movingAwayFromGoals: boolean;
+  movingTowardGoals: boolean;
+};
+
+type IdentityProtection = {
+  selfAbandonment: boolean;
+  boundaryErosion: boolean;
+  chronicSelfDismissal: boolean;
+};
+
+type ValueDrift = {
+  movingAwayFromValues: boolean;
+  actingAlignedWithValues: boolean;
+};
+
+type ValueMemory = {
+  values: string[];
+  updatedAt: string;
+};
+
+type GoalMemory = {
+  goals: string[];
+  updatedAt: string;
+};
+
+type BoundaryMemory = {
+  triggers: string[];
+  updatedAt: string;
+};
+
+type IdentityTimelineEntry = {
+  timestamp: string;
+  emotionalState: TwinEmotionalState;
+  energyState: ConversationEnergyState;
+  responsePriority: ResponsePriority;
+  activeValues: string[];
+  activeGoals: string[];
+  activeBoundaryTriggers: string[];
+};
+
+type IdentityTimeline = {
+  entries: IdentityTimelineEntry[];
+  updatedAt: string;
+};
+
+type TimelineInsight = {
+  dominantValues: string[];
+  dominantGoals: string[];
+  dominantBoundaryTriggers: string[];
+};
+
+type IdentityMomentum = {
+  strengtheningDirection: boolean;
+  weakeningDirection: boolean;
+  recurringPatterns: string[];
+};
+
+type IdentityStrengthening = {
+  strengtheningAreas: string[];
+};
+
+type IdentityRegression = {
+  regressionAreas: string[];
+};
+
+type LongTermIdentityEvolution = {
+  emergingDirections: string[];
+  fadingDirections: string[];
+};
+
+type IdentityNarrative = {
+  dominantStory: string | null;
+};
+
+type NarrativeChapter = {
+  title: string;
+  createdAt: string;
+};
+
+type NarrativeMemory = {
+  chapters: NarrativeChapter[];
+  updatedAt: string;
+};
+
+type IdentityArchetype = {
+  dominantArchetype:
+    | "builder"
+    | "creator"
+    | "protector"
+    | "recoverer"
+    | "explorer"
+    | null;
+};
+
+type PredictiveIdentity = {
+  predictedDirection: string | null;
+};
+
+type NarrativeSynthesis = {
+  synthesis: string | null;
+};
+
+type BoundaryAwareness = {
+  knownTriggerActive: boolean;
+  activeTriggers: string[];
+};
+
+type ValueEvolution = {
+  strengtheningValues: string[];
+  fadingValues: string[];
+};
+
+type GoalEvolution = {
+  strengtheningGoals: string[];
+  fadingGoals: string[];
+};
+
+type BoundaryEvolution = {
+  strengtheningTriggers: string[];
+  fadingTriggers: string[];
+};
+
+function getBoundaryAwareness({
+  latestText,
+  boundaryMemory,
+}: {
+  latestText: string;
+  boundaryMemory: BoundaryMemory;
+}): BoundaryAwareness {
+  const text = latestText
+    .toLowerCase()
+    .replaceAll("’", "'");
+
+  const activeTriggers = boundaryMemory.triggers.filter(
+    (trigger) =>
+      text.includes(trigger.toLowerCase()) ||
+      (trigger === "being ignored" &&
+        (text.includes("ignored") ||
+         text.includes("being ignored"))) ||
+      (trigger === "pressure" &&
+        text.includes("pressure")) ||
+      (trigger === "work pressure" &&
+        (text.includes("work") ||
+         text.includes("job") ||
+         text.includes("hospital"))) ||
+      (trigger === "financial pressure" &&
+        (text.includes("money") ||
+         text.includes("rent") ||
+         text.includes("bills") ||
+         text.includes("debt")))
+  );
+
+  return {
+    knownTriggerActive: activeTriggers.length > 0,
+    activeTriggers,
+  };
+}
+
+function getBoundaryAwarenessOpening(
+  boundaryAwareness: BoundaryAwareness
+): string | null {
+  if (!boundaryAwareness.knownTriggerActive) {
+    return null;
+  }
+
+  const triggerPhrase = boundaryAwareness.activeTriggers
+    .slice(0, 2)
+    .join(" and ");
+
+  return `This touches a pattern you've run into before: ${triggerPhrase}. Pause before responding from the old pressure.`;
+}
+
+function getBoundaryEvolution({
+  latestText,
+  boundaryMemory,
+}: {
+  latestText: string;
+  boundaryMemory: BoundaryMemory;
+}): BoundaryEvolution {
+  const text = latestText
+    .toLowerCase()
+    .replaceAll("’", "'");
+
+  const strengtheningTriggers = boundaryMemory.triggers.filter(
+    (trigger) =>
+      text.includes(trigger.toLowerCase()) ||
+      (trigger === "being ignored" &&
+        (text.includes("ignored") || text.includes("being ignored"))) ||
+      (trigger === "pressure" &&
+        text.includes("pressure")) ||
+      (trigger === "work pressure" &&
+        (text.includes("work") ||
+          text.includes("job") ||
+          text.includes("hospital"))) ||
+      (trigger === "financial pressure" &&
+        (text.includes("money") ||
+          text.includes("rent") ||
+          text.includes("bills") ||
+          text.includes("debt")))
+  );
+
+  return {
+    strengtheningTriggers,
+    fadingTriggers: [],
+  };
+}
+
+function getBoundaryEvolutionOpening(
+  boundaryEvolution: BoundaryEvolution
+): string | null {
+  if (boundaryEvolution.strengtheningTriggers.length > 0) {
+    const triggerPhrase = boundaryEvolution.strengtheningTriggers
+      .slice(0, 2)
+      .join(" and ");
+
+    return `${triggerPhrase} is showing up again as a pressure point. That pattern may be getting stronger.`;
+  }
+
+  if (boundaryEvolution.fadingTriggers.length > 0) {
+    const triggerPhrase = boundaryEvolution.fadingTriggers
+      .slice(0, 2)
+      .join(" and ");
+
+    return `${triggerPhrase} has been showing up less lately. Notice whether that boundary is getting stronger.`;
+  }
+
+  return null;
+}
+
+function getRecoverySignal({
+  emotionalState,
+  conversationEnergyState,
+  latestText,
+}: {
+  emotionalState: TwinEmotionalState;
+  conversationEnergyState: ConversationEnergyState;
+  latestText: string;
+}): RecoverySignal {
+  const text = latestText.toLowerCase();
+
+  const clarityReturning =
+    text.includes("i think") ||
+    text.includes("i know") ||
+    text.includes("i'm going to") ||
+    text.includes("im going to") ||
+    text.includes("i've decided") ||
+    text.includes("ive decided");
+
+  const engagementReturning =
+    conversationEnergyState !== "detached" &&
+    text.split(/\s+/).length > 5;
+
+  const emotionalSettling =
+    emotionalState !== "frustrated" &&
+    emotionalState !== "overwhelmed";
+
+  return {
+    clarityReturning,
+    engagementReturning,
+    emotionalSettling,
+  };
+}
+
+function getGoalDrift({
+  latestText,
+}: {
+  latestText: string;
+}): GoalDrift {
+  const text = latestText.toLowerCase();
+
+  const movingTowardGoals =
+    text.includes("i will") ||
+    text.includes("i'm going to") ||
+    text.includes("im going to") ||
+    text.includes("i decided") ||
+    text.includes("i've decided") ||
+    text.includes("ive decided") ||
+    text.includes("i think i know what to do");
+
+  const movingAwayFromGoals =
+    text.includes("whatever") ||
+    text.includes("doesn't matter") ||
+    text.includes("doesnt matter") ||
+    text.includes("i give up") ||
+    text.includes("not doing it") ||
+    text.includes("forget it");
+
+  return {
+    movingAwayFromGoals,
+    movingTowardGoals,
+  };
+}
+
+function getIdentityProtection({
+  latestText,
+}: {
+  latestText: string;
+}): IdentityProtection {
+  
+  const text = latestText
+  .toLowerCase()
+  .replaceAll("’", "'");
+
+  const selfAbandonment =
+    text.includes("whatever they want") ||
+    text.includes("i'll do what they want") ||
+    text.includes("ill do what they want") ||
+    text.includes("i'll just go along with it") ||
+    text.includes("ill just go along with it");
+
+  const boundaryErosion =
+    text.includes("i can't say no") ||
+    text.includes("i cant say no") ||
+    text.includes("i always say yes") ||
+    text.includes("they'll be upset if i say no") ||
+    text.includes("they will be upset if i say no");
+
+  const chronicSelfDismissal =
+  text.includes("it's fine") ||
+  text.includes("its fine") ||
+  text.includes("doesn't matter") ||
+  text.includes("doesnt matter") ||
+  text.includes("i'll deal with it") ||
+  text.includes("ill deal with it") ||
+  text.includes("deal with it");
+
+  return {
+    selfAbandonment,
+    boundaryErosion,
+    chronicSelfDismissal,
+  };
+}
+
+function getValueDrift({
+  latestText,
+}: {
+  latestText: string;
+}): ValueDrift {
+  const text = latestText
+    .toLowerCase()
+    .replaceAll("’", "'");
+
+  const actingAlignedWithValues =
+    text.includes("i'm going to") ||
+    text.includes("im going to") ||
+    text.includes("i decided") ||
+    text.includes("i've decided") ||
+    text.includes("ive decided") ||
+    text.includes("i think i know what to do");
+
+  const movingAwayFromValues =
+    text.includes("whatever") ||
+    text.includes("i don't care") ||
+    text.includes("i dont care") ||
+    text.includes("forget it") ||
+    text.includes("give up") ||
+    text.includes("doesn't matter") ||
+    text.includes("doesnt matter");
+
+  return {
+    movingAwayFromValues,
+    actingAlignedWithValues,
+  };
+}
+
+function getValueDriftOpening(
+  valueDrift: ValueDrift,
+  valueMemory: ValueMemory
+): string | null {
+  const rememberedValues = valueMemory.values.slice(0, 3);
+
+  const valuePhrase =
+    rememberedValues.length > 0
+      ? rememberedValues.join(" and ")
+      : "what matters to you";
+
+  if (valueDrift.movingAwayFromValues) {
+    return `This sounds like you're drifting away from ${valuePhrase}. Pause before you disconnect from it completely.`;
+  }
+
+  if (valueDrift.actingAlignedWithValues) {
+    return `That sounds more aligned with ${valuePhrase}. Stay with the next simple step.`;
+  }
+
+  return null;
+}
+
+function getValueEvolution({
+  latestText,
+  valueMemory,
+}: {
+  latestText: string;
+  valueMemory: ValueMemory;
+}): ValueEvolution {
+  const text = latestText
+    .toLowerCase()
+    .replaceAll("’", "'");
+
+  const strengtheningValues = valueMemory.values.filter((value) =>
+    text.includes(value.toLowerCase())
+  );
+
+  return {
+    strengtheningValues,
+    fadingValues: [],
+  };
+}
+
+function getGoalEvolution({
+  latestText,
+  goalMemory,
+}: {
+  latestText: string;
+  goalMemory: GoalMemory;
+}): GoalEvolution {
+  const text = latestText
+    .toLowerCase()
+    .replaceAll("’", "'");
+
+  const strengtheningGoals = goalMemory.goals.filter((goal) =>
+    text.includes(goal.toLowerCase())
+  );
+
+  return {
+    strengtheningGoals,
+    fadingGoals: [],
+  };
+}
+
+function getGoalEvolutionOpening(
+  goalEvolution: GoalEvolution
+): string | null {
+  if (goalEvolution.strengtheningGoals.length > 0) {
+    const goalPhrase = goalEvolution.strengtheningGoals
+      .slice(0, 2)
+      .join(" and ");
+
+    return `${goalPhrase} is becoming more central to your direction. Keep your next move connected to it.`;
+  }
+
+  if (goalEvolution.fadingGoals.length > 0) {
+    const goalPhrase = goalEvolution.fadingGoals
+      .slice(0, 2)
+      .join(" and ");
+
+    return `${goalPhrase} has been showing up less lately. Notice whether you're still moving toward it.`;
+  }
+
+  return null;
+}
+
+function getValueEvolutionOpening(
+  valueEvolution: ValueEvolution
+): string | null {
+  if (valueEvolution.strengtheningValues.length > 0) {
+    const valuePhrase = valueEvolution.strengtheningValues
+      .slice(0, 2)
+      .join(" and ");
+
+    return `${valuePhrase} is showing up more strongly in your pattern. That may be becoming more central to you.`;
+  }
+
+  if (valueEvolution.fadingValues.length > 0) {
+    const valuePhrase = valueEvolution.fadingValues
+      .slice(0, 2)
+      .join(" and ");
+
+    return `${valuePhrase} has been showing up less lately. Notice if that still reflects what matters to you.`;
+  }
+
+  return null;
+}
+
+function getIdentityProtectionOpening(
+  identityProtection: IdentityProtection
+): string | null {
+  if (identityProtection.selfAbandonment) {
+    return "You're starting to protect everyone else's needs while leaving yours out of the decision.";
+  }
+
+  if (identityProtection.boundaryErosion) {
+    return "This sounds like your boundary is getting smaller than the situation requires.";
+  }
+
+  if (identityProtection.chronicSelfDismissal) {
+    return "You're minimizing the impact on yourself again. Don't erase your side of the situation.";
+  }
+
+  return null;
+}
+
+function getGoalDriftOpening(
+  goalDrift: GoalDrift,
+  goalMemory: GoalMemory
+): string | null {
+
+  const rememberedGoals = goalMemory.goals.slice(0, 3);
+
+  const goalPhrase =
+    rememberedGoals.length > 0
+      ? rememberedGoals.join(" and ")
+      : "your goals";
+
+  if (goalDrift.movingAwayFromGoals) {
+return `This sounds like you're moving away from ${goalPhrase}. Slow down before you abandon the direction completely.`;  
+ }
+      
+  if (goalDrift.movingTowardGoals) {
+    return `That sounds more aligned with ${goalPhrase}. Stay with the next simple step.`;
+  }
+
+  return null;
+}
+
+function getRecoveryOpening(
+  recoverySignal: RecoverySignal
+): string | null {
+  if (
+    recoverySignal.clarityReturning &&
+    recoverySignal.engagementReturning
+  ) {
+    return "Something shifted. You're sounding clearer than you were a moment ago.";
+  }
+
+  if (recoverySignal.clarityReturning) {
+    return "Clarity is starting to come back. Stay with the next simple step.";
+  }
+
+  if (recoverySignal.engagementReturning) {
+    return "You're coming back into the conversation. Keep it simple.";
+  }
+
+  if (recoverySignal.emotionalSettling) {
+    return "Your tone is starting to settle. Don't rush the next move.";
+  }
+
+  return null;
+}
+
+function getIdentityShift({
+  emotionalState,
+  conversationEnergyState,
+  learnMe,
+}: {
+  emotionalState: TwinEmotionalState;
+  conversationEnergyState: ConversationEnergyState;
+  learnMe?: TwinSignals["learnMe"];
+}): IdentityShift {
+  const decisiveness = learnMe?.decisiveness ?? 50;
+  const consistency = learnMe?.consistency ?? 50;
+  const sensitivity = learnMe?.sensitivity ?? 50;
+
+  const unusualIndecision =
+    decisiveness >= 70 &&
+    (emotionalState === "uncertain" ||
+      conversationEnergyState === "detached");
+
+  const unusualWithdrawal =
+    consistency >= 70 &&
+    conversationEnergyState === "detached";
+
+  const unusualReactivity =
+  sensitivity >= 70 &&
+  emotionalState === "frustrated";
+
+  return {
+    unusualIndecision,
+    unusualWithdrawal,
+    unusualReactivity,
+  };
+}
+
+function getIdentityAwareOpening({
+  identityShift,
+  emotionalState,
+  conversationEnergyState,
+  intent,
+}: IdentityAwareResponseContext): string | null {
+  if (identityShift.unusualIndecision) {
+    return "This hesitation is unusual for you. Don't force certainty yet.";
+  }
+
+  if (identityShift.unusualWithdrawal) {
+    return "You're quieter than your usual pattern. Stay close to the next small step.";
+  }
+
+  if (identityShift.unusualReactivity) {
+    return "Your reaction feels sharper than your usual baseline. Pause before you move on it.";
+  }
+
+  if (
+    emotionalState === "overwhelmed" ||
+    conversationEnergyState === "fading"
+  ) {
+    return "Your energy looks low right now. Keep this simple.";
+  }
+
+  if (intent === "protective") {
+    return "Safety comes first here. Reduce movement and stay visible.";
+  }
+
+  return null;
+}
+
+function adjustIntentForIdentity({
+  intent,
+  identityShift,
+  conversationEnergyState,
+}: {
+  intent: TwinResponseIntent;
+  identityShift: IdentityShift;
+  conversationEnergyState: ConversationEnergyState;
+}): TwinResponseIntent {
+  if (identityShift.unusualIndecision && intent === "clarifying") {
+    return "challenging";
+  }
+
+  if (
+    identityShift.unusualWithdrawal &&
+    conversationEnergyState === "detached"
+  ) {
+    return "supportive";
+  }
+
+  if (identityShift.unusualReactivity) {
+    return "grounding";
+  }
+
+  return intent;
+}
+
+function getBaselineDrift({
+  identityProfile,
+  conversationEnergyState,
+  emotionalState,
+}: {
+  identityProfile: {
+    decisiveness: number;
+    consistency: number;
+    sensitivity: number;
+  };
+  conversationEnergyState: ConversationEnergyState;
+  emotionalState: TwinEmotionalState;
+}): BaselineDrift {
+  const engagementDrop =
+    identityProfile.consistency >= 70 &&
+    (
+      conversationEnergyState === "detached" ||
+      conversationEnergyState === "fading"
+    );
+
+  const decisivenessDrop =
+    identityProfile.decisiveness >= 70 &&
+    emotionalState === "uncertain";
+
+  const emotionalEscalation =
+    identityProfile.sensitivity >= 70 &&
+    emotionalState === "frustrated";
+
+  return {
+    engagementDrop,
+    decisivenessDrop,
+    emotionalEscalation,
+  };
+}
+
+function getBaselineDriftOpening(
+  baselineDrift: BaselineDrift,
+  seed: number
+): string | null {
+
+  if (baselineDrift.decisivenessDrop) {
+    return "Your hesitation is standing out compared to your usual pattern.";
+  }
+
+  if (baselineDrift.engagementDrop) {
+    return "Your engagement is dropping compared to your usual rhythm.";
+  }
+
+if (baselineDrift.emotionalEscalation) {
+  const replies = [
+    "Something is sharper than your usual baseline. Slow it down before reacting.",
+    "You're carrying more edge than usual right now. Give yourself a second before moving on it.",
+    "This feels more charged than your normal pattern. Don't let the reaction choose the direction.",
+    "Your responses are tightening up. Stay curious before you become certain.",
+  ];
+return replies[Math.abs(seed) % replies.length];
+
+}
+  return null;
+}
+
+function getSelfTrajectoryOpening(
+  selfTrajectory: SelfTrajectory
+): string | null {
+  if (selfTrajectory.deteriorating) {
+    return "This conversation is trending away from clarity. Let's slow it down before you disconnect completely.";
+  }
+
+  if (selfTrajectory.improving) {
+    return "You're starting to come back into the conversation. Keep it simple.";
+  }
+
+  return null;
+}
+
+function getSelfTrajectory({
+  recentMessages,
+}: {
+  recentMessages: string[];
+}): SelfTrajectory {
+  const recent = recentMessages
+    .slice(-5)
+    .join(" ")
+    .toLowerCase();
+
+  const deteriorationSignals =
+    (recent.match(/\bidk\b/g) || []).length +
+    (recent.match(/\bwhatever\b/g) || []).length +
+    (recent.match(/\bfine\b/g) || []).length +
+    (recent.match(/\bdoesn't matter\b/g) || []).length;
+
+  const improvementSignals =
+    (recent.match(/\bi will\b/g) || []).length +
+    (recent.match(/\bok\b/g) || []).length +
+    (recent.match(/\byeah\b/g) || []).length +
+    (recent.match(/\bgot it\b/g) || []).length;
+
+  const deteriorating = deteriorationSignals >= 2;
+  const improving = improvementSignals >= 2;
+
+  return {
+    deteriorating,
+    improving,
+    stable: !deteriorating && !improving,
+  };
+}
+
+function getMemoryTrajectory({
+  memory,
+  identityShift,
+}: {
+  memory: TwinMemory | null;
+  identityShift: IdentityShift;
+}): MemoryTrajectory {
+  const safeMemory = memory as TwinMemory & {
+    withdrawalCount?: number;
+    indecisionCount?: number;
+    reactivityCount?: number;
+  };
+
+  const recurringWithdrawal =
+    identityShift.unusualWithdrawal &&
+    (safeMemory?.withdrawalCount ?? 0) >= 3;
+
+  const recurringIndecision =
+    identityShift.unusualIndecision &&
+    (safeMemory?.indecisionCount ?? 0) >= 3;
+
+  const recurringEscalation =
+  (safeMemory?.reactivityCount ?? 0) >= 3;
+
+  return {
+    recurringWithdrawal,
+    recurringIndecision,
+    recurringEscalation,
+  };
+}
+
+function getMemoryWeight(memory: TwinMemory): MemoryWeight {
+  const escalationCount = memory.reactivityCount ?? 0;
+  const indecisionCount = memory.indecisionCount ?? 0;
+  const withdrawalCount = memory.withdrawalCount ?? 0;
+
+  return {
+    escalationWeight:
+      escalationCount >= 6 ? "strong" : escalationCount >= 3 ? "light" : "none",
+
+    indecisionWeight:
+      indecisionCount >= 6 ? "strong" : indecisionCount >= 3 ? "light" : "none",
+
+    withdrawalWeight:
+      withdrawalCount >= 6 ? "strong" : withdrawalCount >= 3 ? "light" : "none",
+  };
+}
+
+function getIdentityEvolution({
+  memoryWeight,
+  identityProfile,
+}: {
+  memoryWeight: MemoryWeight;
+  identityProfile: {
+    decisiveness: number;
+    consistency: number;
+    sensitivity: number;
+  };
+}): IdentityEvolution {
+  return {
+    decisivenessDeclining:
+      memoryWeight.indecisionWeight === "strong" &&
+      identityProfile.decisiveness < 50,
+
+    engagementDeclining:
+      memoryWeight.withdrawalWeight === "strong" &&
+      identityProfile.consistency < 50,
+
+    emotionalVolatilityIncreasing:
+      memoryWeight.escalationWeight === "strong" &&
+      identityProfile.sensitivity >= 50,
+  };
+}
+
+function getInternalContradiction({
+  emotionalState,
+  conversationEnergyState,
+  latestText,
+}: {
+  emotionalState: TwinEmotionalState;
+  conversationEnergyState: ConversationEnergyState;
+  latestText: string;
+}): InternalContradiction {
+  const text = latestText.toLowerCase();
+
+  const saysFine =
+    text === "fine" ||
+    text === "i'm fine" ||
+    text === "im fine" ||
+    text === "okay" ||
+    text === "ok";
+
+  const emotionalMismatch =
+    saysFine &&
+    (emotionalState === "frustrated" ||
+      emotionalState === "overwhelmed");
+
+  const confidenceMismatch =
+    (text.includes("sure") || text.includes("definitely")) &&
+    emotionalState === "uncertain";
+
+  const engagementMismatch =
+    saysFine &&
+    conversationEnergyState === "detached";
+
+  return {
+    emotionalMismatch,
+    confidenceMismatch,
+    engagementMismatch,
+  };
+}
+
+function getInternalContradictionOpening(
+  internalContradiction: InternalContradiction
+): string | null {
+  if (
+    internalContradiction.emotionalMismatch &&
+    internalContradiction.engagementMismatch
+  ) {
+    return "Your words say you're fine, but your energy is pulling back and your emotion is still active.";
+  }
+
+  if (internalContradiction.emotionalMismatch) {
+    return "You say you're fine, but your reaction does not fully match that.";
+  }
+
+  if (internalContradiction.engagementMismatch) {
+    return "You say you're fine, but you're becoming less present in the conversation.";
+  }
+
+  if (internalContradiction.confidenceMismatch) {
+    return "You sound certain, but the signal underneath still looks unsure.";
+  }
+
+  return null;
+}
+
+function getIdentityEvolutionOpening(
+  identityEvolution: IdentityEvolution
+): string | null {
+  if (identityEvolution.decisivenessDeclining) {
+    return "You've been becoming less decisive over time. Don't confuse hesitation with careful thinking.";
+  }
+
+  if (identityEvolution.engagementDeclining) {
+    return "You've been pulling back more often lately. Stay connected to what's actually happening.";
+  }
+
+  if (identityEvolution.emotionalVolatilityIncreasing) {
+    return "Your reactions have been becoming more frequent lately. Notice the pattern before it chooses for you.";
+  }
+
+  return null;
+}
+
+function getMemoryTrajectoryOpening(
+  memoryTrajectory: MemoryTrajectory,
+  memoryWeight: MemoryWeight
+): string | null {
+  if (memoryTrajectory.recurringEscalation) {
+    if (memoryWeight.escalationWeight === "strong") {
+      return "This reaction pattern is becoming familiar. Slow it down before it starts running the moment for you.";
+    }
+
+    return "This reaction pattern has been showing up repeatedly. Slow it down before it becomes automatic.";
+  }
+
+  if (memoryTrajectory.recurringIndecision) {
+    if (memoryWeight.indecisionWeight === "strong") {
+      return "This hesitation has become a familiar loop. Name the next small move before it takes over.";
+    }
+
+    return "This hesitation has been showing up more than once. Don't let it quietly become the pattern.";
+  }
+
+  if (memoryTrajectory.recurringWithdrawal) {
+    if (memoryWeight.withdrawalWeight === "strong") {
+      return "This pullback pattern is becoming familiar. Stay close to what's actually happening before you disappear from it.";
+    }
+
+    return "This isn't the first time you've started pulling back like this. Stay close to what's actually going on.";
+  }
+
+  return null;
+}
+
+function getResponsePriority({
+  recoverySignal,
+  internalContradiction,
+  identityProtection,
+  boundaryAwareness,
+  boundaryEvolution,
+  valueEvolution,
+  goalEvolution,
+  identityRegression,
+  identityNarrative,
+  narrativeSynthesis,
+  identityArchetype,
+  predictiveIdentity,
+  longTermIdentityEvolution,
+  identityStrengthening,
+  identityMomentum,
+  timelineInsight,
+  valueDrift,
+  goalDrift,
+  identityEvolution,
+  memoryTrajectory,
+  selfTrajectory,
+  baselineDrift,
+  identityShift,
+  emotionalState,
+}: {
+
+  recoverySignal: RecoverySignal;
+  internalContradiction: InternalContradiction;
+  identityProtection: IdentityProtection;
+  boundaryAwareness: BoundaryAwareness;
+  boundaryEvolution: BoundaryEvolution;
+  valueEvolution: ValueEvolution;
+  goalEvolution: GoalEvolution;
+  identityRegression: IdentityRegression;
+  identityArchetype: IdentityArchetype;
+  predictiveIdentity: PredictiveIdentity;
+  identityNarrative: IdentityNarrative;
+  narrativeSynthesis: NarrativeSynthesis;
+  longTermIdentityEvolution: LongTermIdentityEvolution;
+  identityStrengthening: IdentityStrengthening;
+  identityMomentum: IdentityMomentum;
+  timelineInsight: TimelineInsight;
+  valueDrift: ValueDrift;
+  goalDrift: GoalDrift;
+  identityEvolution: IdentityEvolution;
+  memoryTrajectory: MemoryTrajectory;
+  selfTrajectory: SelfTrajectory;
+  baselineDrift: BaselineDrift;
+  identityShift: IdentityShift;
+  emotionalState: TwinEmotionalState;
+}): ResponsePriority {
+
+if (
+  recoverySignal.clarityReturning &&
+  !identityProtection.selfAbandonment &&
+  !identityProtection.boundaryErosion &&
+  !identityProtection.chronicSelfDismissal
+) {
+  return "recovery";
+}
+
+  if (
+  internalContradiction.emotionalMismatch ||
+  internalContradiction.confidenceMismatch ||
+  internalContradiction.engagementMismatch
+) {
+  return "contradiction";
+}
+
+
+if (
+  identityProtection.selfAbandonment ||
+  identityProtection.boundaryErosion ||
+  identityProtection.chronicSelfDismissal
+) {
+  return "protection";
+}
+
+if (boundaryAwareness.knownTriggerActive) {
+  return "boundary";
+}
+
+if (
+  boundaryEvolution.strengtheningTriggers.length > 0 ||
+  boundaryEvolution.fadingTriggers.length > 0
+) {
+  return "boundaryEvolution";
+}
+
+if (narrativeSynthesis.synthesis) {
+  return "synthesis";
+}
+
+if (
+  valueEvolution.strengtheningValues.length > 0 ||
+  valueEvolution.fadingValues.length > 0
+) {
+  return "valueEvolution";
+}
+
+if (
+  goalEvolution.strengtheningGoals.length > 0 ||
+  goalEvolution.fadingGoals.length > 0
+) {
+  return "goalEvolution";
+}
+
+if (
+  identityRegression.regressionAreas.length > 0
+) {
+  return "regression";
+}
+
+if (identityNarrative.dominantStory) {
+  return "narrative";
+}
+
+if (
+  identityArchetype.dominantArchetype
+) {
+  return "archetype";
+}
+
+if (predictiveIdentity.predictedDirection) {
+  return "predictive";
+}
+
+if (
+  longTermIdentityEvolution.emergingDirections.length > 0 ||
+  longTermIdentityEvolution.fadingDirections.length > 0
+) {
+  return "longTermEvolution";
+}
+
+if (
+  identityStrengthening.strengtheningAreas.length > 0
+) {
+  return "strengthening";
+}
+
+if (
+  identityMomentum.recurringPatterns.length > 0
+) {
+  return "momentum";
+}
+
+if (
+  timelineInsight.dominantBoundaryTriggers.length > 0 ||
+  timelineInsight.dominantGoals.length > 0 ||
+  timelineInsight.dominantValues.length > 0
+) {
+  return "timelineInsight";
+}
+
+if (
+  valueDrift.movingAwayFromValues ||
+  valueDrift.actingAlignedWithValues
+) {
+  return "value";
+}
+
+if (goalDrift.movingAwayFromGoals || goalDrift.movingTowardGoals) {
+  return "goal";
+}
+
+  if (
+  identityEvolution.decisivenessDeclining ||
+  identityEvolution.engagementDeclining ||
+  identityEvolution.emotionalVolatilityIncreasing
+) {
+  return "evolution";
+}
+  if (
+    memoryTrajectory.recurringEscalation ||
+    memoryTrajectory.recurringIndecision ||
+    memoryTrajectory.recurringWithdrawal
+  ) {
+    return "memory";
+  }
+
+  if (
+    selfTrajectory.deteriorating &&
+    !identityShift.unusualReactivity &&
+    !baselineDrift.emotionalEscalation
+  ) {
+    return "trajectory";
+  }
+
+  if (
+    identityShift.unusualIndecision ||
+    identityShift.unusualWithdrawal ||
+    identityShift.unusualReactivity
+  ) {
+    return "identity";
+  }
+
+  if (
+    baselineDrift.engagementDrop ||
+    baselineDrift.decisivenessDrop ||
+    baselineDrift.emotionalEscalation
+  ) {
+    return "baseline";
+  }
+
+  if (
+    emotionalState === "frustrated" ||
+    emotionalState === "overwhelmed" ||
+    emotionalState === "uncertain"
+  ) {
+    return "emotion";
+  }
+
+  return "default";
+}
+
+function getReplyIndex({
+  latestText,
+  messages,
+  passiveLoopCount,
+}: {
+  latestText: string;
+  messages: Message[];
+  passiveLoopCount: number;
+}) {
+  return Math.abs(
+    messages.length * 7 +
+      latestText.length * 13 +
+      passiveLoopCount * 17
+  );
+}
 
 function generateTwinResponse({
   input,
@@ -2114,7 +4776,15 @@ function generateTwinResponse({
 
   const contextText = input.toLowerCase();
 
-  const latestText = input.toLowerCase().trim();
+ const latestText = input.toLowerCase().trim();
+
+updateValueMemory(latestText);
+updateGoalMemory(latestText);
+updateBoundaryMemory(latestText);
+
+const valueMemory = getValueMemory();
+const goalMemory = getGoalMemory();
+const boundaryMemory = getBoundaryMemory();
 
   const soundsRisky =
     latestText.includes("drive") ||
@@ -2152,6 +4822,879 @@ function generateTwinResponse({
   const awarenessSignal = twinSignals.awareness;
   const trajectory = twinSignals.trajectory;
   const drift = twinSignals.drift;
+
+  const environmentSignal =
+  twinSyncSnapshot.spots.environmentLevel ?? "unknown";
+
+const supportWeakening =
+  twinSignals.crewCollapse.level === "thinning" ||
+  twinSignals.crewCollapse.level === "collapsing";
+
+const ecosystemPressure =
+  trajectory.riskWindow === "imminent" ||
+  environmentSignal === "unsafe" ||
+  drift === "prolonged";
+
+const momentumEscalating =
+  environmentSignal === "volatile" ||
+  trajectory.riskWindow === "approaching";
+
+  const emotionalState = detectEmotionalState({
+  text: latestText,
+  awareness,
+  trajectory: {
+    riskWindow: trajectory.riskWindow ?? "none",
+    direction: "stable",
+    summary: trajectory.reason ?? "",
+  },
+  driftLevel: drift as DriftLevel,
+  desyncLevel: desync.level,
+});
+
+  const previousUserMessage =
+    messages
+      .filter((m) => m.role === "user")
+      .slice(-2)[0]?.text?.toLowerCase() || "";
+
+const recentPassiveUserMessages = messages
+  .filter((m) => m.role === "user")
+  .slice(-4)
+  .map((m) => m.text.toLowerCase());
+
+const passiveLoopCount = recentPassiveUserMessages.filter(
+  (msg) =>
+    msg.includes("idk") ||
+    msg.includes("whatever") ||
+    msg.includes("fine") ||
+    msg.includes("i guess") ||
+    msg.includes("maybe")
+).length;
+
+const conversationEnergyState = getConversationEnergyState({
+  latestText,
+  recentUserMessages: recentPassiveUserMessages,
+  passiveLoopCount,
+});
+
+const twinEmotionalState = getTwinEmotionalState({
+  latestText,
+  conversationEnergyState,
+  passiveLoopCount,
+  supportWeakening,
+  ecosystemPressure,
+});
+
+const baseTwinResponseIntent = getTwinResponseIntent({
+  emotionalState: twinEmotionalState,
+  ecosystemPressure,
+  supportWeakening,
+  passiveLoopCount,
+});
+
+const storedUserProfile = window.__twinUserProfile || {
+  decisiveness: 0,
+  resistance: 0,
+  sensitivity: 0,
+};
+
+const identityProfile = {
+  decisiveness: Math.max(
+    0,
+    Math.min(100, 50 + (storedUserProfile.decisiveness ?? 0) * 10)
+  ),
+  consistency: Math.max(
+    0,
+    Math.min(100, 50 + (storedUserProfile.resistance ?? 0) * 10)
+  ),
+  sensitivity: Math.max(
+    0,
+    Math.min(100, 50 + (storedUserProfile.sensitivity ?? 0) * 10)
+  ),
+};
+
+const baselineDrift = getBaselineDrift({
+  identityProfile,
+  conversationEnergyState,
+  emotionalState: twinEmotionalState,
+});
+
+const selfTrajectory = getSelfTrajectory({
+  recentMessages: messages
+    .filter((m) => m.role === "user")
+    .map((m) => m.text),
+});
+
+const earlyMemory = getTwinMemory();
+
+const identityShift = getIdentityShift({
+  emotionalState: twinEmotionalState,
+  conversationEnergyState,
+  learnMe: identityProfile,
+});
+
+updateIdentityMemory(identityShift);
+
+const updatedMemory = getTwinMemory();
+
+const memoryWeight = getMemoryWeight(updatedMemory);
+
+const identityEvolution = getIdentityEvolution({
+  memoryWeight,
+  identityProfile,
+});
+
+const internalContradiction = getInternalContradiction({
+  emotionalState: twinEmotionalState,
+  conversationEnergyState,
+  latestText,
+});
+
+const recoverySignal = getRecoverySignal({
+  emotionalState: twinEmotionalState,
+  conversationEnergyState,
+  latestText,
+});
+
+const goalDrift = getGoalDrift({
+  latestText,
+});
+
+const identityProtection = getIdentityProtection({
+  latestText,
+});
+
+const boundaryAwareness = getBoundaryAwareness({
+  latestText,
+  boundaryMemory,
+});
+
+const boundaryAwarenessOpening =
+  getBoundaryAwarenessOpening(
+    boundaryAwareness
+  );
+
+const boundaryEvolution = getBoundaryEvolution({
+  latestText,
+  boundaryMemory,
+});
+
+const boundaryEvolutionOpening =
+  getBoundaryEvolutionOpening(boundaryEvolution);
+
+const identityProtectionOpening =
+  getIdentityProtectionOpening(
+    identityProtection
+  );
+
+const valueDrift = getValueDrift({
+  latestText,
+});
+
+const valueDriftOpening = getValueDriftOpening(
+  valueDrift,
+  valueMemory
+);
+
+const valueEvolution = getValueEvolution({
+  latestText,
+  valueMemory,
+});
+
+const goalEvolution = getGoalEvolution({
+  latestText,
+  goalMemory,
+});
+
+const goalEvolutionOpening =
+  getGoalEvolutionOpening(goalEvolution);
+
+const valueEvolutionOpening =
+  getValueEvolutionOpening(valueEvolution);
+
+const goalDriftOpening = getGoalDriftOpening(
+  goalDrift,
+  goalMemory
+);
+
+const recoveryOpening = getRecoveryOpening(
+  recoverySignal
+);
+
+const internalContradictionOpening =
+  getInternalContradictionOpening(
+    internalContradiction
+  );
+
+const identityEvolutionOpening = getIdentityEvolutionOpening(
+  identityEvolution
+);
+
+const memoryTrajectory = getMemoryTrajectory({
+  memory: updatedMemory,
+  identityShift,
+});
+
+const memoryTrajectoryOpening = getMemoryTrajectoryOpening(
+  memoryTrajectory,
+  memoryWeight
+);
+
+const identityTimeline = getIdentityTimeline();
+
+const identityMomentum =
+  getIdentityMomentum(identityTimeline);
+
+const identityMomentumOpening =
+  getIdentityMomentumOpening(identityMomentum);
+
+const timelineInsight =
+  getTimelineInsight(identityTimeline);
+
+const timelineInsightOpening =
+  getTimelineInsightOpening(timelineInsight);  
+
+const identityStrengthening =
+  getIdentityStrengthening({
+    identityTimeline,
+    valueEvolution,
+    goalEvolution,
+    identityMomentum,
+  });
+
+const identityStrengtheningOpening =
+  getIdentityStrengtheningOpening(
+    identityStrengthening
+  );
+
+const identityRegression =
+  getIdentityRegression({
+    valueDrift,
+    goalDrift,
+    timelineInsight,
+    identityMomentum,
+  });
+
+const identityRegressionOpening =
+  getIdentityRegressionOpening(
+    identityRegression
+  );
+
+const longTermIdentityEvolution =
+  getLongTermIdentityEvolution(
+    identityTimeline
+  );
+
+const longTermIdentityEvolutionOpening =
+  getLongTermIdentityEvolutionOpening(
+    longTermIdentityEvolution
+  );
+
+const identityNarrative =
+  getIdentityNarrative({
+    timelineInsight,
+    identityMomentum,
+    identityStrengthening,
+    identityRegression,
+    longTermIdentityEvolution,
+  });
+
+const identityNarrativeOpening =
+  getIdentityNarrativeOpening(
+    identityNarrative
+  );
+
+updateNarrativeMemory(identityNarrative);
+
+const narrativeMemory =
+  getNarrativeMemory();
+
+const identityArchetype =
+  getIdentityArchetype({
+    timelineInsight,
+    identityMomentum,
+    narrativeMemory,
+  });
+
+const identityArchetypeOpening =
+  getIdentityArchetypeOpening(
+    identityArchetype
+  );
+
+const predictiveIdentity =
+  getPredictiveIdentity({
+    identityNarrative,
+    identityArchetype,
+    identityMomentum,
+    longTermIdentityEvolution,
+    timelineInsight,
+  });
+
+const predictiveIdentityOpening =
+  getPredictiveIdentityOpening(
+    predictiveIdentity
+  );
+
+const narrativeSynthesis =
+  getNarrativeSynthesis({
+    identityNarrative,
+    identityArchetype,
+    predictiveIdentity,
+    timelineInsight,
+    valueEvolution,
+    goalEvolution,
+  });
+
+const narrativeSynthesisOpening =
+  getNarrativeSynthesisOpening(
+    narrativeSynthesis
+  );
+
+const responsePriority = getResponsePriority({
+  recoverySignal,
+  internalContradiction,
+  identityProtection,
+  boundaryAwareness,
+  boundaryEvolution,
+  valueEvolution,
+  goalEvolution,
+  identityRegression,
+  identityNarrative,
+  narrativeSynthesis,
+  identityArchetype,
+  predictiveIdentity,
+  longTermIdentityEvolution,
+  identityStrengthening,
+  identityMomentum,
+  timelineInsight,
+  valueDrift,
+  goalDrift,
+  identityEvolution,
+  memoryTrajectory,
+  selfTrajectory,
+  baselineDrift,
+  identityShift,
+  emotionalState: twinEmotionalState,
+});
+
+updateIdentityTimeline({
+  timestamp: new Date().toISOString(),
+  emotionalState: twinEmotionalState,
+  energyState: conversationEnergyState,
+  responsePriority,
+
+  activeValues: valueEvolution.strengtheningValues,
+
+  activeGoals: goalEvolution.strengtheningGoals,
+
+  activeBoundaryTriggers: boundaryAwareness.activeTriggers,
+});
+
+const updatedIdentityTimeline = getIdentityTimeline();
+
+const twinResponseIntent = adjustIntentForIdentity({
+  intent: baseTwinResponseIntent,
+  identityShift,
+  conversationEnergyState,
+});
+
+const identityAwareOpening = getIdentityAwareOpening({
+  identityShift,
+  emotionalState: twinEmotionalState,
+  conversationEnergyState,
+  intent: twinResponseIntent,
+});
+
+const baselineDriftOpening = getBaselineDriftOpening(
+  baselineDrift,
+  Date.now() +
+    messages.length * 7 +
+    latestText.length * 13 +
+    passiveLoopCount * 17
+);
+
+const selfTrajectoryOpening = getSelfTrajectoryOpening(
+  selfTrajectory
+);
+
+console.log("🔥 TWIN DEBUG START");
+
+console.warn("🔥 DEBUG HIT");
+
+console.log("Twin Debug", {
+
+  baseTwinResponseIntent,
+
+  identityProfile,
+
+  valueMemory,
+
+  goalMemory,
+
+  boundaryMemory,
+
+  identityTimeline: updatedIdentityTimeline,
+  identityMomentum,
+  identityMomentumOpening,
+
+  boundaryAwareness,
+  boundaryAwarenessOpening,
+
+  boundaryEvolution,
+  boundaryEvolutionOpening,
+
+  baselineDrift,
+
+  selfTrajectory,
+  selfTrajectoryOpening,
+
+  memory: updatedMemory,
+
+  memoryTrajectory,
+  memoryTrajectoryOpening,
+
+  memoryWeight,
+
+  identityEvolution,
+  identityEvolutionOpening,
+
+  internalContradiction,
+  internalContradictionOpening,
+
+  goalDrift,
+  goalDriftOpening,
+
+  identityProtection,
+  identityProtectionOpening,
+
+  goalEvolution,
+  goalEvolutionOpening,
+
+  timelineInsight,
+  timelineInsightOpening,
+
+  identityStrengthening,
+identityStrengtheningOpening,
+
+identityRegression,
+identityRegressionOpening,
+
+longTermIdentityEvolution,
+longTermIdentityEvolutionOpening,
+
+identityNarrative,
+identityNarrativeOpening,
+narrativeMemory,
+
+identityArchetype,
+identityArchetypeOpening,
+
+predictiveIdentity,
+predictiveIdentityOpening,
+
+narrativeSynthesis,
+narrativeSynthesisOpening,
+
+  valueDrift,
+  valueDriftOpening,
+
+  valueEvolution,
+  valueEvolutionOpening,
+
+  recoverySignal,
+  recoveryOpening,
+
+  responsePriority,
+
+  identityShift,
+
+  emotionalState: twinEmotionalState,
+
+  energyState: conversationEnergyState,
+
+  intent: twinResponseIntent,
+
+  identityAwareOpening,
+
+  baselineDriftOpening,
+
+  passiveLoopCount,
+
+  supportWeakening,
+
+  ecosystemPressure,
+
+});
+
+if (responsePriority === "protection" && identityProtectionOpening) {
+  return identityProtectionOpening;
+}
+
+if (responsePriority === "boundary" && boundaryAwarenessOpening) {
+  return boundaryAwarenessOpening;
+}
+
+if (
+  responsePriority === "boundaryEvolution" &&
+  boundaryEvolutionOpening
+) {
+  return boundaryEvolutionOpening;
+}
+
+if (responsePriority === "valueEvolution" && valueEvolutionOpening) {
+  return valueEvolutionOpening;
+}
+
+if (responsePriority === "goalEvolution" && goalEvolutionOpening) {
+  return goalEvolutionOpening;
+}
+
+if (
+  responsePriority === "regression" &&
+  identityRegressionOpening
+) {
+  return identityRegressionOpening;
+}
+
+if (
+  responsePriority === "synthesis" &&
+  narrativeSynthesisOpening
+) {
+  return narrativeSynthesisOpening;
+}
+
+if (
+  responsePriority === "narrative" &&
+  identityNarrativeOpening
+) {
+  return identityNarrativeOpening;
+}
+
+if (
+  responsePriority === "archetype" &&
+  identityArchetypeOpening
+) {
+  return identityArchetypeOpening;
+}
+
+if (
+  responsePriority === "predictive" &&
+  predictiveIdentityOpening
+) {
+  return predictiveIdentityOpening;
+}
+
+if (
+  responsePriority === "longTermEvolution" &&
+  longTermIdentityEvolutionOpening
+) {
+  return longTermIdentityEvolutionOpening;
+}
+
+if (
+  responsePriority === "strengthening" &&
+  identityStrengtheningOpening
+) {
+  return identityStrengtheningOpening;
+}
+
+if (
+  responsePriority === "momentum" &&
+  identityMomentumOpening
+) {
+  return identityMomentumOpening;
+}
+
+if (
+  responsePriority === "timelineInsight" &&
+  timelineInsightOpening
+) {
+  return timelineInsightOpening;
+}
+
+if (responsePriority === "value" && valueDriftOpening) {
+  return valueDriftOpening;
+}
+
+if (responsePriority === "recovery" && recoveryOpening) {
+  return recoveryOpening;
+}
+
+  const recentLowEnergy =
+    previousUserMessage.includes("tired") ||
+    previousUserMessage.includes("drained") ||
+    previousUserMessage.includes("exhausted");
+
+  let responseLocked = false;
+
+ const passiveDriftLanguage =
+  (
+    latestText.includes("idk") ||
+    latestText.includes("whatever") ||
+    latestText.includes("fine") ||
+    latestText.includes("maybe") ||
+    latestText.includes("i guess") ||
+    latestText.includes("doesn't matter")
+  );
+
+if (passiveDriftLanguage && (ecosystemPressure || momentumEscalating || supportWeakening)) {
+  responseLocked = true;
+
+  if (trajectory.riskWindow === "imminent") {
+  return shapeTone(
+  "You're drifting into passive decision mode while the environment around you is tightening. Slow the spiral down and make one grounded choice intentionally."
+);
+
+  }
+
+if (conversationEnergyState === "fading") {
+  responseLocked = true;
+
+  const fadingRepliesByEmotion: Record<TwinEmotionalState, string[]> = {
+    grounded: [
+      "Your engagement is dipping, but you still sound present. What is the next small thing you want to figure out?",
+      "You're fading a little, but not gone. What part should we focus on first?",
+    ],
+
+    overwhelmed: [
+      "Your engagement is dropping, and this feels like too much input at once. Name the one thing that needs attention first.",
+      "You sound overloaded. Do not solve the whole situation — choose the next manageable piece.",
+    ],
+
+    uncertain: [
+      "Your engagement is dropping. Before we lose the thread completely, what feels unclear right now?",
+      "You're fading out a little. Is this confusion, hesitation, or not knowing what you want next?",
+    ],
+
+    frustrated: [
+      "You sound checked out and irritated. What is actually bothering you underneath the short answers?",
+      "This feels less like uncertainty and more like resistance. What is making you pull back?",
+    ],
+
+    isolated: [
+      "Your engagement is dropping, and your support signal looks thin. Who can you stay connected to right now?",
+      "You sound less present while support is weak around you. Reconnect with one safe person or one safer place.",
+    ],
+
+    reflective: [
+      "You're quieter, but it sounds like you're processing. What thought keeps coming back?",
+      "You do not need to force an answer. What are you still sorting through?",
+    ],
+  };
+
+  const fadingReplies = fadingRepliesByEmotion[twinEmotionalState];
+
+  const fadingIndex =
+    Math.abs(messages.length + latestText.length + passiveLoopCount) %
+    fadingReplies.length;
+
+  return shapeTone(fadingReplies[fadingIndex]);
+}
+
+if (conversationEnergyState === "reactive") {
+  responseLocked = true;
+
+  return shapeTone(
+    "Something is pushing your responses harder than usual. Focus on what's driving the reaction, not just the reaction itself."
+  );
+}
+
+if (passiveLoopCount >= 3 && passiveDriftLanguage) {
+  responseLocked = true;
+
+  const intentReplies: Record<TwinResponseIntent, string[]> = {
+    grounding: [
+      "Pause the whole situation for a second. What is the next small move you can make safely?",
+      "You do not need the full answer yet. Start with the next grounded step.",
+    ],
+
+    clarifying: [
+      "You keep circling uncertainty. What part is actually unclear: what you want, what feels safe, or what happens next?",
+      "This sounds less like no answer and more like mixed signals. Name the part you cannot sort out yet.",
+    ],
+
+    protective: [
+      "Before anything else, slow down and protect your position. Stay visible, stay connected, and do not let momentum choose for you.",
+      "This is not the moment to drift. Your next move needs to increase safety, support, or clarity.",
+    ],
+
+    supportive: [
+      "You do not have to carry this alone. Choose one safe person, one safe place, or one clear next step.",
+      "Your support signal looks thin. Before you keep deciding alone, reconnect with something steady.",
+    ],
+
+    reflective: [
+      "You are not stuck because you have no answer. You are still processing. What thought keeps coming back?",
+      "You keep circling because something has not been named yet. What is it?",
+    ],
+
+    challenging: [
+      "This is a loop now. Do not solve everything — choose the next safe move only.",
+      "You keep giving low-commitment answers. What decision are you avoiding right now?",
+    ],
+  };
+
+  const replies = intentReplies[twinResponseIntent];
+
+  const replyIndex =
+    Math.abs(messages.length + latestText.length + passiveLoopCount) %
+    replies.length;
+
+ const baseReply = shapeTone(replies[replyIndex]);
+
+if (conversationEnergyState === "detached") {
+  responseLocked = true;
+
+  const detachedReply = shapeTone(
+    "You're still here, but you're becoming less present in the conversation. Don't solve everything right now. Tell me what feels most off."
+  );
+
+  const directUncertainty =
+    latestText.includes("idk") ||
+    latestText.includes("i don't know") ||
+    latestText.includes("i do not know") ||
+    latestText.includes("not sure") ||
+    latestText.includes("maybe");
+
+  if (responsePriority === "recovery") {
+  return (
+    recoveryOpening ??
+    internalContradictionOpening ??
+    identityEvolutionOpening ??
+    memoryTrajectoryOpening ??
+    selfTrajectoryOpening ??
+    identityAwareOpening ??
+    baselineDriftOpening ??
+    detachedReply
+  );
+}
+
+  if (responsePriority === "contradiction") {
+  return (
+    internalContradictionOpening ??
+    identityEvolutionOpening ??
+    memoryTrajectoryOpening ??
+    selfTrajectoryOpening ??
+    identityAwareOpening ??
+    baselineDriftOpening ??
+    detachedReply
+  );
+}
+
+if (responsePriority === "protection") {
+  return (
+    identityProtectionOpening ??
+    internalContradictionOpening ??
+    goalDriftOpening ??
+    identityEvolutionOpening ??
+    memoryTrajectoryOpening ??
+    selfTrajectoryOpening ??
+    identityAwareOpening ??
+    baselineDriftOpening ??
+    detachedReply
+  );
+}
+
+if (responsePriority === "value") {
+  return (
+    valueDriftOpening ??
+    identityProtectionOpening ??
+    goalDriftOpening ??
+    internalContradictionOpening ??
+    identityEvolutionOpening ??
+    memoryTrajectoryOpening ??
+    selfTrajectoryOpening ??
+    identityAwareOpening ??
+    baselineDriftOpening ??
+    detachedReply
+  );
+}
+
+if (responsePriority === "goal") {
+  return (
+    goalDriftOpening ??
+    recoveryOpening ??
+    internalContradictionOpening ??
+    identityEvolutionOpening ??
+    memoryTrajectoryOpening ??
+    selfTrajectoryOpening ??
+    identityAwareOpening ??
+    baselineDriftOpening ??
+    detachedReply
+  );
+}
+
+  if (responsePriority === "evolution") {
+  return (
+    identityEvolutionOpening ??
+    memoryTrajectoryOpening ??
+    selfTrajectoryOpening ??
+    identityAwareOpening ??
+    baselineDriftOpening ??
+    detachedReply
+  );
+}
+
+if (responsePriority === "memory") {
+  return (
+    memoryTrajectoryOpening ??
+    selfTrajectoryOpening ??
+    identityAwareOpening ??
+    baselineDriftOpening ??
+    detachedReply
+  );
+}
+
+if (
+  responsePriority === "trajectory" &&
+  directUncertainty
+) {
+  return selfTrajectoryOpening ?? baselineDriftOpening ?? identityAwareOpening ?? detachedReply;
+}
+
+  if (baselineDriftOpening) {
+    return baselineDriftOpening;
+  }
+
+  if (identityAwareOpening) {
+    return identityAwareOpening;
+  }
+
+  return detachedReply;
+}
+
+  if (supportWeakening) {
+  const supportDriftReplies = [
+    "Your support around you is thinning, and your responses are starting to sound less intentional. Pause and choose your next move on purpose.",
+    "This is the kind of moment where momentum can start deciding for you. Slow it down and reconnect with one grounded option.",
+    "You do not need a perfect answer right now. You need one clear move that keeps you connected and aware.",
+    "Your crew signal looks weak right now. Before you keep moving, re-anchor with someone safe or choose a safer direction.",
+  ];
+
+  const supportDriftReplyKey = `support-drift-${messages.length}`;
+
+return shapeTone(
+  supportDriftReplies[
+    Math.abs(supportDriftReplyKey.length + latestText.length) %
+      supportDriftReplies.length
+  ]
+);
+}
+
+const openings =
+  responsePriority === "trajectory"
+    ? [baselineDriftOpening].filter(Boolean)
+    : responsePriority === "baseline"
+      ? [baselineDriftOpening].filter(Boolean)
+      : responsePriority === "identity"
+        ? [identityAwareOpening].filter(Boolean)
+        : [];
+
+return openings.length > 0
+  ? `${openings.join("\n\n")}\n\n${baseReply}`
+  : baseReply;
+}
+
+}
 
   const learnMe = twinSignals.learnMe ?? {
     label: "learning",
@@ -2598,8 +6141,9 @@ function generateTwinResponse({
   }
 
   const intentMap = {
+    social: ["party", "party time", "turn up", "outside", "going out", "club", "bar", "link up", "vibing"],
     tired: ["tired", "exhausted", "drained", "low energy", "burnt out"],
-    uncertain: ["i dont know", "i don't know", "i do not know", "idk", "any suggestions", "unsure"],
+    uncertain: ["i dont know", "i don't know", "i do not know", "idk", "unsure"],
     help: ["help", "need help", "assist"],
     reassurance: ["am i good", "am i okay"],
     direction: ["what should i do", "what now", "next move"],
@@ -2607,7 +6151,7 @@ function generateTwinResponse({
     decision: ["should i", "what should i do", "what do i do",],
   };
 
-  let intent = "default";
+  let intent = getConversationIntent(input);
 
   for (const [key, keywords] of Object.entries(intentMap)) {
     if (keywords.some((word) => latestText.includes(word))) {
@@ -2617,7 +6161,7 @@ function generateTwinResponse({
   }
 
   // HIGH RISK OVERRIDE
-  if (trajectory.riskWindow === "imminent") {
+  if ((trajectory.riskWindow as TrajectoryRiskWindow) === "approaching") {
     return shapeTone(
       "Stay with me for a second. Things are stacking right now. Slow your next move down on purpose."
     );
@@ -2635,11 +6179,64 @@ function generateTwinResponse({
     );
   }
 
-  if (twinSyncSnapshot.noSupport?.active) {
+  if (
+    recentLowEnergy &&
+    (
+      latestText.includes("go out") ||
+      latestText.includes("outside") ||
+      latestText.includes("party")
+    )
+  ) {
     return shapeTone(
-      "You don't have strong support around you right now. Keep your next move simple and visible."
+      toneByAwareness(
+        [
+          "You can — just don't force a high-energy version of the night if your body already feels low.",
+
+          "Sounds like part of you wants the vibe, but your energy isn't fully matching it right now.",
+
+          "Then make it a lighter version of the night. Don't chase intensity right now."
+        ],
+        [
+          "If you go out, keep the pace lighter than your body is asking for.",
+
+          "You already sounded drained earlier. Don't overextend the night."
+        ],
+        [
+          "Your energy already dipped earlier. Avoid escalation tonight."
+        ],
+        [
+          "You're depleted and unstable right now. Do not push deeper into the night."
+        ]
+      )
     );
   }
+
+  if (intent === "social") {
+    const socialReplies = [
+      "Aight. Then we keep it fun, but not messy. Who's with you?",
+      "Okay, party mode energy. What's the setup — solo, crew, or meeting people?",
+      "Say less. Fun is fine — we just keep your exits clean and your people close.",
+      "I hear you. What's the move: pre-drink, club, bar, or just outside?",
+    ];
+
+    return shapeTone(pickNonRepeating(socialReplies));
+  }
+  if (intent === "uncertain") {
+    return shapeTone(
+      "That's okay. Don't force certainty. Give me the next smallest option you're considering."
+    );
+  }
+
+if (
+  twinSyncSnapshot.noSupport?.active &&
+  (
+    (trajectory.riskWindow as TrajectoryRiskWindow) === "approaching" ||
+    trajectory.riskWindow === "imminent" ||
+    desync.level === "separated"
+  )
+) {
+  return "You don't have strong support around you right now. Keep your next move simple and visible.";
+}
 
   // DRINKING
   if (live?.status === "Drinking" && (awarenessSignal?.score ?? 0) > 65) {
@@ -2768,11 +6365,12 @@ function generateTwinResponse({
   else if (awarenessSignal?.level === "guarded") contextRiskScore += 1;
 
   const riskWindow = trajectory.riskWindow as TrajectoryRiskWindow;
-const desyncLevel = twinSyncSnapshot.desync?.level as DesyncLevel;
-const driftLevel = drift as DriftLevel;
+  const driftLevel: DriftLevel = drift ?? "none";
+const desyncLevel: DesyncLevel =
+  twinSyncSnapshot.desync?.level ?? "synced";
 
-if (riskWindow === "imminent") contextRiskScore += 3;
-else if (riskWindow === "approaching") contextRiskScore += 1;
+  if (riskWindow === "imminent") contextRiskScore += 3;
+  else if (riskWindow === "approaching") contextRiskScore += 1;
 
 
   if (twinSyncSnapshot.noSupport?.active) contextRiskScore += 2;
@@ -2797,7 +6395,7 @@ else if (riskWindow === "approaching") contextRiskScore += 1;
   if (isDriveRisk && awarenessSignal?.level === "critical") contextRiskScore += 2;
 
   if (isAloneRisk && twinSyncSnapshot.noSupport?.active) contextRiskScore += 3;
-if (isAloneRisk && desyncLevel === "separated") contextRiskScore += 2;
+  if (isAloneRisk && (desyncLevel as DesyncLevel) === "separated") contextRiskScore += 2;
   if (isStrangerRisk && awarenessSignal?.level !== "low") contextRiskScore += 3;
 
   const riskReasons: string[] = [];
@@ -2811,11 +6409,11 @@ if (isAloneRisk && desyncLevel === "separated") contextRiskScore += 2;
   else if (awarenessSignal?.level === "guarded") riskReasons.push("already under pressure");
 
   if (twinSyncSnapshot.noSupport?.active) riskReasons.push("low on support");
-  if (desyncLevel === "separated") riskReasons.push("out of sync");
-else if (desyncLevel === "drifting") riskReasons.push("drifting");
+  if ((desyncLevel as DesyncLevel) === "separated") riskReasons.push("out of sync");
+  else if (desyncLevel === "drifting") riskReasons.push("drifting");
 
-if (driftLevel === "prolonged") riskReasons.push("elevated for a while");
-else if (driftLevel === "elevated") riskReasons.push("running above baseline");
+  if ((driftLevel as DriftLevel) === "prolonged") riskReasons.push("elevated for a while");
+  else if (driftLevel === "elevated") riskReasons.push("running above baseline");
 
   const uniqueRiskReasons = Array.from(new Set(riskReasons));
 
@@ -3101,8 +6699,17 @@ else if (driftLevel === "elevated") riskReasons.push("running above baseline");
 
   // MODE RESPONSE LAYER
   if (mode === "casual") {
+    const casualReplies = [
+      "I'm here. We don't have to solve anything yet—what's on your mind?",
+      "Hey. What's the energy like right now?",
+      "Good to see you back. What's going on?",
+      "I'm with you. What kind of night are we in?",
+      "You seem grounded right now. Talk to me.",
+      "Nothing urgent detected. What's up?",
+    ];
+
     return shapeTone(
-      "I'm here. We don't have to solve anything yet—what's on your mind?"
+      pickNonRepeating(casualReplies)
     );
   }
 
@@ -3155,12 +6762,12 @@ else if (driftLevel === "elevated") riskReasons.push("running above baseline");
           "That's enough input—don't add more. Follow through cleanly.",
           "Keep it simple and follow through.",
         ],
-        
+
       ),
       awareness
     );
   }
-  
+
 
   // ACTION LOCK
   if (contextText.includes("decision") || contextText.includes("decisions")) {
@@ -3192,7 +6799,7 @@ else if (driftLevel === "elevated") riskReasons.push("running above baseline");
       )
     );
   }
-}   
+}
 
 /* -------------------------
    ALERTS
@@ -3211,7 +6818,7 @@ function getAlert(
 ): string | null {
   if (!live?.active) return null;
 
-  if (trajectory.riskWindow === "imminent") {
+  if ((trajectory.riskWindow as TrajectoryRiskWindow) === "approaching") {
     return "⚠️ Your current pattern is trending toward a high-risk state. Interrupt it now.";
   }
 
@@ -3219,7 +6826,7 @@ function getAlert(
     return "⚠️ You are active without visible support around you. Keep your next move small and intentional.";
   }
 
-  if (desyncLevel === "separated") {
+  if ((desyncLevel as DesyncLevel) === "separated") {
     return "⚠️ You are out of sync with your crew. Reconnect now before the gap widens.";
   }
 
@@ -3310,13 +6917,13 @@ function getPredictiveSignals(
     return signals;
   }
 
-  if (trajectory.riskWindow === "imminent") {
+  if ((trajectory.riskWindow as TrajectoryRiskWindow) === "approaching") {
     signals.push({
       level: "red",
       title: "High-risk window opening",
       body: "Your current pace and pattern suggest a higher-risk state is about to compound.",
     });
-  } else if (trajectory.riskWindow === "approaching") {
+  } else if ((trajectory.riskWindow as TrajectoryRiskWindow) === "approaching") {
     signals.push({
       level: "orange",
       title: "Pressure building",
@@ -3324,7 +6931,7 @@ function getPredictiveSignals(
     });
   }
 
-  if (desyncLevel === "separated") {
+  if ((desyncLevel as DesyncLevel) === "separated") {
     signals.push({
       level: "red",
       title: "Crew separation detected",
@@ -3338,7 +6945,7 @@ function getPredictiveSignals(
     });
   }
 
-  if (driftLevel === "prolonged") {
+  if ((driftLevel as DriftLevel) === "prolonged") {
     signals.push({
       level: "orange",
       title: "Prolonged elevation",
@@ -3352,7 +6959,10 @@ function getPredictiveSignals(
     });
   }
 
-  if (noSupportActive) {
+  if (
+    noSupportActive &&
+    (driftLevel as DriftLevel) === "prolonged"
+  ) {
     signals.push({
       level: "orange",
       title: "Low support coverage",
@@ -3438,7 +7048,7 @@ function buildReply(
 TwinMe is reading the pattern, not just the moment.`;
   }
 
-  if (trajectory.riskWindow === "imminent") {
+  if ((trajectory.riskWindow as TrajectoryRiskWindow) === "approaching") {
     return `Your current pattern is heading toward a higher-risk state.
 
 • Interrupt the pace now
@@ -3448,7 +7058,7 @@ TwinMe is reading the pattern, not just the moment.`;
 The best move right now is the one that slows the pattern down.`;
   }
 
-  if (trajectory.riskWindow === "approaching") {
+  if ((trajectory.riskWindow as TrajectoryRiskWindow) === "approaching") {
     return `You are trending toward a more pressured state.
 
 • Get ahead of it early
@@ -3468,7 +7078,7 @@ The earlier you intervene, the easier this stays.`;
 I'm here with you — keep this moment steady.`;
   }
 
-  if (desyncLevel === "separated") {
+  if ((desyncLevel as DesyncLevel) === "separated") {
     return `You are out of sync with your crew right now.
 
 • Reconnect before doing anything extra
@@ -3595,15 +7205,15 @@ function applyConfidenceTone(
   crewCollapse: CrewCollapseInsight
 ) {
   const isProtective =
-    trajectory.riskWindow === "imminent" ||
-    desyncLevel === "separated" ||
-    driftLevel === "prolonged" ||
+    (trajectory.riskWindow as TrajectoryRiskWindow) === "approaching" ||
+    (desyncLevel as DesyncLevel) === "separated" ||
+    (driftLevel as DriftLevel) === "prolonged" ||
     noSupportActive ||
     crewCollapse.level === "collapsing" ||
     awareness.level === "critical";
 
-  const isFirm =
-    trajectory.riskWindow === "approaching" ||
+  const isFirm = 
+    (trajectory.riskWindow as TrajectoryRiskWindow) === "approaching"||
     desyncLevel === "drifting" ||
     driftLevel === "elevated" ||
     driftLevel === "rising" ||
@@ -3709,7 +7319,11 @@ function rephraseMessage(message: string) {
 }
 
 function makeMessageId() {
-  return crypto.randomUUID();
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+
+  return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 function getEscalationLevel(
@@ -3724,13 +7338,13 @@ function getEscalationLevel(
 ) {
   let score = 0;
 
-  if (trajectory.riskWindow === "imminent") score += 3;
-  else if (trajectory.riskWindow === "approaching") score += 2;
+  if ((trajectory.riskWindow as TrajectoryRiskWindow) === "approaching") score += 3;
+  else if ((trajectory.riskWindow as TrajectoryRiskWindow) === "approaching") score += 2;
 
-  if (desyncLevel === "separated") score += 3;
+  if ((desyncLevel as DesyncLevel) === "separated") score += 3;
   else if (desyncLevel === "drifting") score += 2;
 
-  if (driftLevel === "prolonged") score += 3;
+  if ((driftLevel as DriftLevel) === "prolonged") score += 3;
   else if (driftLevel === "elevated") score += 2;
 
   if (noSupportActive) score += 2;
@@ -3809,27 +7423,24 @@ function getPredictiveInterruption(
   environmentLevel: string,
   movementLevel: string
 ) {
+
   const isHighRisk =
-    trajectory.riskWindow === "imminent" ||
-    desyncLevel === "separated" ||
-    driftLevel === "prolonged" ||
-    noSupportActive;
+    (trajectory.riskWindow as TrajectoryRiskWindow) === "approaching" ||
+    (desyncLevel as DesyncLevel) === "separated" ||
+    (driftLevel as DriftLevel) === "prolonged" ||
+    awareness.level === "critical";
 
   if (!isHighRisk) return null;
 
-  if (trajectory.riskWindow === "imminent") {
+  if ((trajectory.riskWindow as TrajectoryRiskWindow) === "approaching") {
     return "Stop. Don't continue this path. Pause and reassess right now.";
   }
 
-  if (desyncLevel === "separated") {
+  if ((desyncLevel as DesyncLevel) === "separated") {
     return "You're out of sync. Do not keep moving forward like this.";
   }
 
-  if (noSupportActive) {
-    return "You're isolated right now. Don't make a risky move alone.";
-  }
-
-  if (driftLevel === "prolonged") {
+  if ((driftLevel as DriftLevel) === "prolonged") {
     return "You've been elevated too long. Stop and stabilize before anything else.";
   }
 
@@ -3879,12 +7490,20 @@ function getStateGuidance(
 
   let message: string | null = null;
 
-  if (trajectory.riskWindow === "imminent") {
+  if ((trajectory.riskWindow as TrajectoryRiskWindow) === "approaching") {
     message =
       escalation >= 3
         ? "Pause. Do not add anything right now. Stabilize first."
         : "Your pace is turning risky. Slow this moment down.";
-  } else if (noSupportActive) {
+  } else if (
+    noSupportActive &&
+    (
+      awareness.level === "critical" ||
+      (trajectory.riskWindow as TrajectoryRiskWindow) === "approaching" ||
+      (desyncLevel as DesyncLevel) === "separated" ||
+      (driftLevel as DriftLevel) === "prolonged"
+    )
+  ) {
     message =
       escalation >= 3
         ? "You do not have support around you right now. Stay visible and keep control of your next move."
@@ -3894,7 +7513,7 @@ function getStateGuidance(
       escalation >= 3
         ? "Your support layer has dropped away. Do not move like you still have coverage."
         : "Your group is slipping. Stay anchored before you move again.";
-  } else if (desyncLevel === "separated") {
+  } else if ((desyncLevel as DesyncLevel) === "separated") {
     message =
       escalation >= 3
         ? "You're out of sync. Reconnect before making another move."
@@ -3904,7 +7523,7 @@ function getStateGuidance(
       escalation >= 2
         ? "You're starting to drift. Correct it now while it's small."
         : "Small drift is building. Re-align early.";
-  } else if (driftLevel === "prolonged") {
+  } else if ((driftLevel as DriftLevel) === "prolonged") {
     message =
       escalation >= 3
         ? "You've been off pace for a while. Reset before deciding anything."
@@ -4007,10 +7626,10 @@ function getAdaptiveNextMove({
 
   const riskIsStacking =
     awareness.level === "critical" ||
-    trajectory.riskWindow === "imminent" ||
+    (trajectory.riskWindow as TrajectoryRiskWindow) === "approaching" ||
     crewCollapse.level === "collapsing" ||
-    desyncLevel === "separated" ||
-    noSupportActive ||
+    (desyncLevel as DesyncLevel) === "separated" ||
+    false ||
     environmentLevel === "unsafe";
 
   const userNeedsFirmness =
@@ -4032,26 +7651,26 @@ function getAdaptiveNextMove({
         : "calm";
 
   const nextRiskPrediction =
-    trajectory.riskWindow === "imminent"
+    (trajectory.riskWindow as TrajectoryRiskWindow) === "approaching"
       ? "Risk is already stacking. The next few minutes need to stay simple."
-      : trajectory.riskWindow === "approaching"
+      : (trajectory.riskWindow as TrajectoryRiskWindow) === "approaching"
         ? "Pressure is building. If the pace continues, risk will likely rise."
-        : driftLevel === "prolonged"
+        : (driftLevel as DriftLevel) === "prolonged"
           ? "You have been elevated for a while. A random move could make this harder to control."
           : noSupportActive
             ? "Support is thin. Moving without a clear plan could increase risk."
             : "Things are manageable if the next move stays intentional.";
 
   const guidanceReason =
-    desyncLevel === "separated"
+    (desyncLevel as DesyncLevel) === "separated"
       ? "you are out of sync with your crew"
       : noSupportActive
         ? "support is thin around you"
-        : driftLevel === "prolonged"
+        : (driftLevel as DriftLevel) === "prolonged"
           ? "your pace has been elevated for a while"
           : environmentLevel === "unsafe"
             ? "your environment is not stable"
-            : trajectory.riskWindow === "imminent"
+            : (trajectory.riskWindow as TrajectoryRiskWindow) === "approaching"
               ? "things are stacking quickly"
               : "this keeps your next move controlled";
 
@@ -4112,8 +7731,8 @@ function getAmbientTheme(
 ) {
   if (
     awarenessLevel === "critical" ||
-    desyncLevel === "separated" ||
-    trajectory.riskWindow === "imminent"
+    (desyncLevel as DesyncLevel) === "separated" ||
+    (trajectory.riskWindow as TrajectoryRiskWindow) === "approaching"
   ) {
     return {
       pageBg:
@@ -4129,7 +7748,7 @@ function getAmbientTheme(
 
   if (
     awarenessLevel === "elevated" ||
-    driftLevel === "prolonged" ||
+    (driftLevel as DriftLevel) === "prolonged" ||
     noSupportActive ||
     environmentLevel === "volatile"
   ) {
@@ -4235,19 +7854,22 @@ function getAutoVoiceMessage(
   const firstAction =
     microGuidance?.actions?.[0] ?? "Keep your next move simple.";
 
-  if (trajectory.riskWindow === "imminent") {
+  if ((trajectory.riskWindow as TrajectoryRiskWindow) === "approaching") {
     return "Pause. Things are stacking. Slow your next move down.";
   }
 
-  if (noSupportActive) {
+  if (
+    noSupportActive &&
+    (driftLevel as DriftLevel) === "prolonged"
+  ) {
     return "Support is thin right now. Stay visible and keep it simple.";
   }
 
-  if (desyncLevel === "separated") {
+  if ((desyncLevel as DesyncLevel) === "separated") {
     return "You're out of sync. Reconnect before moving.";
   }
 
-  if (driftLevel === "prolonged") {
+  if ((driftLevel as DriftLevel) === "prolonged") {
     return "You've been elevated for a while. Slow this down.";
   }
 
@@ -4256,81 +7878,142 @@ function getAutoVoiceMessage(
   }
 
   return firstAction;
- }
+}
 
 /* -------------------------
    COMPONENT
 --------------------------*/
+const CONVERSATION_STATE_KEY =
+  "twincore_conversation_state";
+
+function loadConversationState(): ConversationState {
+  if (typeof window === "undefined") {
+    return {
+      emotionalMomentum: "stable",
+    };
+  }
+
+  try {
+    const raw = localStorage.getItem(
+      CONVERSATION_STATE_KEY
+    );
+
+    if (!raw) {
+      return {
+        emotionalMomentum: "stable",
+      };
+    }
+
+    return JSON.parse(raw);
+  } catch {
+    return {
+      emotionalMomentum: "stable",
+    };
+  }
+}
+
+function saveConversationState(
+  state: ConversationState
+) {
+  if (typeof window === "undefined") return;
+
+  try {
+    localStorage.setItem(
+      CONVERSATION_STATE_KEY,
+      JSON.stringify(state)
+    );
+  } catch {}
+}
+
 export default function TwinMePage() {
-  
+
   const [displayName, setDisplayName] = useState("Neo");
-  
+
+  const [identityPreferences, setIdentityPreferences] =
+    useState<TwinIdentityPreferences>({
+      name: "Neo",
+      pronouns: "custom",
+      customPronouns: "",
+      genderIdentity: "",
+      voiceStyle: "balanced",
+    });
   const [live, setLive] = useState<PartyLive | null>(null);
- 
+
   const [crew, setCrew] = useState<CrewStatus[]>([]);
 
   const lastTwinReplyRef = useRef<string | null>(null);
-  
-  const lastUserIntentRef = useRef<string | null>(null);
-  
+
+  const conversationStateRef = useRef<ConversationState>({
+  emotionalMomentum: "stable",
+});
+
+useEffect(() => {
+  conversationStateRef.current =
+    loadConversationState();
+}, []);
+
+const lastUserIntentRef = useRef<string | null>(null);
+
   const [spots, setSpots] = useState<SpotsSnapshot | null>(null);
-  
+
   const [history, setHistory] = useState<PositionPoint[]>([]);
-  
+
   const [messages, setMessages] = useState<Message[]>([]);
-  
+
   const lastUserMessageTimeRef = useRef<number>(Date.now());
 
   const lastTwinMessageTimeRef = useRef<number>(0);
 
-const lastPredictiveNudgeRef = useRef<number>(0);
+  const lastPredictiveNudgeRef = useRef<number>(0);
 
-const lastPredictiveMessageRef = useRef<string | null>(null);
+  const lastPredictiveMessageRef = useRef<string | null>(null);
 
-const predictiveEscalationRef = useRef<number>(0);
+  const predictiveEscalationRef = useRef<number>(0);
 
-const lastPredictiveRiskRef = useRef<string | null>(null);
+  const lastPredictiveRiskRef = useRef<string | null>(null);
 
-const lastPassiveInterventionRef = useRef<number>(0);
+  const lastPassiveInterventionRef = useRef<number>(0);
 
-const lastAutonomousMessageRef = useRef<string | null>(null);
+  const lastAutonomousMessageRef = useRef<string | null>(null);
 
-const lastEcosystemSignalRef = useRef<string | null>(null);
+  const lastAutonomousReasonRef = useRef<string | null>(null);
 
-const lastEcosystemSyncAtRef = useRef<number>(0);
+  const lastEcosystemSignalRef = useRef<string | null>(null);
 
-const passiveReasonCountsRef = useRef<Record<string, number>>({});
+  const lastEcosystemSyncAtRef = useRef<number>(0);
 
-const interventionCountsRef = useRef<Record<string, number>>({});
+  const passiveReasonCountsRef = useRef<Record<string, number>>({});
 
-const twinMemoryRef = useRef(getInitialTwinMemory());
+  const interventionCountsRef = useRef<Record<string, number>>({});
 
-const [subscriptionState, setSubscriptionState] =
-  useState(getSubscriptionState()); 
- 
+  const twinMemoryRef = useRef(getInitialTwinMemory());
+
+  const [subscriptionState, setSubscriptionState] =
+    useState(getSubscriptionState());
+
   const hasFullAccess =
-  hasFullTwinCoreAccess(subscriptionState);
+    hasFullTwinCoreAccess(subscriptionState);
 
-const predictiveAccess = canAccessFeature(
-  subscriptionState,
-  "predictive_guidance"
-);
+  const predictiveAccess = canAccessFeature(
+    subscriptionState,
+    "predictive_guidance"
+  );
 
-const passiveAccess = canAccessFeature(
-  subscriptionState,
-  "passive_awareness"
-);
+  const passiveAccess = canAccessFeature(
+    subscriptionState,
+    "passive_awareness"
+  );
 
-const voiceAccess = canAccessFeature(
-  subscriptionState,
-  "hands_free_voice"
-);
+  const voiceAccess = canAccessFeature(
+    subscriptionState,
+    "hands_free_voice"
+  );
   const [input, setInput] = useState("");
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [voiceOutputEnabled, setVoiceOutputEnabled] = useState(true);
   const [showUpgradePrompt, setShowUpgradePrompt] =
-  useState(false);
+    useState(false);
   const [handsFreeEnabled, setHandsFreeEnabled] = useState(false);
   const handsFreeRef = useRef(false);
   const [voiceSupported, setVoiceSupported] = useState(true);
@@ -4350,15 +8033,72 @@ const voiceAccess = canAccessFeature(
   const lastAutoStateRef = useRef<string | null>(null);
   const autoMessageTimeoutRef = useRef<number | null>(null);
   const lastInterruptionRef = useRef<string | null>(null);
+  
+const environmentLevel = useMemo(() => getEnvironmentInsight(spots), [spots]);
+
+const exitState: ExitState | null = null;
 
   const twinSnapshot: TwinContextSnapshot = useMemo(
     () => ({
-      party: live,
-      crew,
-      spots: [],
-      exitState: null,
-    }),
-    [live, crew]
+  party: live, crew,
+  spots:
+    spots?.selectedName
+      ? [
+          {
+            name: spots.selectedName,
+            energy:
+              spots.selectedTone === "lit"
+                ? 85
+                : spots.selectedTone === "risk"
+                ? 70
+                : 45,
+
+            crowdedness:
+              (spots.nearbyCount ?? 0) >= 8
+                ? "high"
+                : (spots.nearbyCount ?? 0) >= 4
+                ? "medium"
+                : "low",
+
+            safetyTone:
+              spots.selectedTone === "risk"
+                ? "risky"
+                : spots.selectedTone === "safe"
+                ? "safe"
+                : "mixed",
+
+            isNearby: true,
+          },
+        ]
+      : [],
+
+  exitState,
+
+  environment: {
+    level: environmentLevel,
+    selectedName: spots?.selectedName ?? null,
+    selectedTone: spots?.selectedTone ?? null,
+    nearbyCount: spots?.nearbyCount ?? 0,
+    safeCount: spots?.safeCount ?? 0,
+    riskCount: spots?.riskCount ?? 0,
+    hotspotCount: spots?.hotspotCount ?? 0,
+    trustedVisibleCount: spots?.trustedVisibleCount ?? 0,
+  },
+
+  commercial: {
+    activeEvents: 0,
+    promotedEvents: 0,
+    trendingVenueName: null,
+    momentumLevel:
+      environmentLevel === "unsafe"
+        ? "high"
+        : environmentLevel === "volatile"
+        ? "medium"
+        : "low",
+  },
+}) ,
+[live, crew, spots, exitState, environmentLevel]
+
   );
 
   const twinSignals = useMemo(
@@ -4385,43 +8125,43 @@ const voiceAccess = canAccessFeature(
   }, []);
 
   useEffect(() => {
-  const loadSubscription = async () => {
-    const supabaseState = await getUserSubscriptionFromSupabase();
+    const loadSubscription = async () => {
+      const supabaseState = await getUserSubscriptionFromSupabase();
 
-    if (supabaseState.status === "active") {
-      setSubscriptionState(supabaseState);
-      return;
-    }
+      if (supabaseState.status === "active") {
+        setSubscriptionState(supabaseState);
+        return;
+      }
 
-    setSubscriptionState(getSubscriptionState());
-  };
+      setSubscriptionState(getSubscriptionState());
+    };
 
-  loadSubscription();
-}, []);
-
-useEffect(() => {
-  if (typeof window === "undefined") return;
-
-  const params = new URLSearchParams(window.location.search);
-
-  const checkoutStatus = params.get("checkout");
-
-  if (checkoutStatus !== "success") return;
-
-  activateLocalPremium();
-
-  window.history.replaceState(
-    {},
-    "",
-    "/twinme"
-  );
-}, []);
+    loadSubscription();
+  }, []);
 
   useEffect(() => {
-  handsFreeRef.current = handsFreeEnabled;
+    if (typeof window === "undefined") return;
+
+    const params = new URLSearchParams(window.location.search);
+
+    const checkoutStatus = params.get("checkout");
+
+    if (checkoutStatus !== "success") return;
+
+    activateLocalPremium();
+
+    window.history.replaceState(
+      {},
+      "",
+      "/twinme"
+    );
+  }, []);
+
+  useEffect(() => {
+    handsFreeRef.current = handsFreeEnabled;
   }, [handsFreeEnabled]);
 
-  
+
 
   useEffect(() => {
     const name = getDisplayName();
@@ -4458,9 +8198,6 @@ useEffect(() => {
   const minutes = useMemo(() => getMinutesActive(live), [live]);
   const crewLevel = useMemo(() => getCrewInsight(crew), [crew]);
   const movementLevel = useMemo(() => getMovementInsight(history), [history]);
-  const environmentLevel = useMemo(() => getEnvironmentInsight(spots), [spots]);
-
-  const exitState: ExitState | null = null;
 
   const twinSyncSnapshot: TwinSyncSnapshot = useMemo(
     () =>
@@ -4492,7 +8229,7 @@ useEffect(() => {
         twinSyncSnapshot.desync?.level,
         drift.level
       ),
-    [live, minutes, movementLevel, twinSyncSnapshot.desync?.level, drift.level]
+    [live, minutes, movementLevel, twinSyncSnapshot.desync?.level, drift]
   );
 
   const noSupport = useMemo(
@@ -4513,13 +8250,13 @@ useEffect(() => {
   const learnMe = useMemo(
     () =>
       getLearnMeInsight(
-        learningProfile?? null,
+        learningProfile ?? null,
         live,
         minutes,
         trajectory,
         drift.level
       ),
-    [learningProfile, live, minutes, trajectory, drift.level]
+    [learningProfile, live, minutes, trajectory, drift]
   );
 
   const crewCollapse = useMemo(
@@ -4659,9 +8396,9 @@ useEffect(() => {
     if (awareness.level === "critical") score += 3;
     else if (awareness.level === "elevated") score += 2;
 
-    if (trajectory.riskWindow === "imminent") score += 3;
-    if (driftLevel === "prolonged") score += 2;
-    if (desyncLevel === "separated") score += 2;
+    if ((trajectory.riskWindow as TrajectoryRiskWindow) === "approaching") score += 3;
+    if ((driftLevel as DriftLevel) === "prolonged") score += 2;
+    if ((desyncLevel as DesyncLevel) === "separated") score += 2;
     if (noSupportActive) score += 2;
 
     if (profile.decisiveness <= -2) score += 1;
@@ -4685,7 +8422,7 @@ useEffect(() => {
       ].join("|");
 
       const isHighRisk =
-        trajectory.riskWindow === "imminent" ||
+        (trajectory.riskWindow as TrajectoryRiskWindow) === "approaching" ||
         twinSyncSnapshot.noSupport?.active ||
         twinSyncSnapshot.desync?.level === "separated" ||
         drift.level === "prolonged" ||
@@ -4707,6 +8444,43 @@ useEffect(() => {
 
       const profile = getPersistentProfile();
 
+      const CONVERSATION_STATE_KEY = "twincore_conversation_state";
+
+function loadConversationState(): ConversationState {
+  if (typeof window === "undefined") {
+    return {
+      emotionalMomentum: "stable",
+    };
+  }
+
+  try {
+    const raw = localStorage.getItem(CONVERSATION_STATE_KEY);
+
+    if (!raw) {
+      return {
+        emotionalMomentum: "stable",
+      };
+    }
+
+    return JSON.parse(raw);
+  } catch {
+    return {
+      emotionalMomentum: "stable",
+    };
+  }
+}
+
+function saveConversationState(state: ConversationState) {
+  if (typeof window === "undefined") return;
+
+  try {
+    localStorage.setItem(
+      CONVERSATION_STATE_KEY,
+      JSON.stringify(state)
+    );
+  } catch {}
+}
+
       const predictionConfidence = getPredictionConfidence({
         awareness,
         trajectory,
@@ -4727,19 +8501,56 @@ useEffect(() => {
         desyncLevel: twinSyncSnapshot.desync?.level,
       });
 
+      const recentConversation =
+        Date.now() - lastTwinMessageTimeRef.current < 45000;
+
+      const lastUserText =
+        messages
+          .slice()
+          .reverse()
+          .find((m) => m.role === "user")?.text?.trim().toLowerCase() || "";
+
+      const intent = getConversationIntent(lastUserText);
+
+      let passiveInterventionTriggered = false;
+
+      const activeConversationState =
+        recentConversation ||
+        intent === "casual" ||
+        intent === "social" ||
+        intent === "uncertain";
+
+      if (
+        activeConversationState &&
+        trajectory.riskWindow !== "imminent" &&
+        drift.level !== "prolonged" &&
+        twinSyncSnapshot.desync?.level !== "separated"
+      ) {
+        return;
+      }
+
       const nudge =
-        preTypePrediction ??
-        getPredictiveNudge({
-          awareness,
-          driftLevel: drift.level,
-          desyncLevel: twinSyncSnapshot.desync?.level,
-          noSupportActive: twinSyncSnapshot.noSupport?.active,
-          trajectory,
-          lastUserMessageTime: lastUserMessageTimeRef.current,
-        });
+        activeConversationState &&
+          trajectory.riskWindow !== "imminent" &&
+          drift.level !== "prolonged" &&
+          twinSyncSnapshot.desync?.level !== "separated"
+          ? null
+          : (
+            preTypePrediction ??
+            getPredictiveNudge({
+              awareness,
+              driftLevel: drift.level,
+              desyncLevel: twinSyncSnapshot.desync?.level,
+              noSupportActive: twinSyncSnapshot.noSupport?.active,
+              trajectory,
+              lastUserMessageTime: lastUserMessageTimeRef.current,
+            })
+          );
 
       // ✅ FIRST: no nudge → exit early
       if (!nudge) return;
+
+      passiveInterventionTriggered = true;
 
       const lastUser = messages
         .slice()
@@ -4856,21 +8667,21 @@ useEffect(() => {
     lastAutoStateRef.current = stateKey;
 
     const message = getAutoVoiceMessage(
-  live,
-  awareness,
-  twinSyncSnapshot.desync?.level,
-  drift.level,
-  twinSyncSnapshot.noSupport?.active,
-  trajectory,
-  microGuidance,
-  crewCollapse
-);
+      live,
+      awareness,
+      twinSyncSnapshot.desync?.level,
+      drift.level,
+      twinSyncSnapshot.noSupport?.active,
+      trajectory,
+      microGuidance,
+      crewCollapse
+    );
 
     if (!message) return;
 
     const finalAutoMessage = message;
     const isUrgent =
-      trajectory.riskWindow === "imminent" ||
+     (trajectory.riskWindow as TrajectoryRiskWindow) === "approaching" ||
       twinSyncSnapshot.desync?.level === "separated" ||
       drift.level === "prolonged" ||
       crewCollapse.level === "collapsing";
@@ -5102,6 +8913,39 @@ useEffect(() => {
 
       const repeatCount = passiveReasonCountsRef.current[interventionKey] - 1;
 
+      let passiveInterventionTriggered = false;
+
+      const recentText =
+        lastUserMessage?.text?.trim().toLowerCase() || "";
+
+      const intent = getConversationIntent(recentText);
+
+      const casualEnergy =
+        intent === "casual" ||
+        recentText.includes("party time") ||
+        recentText.includes("you tell me") ||
+        recentText.includes("nothing") ||
+        recentText.includes("chilling") ||
+        recentText.includes("vibing");
+
+      if (
+        casualEnergy &&
+        awareness.level === "low"
+      ) {
+        lastPassiveInterventionRef.current = now + 1000 * 60 * 10;
+        return;
+      }
+      const socialOrCasual =
+        intent === "casual" ||
+        intent === "social";
+
+      if (
+        socialOrCasual &&
+        awareness.level === "low"
+      ) {
+        return;
+      }
+
       const autonomyDecision = decideAutonomousIntervention({
         now,
         lastUserMessageAt: lastUserMessageTimeRef.current,
@@ -5120,7 +8964,10 @@ useEffect(() => {
         recentReason: result.reason,
       });
 
-      if (!autonomyDecision.shouldIntervene) return;
+      if (
+        passiveInterventionTriggered ||
+        !autonomyDecision.shouldIntervene
+      ) return;
 
       const intervention = shapeIntervention({
         reason: result.reason === "none" || result.reason === "silence" ? "loop" : result.reason,
@@ -5133,7 +8980,17 @@ useEffect(() => {
         isPartyActive: live?.active,
       });
 
-      if (lastAutonomousMessageRef.current === intervention.message) return;
+      if (
+        lastAutonomousReasonRef.current === result.reason
+      ) {
+        return;
+      }
+
+      lastAutonomousReasonRef.current = result.reason;
+
+      passiveInterventionTriggered = true;
+
+
 
       const twinMessage: Message = {
         id: makeMessageId(),
@@ -5201,8 +9058,8 @@ useEffect(() => {
         syncEvent.urgency === "urgent"
           ? 45 * 1000
           : syncEvent.urgency === "elevated"
-          ? 90 * 1000
-          : 3 * 60 * 1000;
+            ? 90 * 1000
+            : 3 * 60 * 1000;
 
       if (now - lastEcosystemSyncAtRef.current < cooldownMs) return;
 
@@ -5299,13 +9156,16 @@ useEffect(() => {
     const isRepeatIntent = isSpotRequest && (isExactRepeat || isLooseRepeat);
 
     if (isRepeatIntent) {
-      const loopReply =
-        "You're circling. Pick Neo or open Spots and choose one. Don’t stay stuck here.";
+       const loopReplies = [
+  "You've been circling the same detached energy for a while now. Pick one: grounding, support, or change the environment.",
+  "This is a loop now. Do not solve everything — choose the next safe move only.",
+  "You keep giving low-commitment answers. That usually means you need clarity before momentum makes the choice for you.",
+  "Pause. Your pattern is repeating. Name what you need next: space, support, food, water, home, or a safer spot.",
+];
 
       setMessages((prev) => [
         ...prev,
         { id: crypto.randomUUID(), role: "user", text: trimmed },
-        { id: crypto.randomUUID(), role: "twin", text: loopReply },
       ]);
 
       setInput("");
@@ -5343,15 +9203,22 @@ useEffect(() => {
 
     try {
 
-   const lowerTrimmed = trimmed.toLowerCase();
+      const lowerTrimmed = trimmed.toLowerCase();
 
-   const memoryUpdate = updateTwinMemoryState({
-    now: Date.now(),
-    userText: trimmed,
-    previous: twinMemoryRef.current,
-});
+      const isLowRiskConversation =
+        isSimpleGreeting(trimmed) ||
+        lowerTrimmed.includes("nothing") ||
+        lowerTrimmed.includes("just chilling") ||
+        lowerTrimmed.includes("nm") ||
+        lowerTrimmed.includes("not much");
 
-twinMemoryRef.current = memoryUpdate.memory;
+      const memoryUpdate = updateTwinMemoryState({
+        now: Date.now(),
+        userText: trimmed,
+        previous: twinMemoryRef.current,
+      });
+
+      twinMemoryRef.current = memoryUpdate.memory;
 
       let twinText = generateTwinResponse({
         input: trimmed,
@@ -5368,15 +9235,15 @@ twinMemoryRef.current = memoryUpdate.memory;
         crewCollapse,
         spots,
       });
-      
-      if (
-  memoryUpdate.shouldCarryForward &&
-  memoryUpdate.carryForwardMessage
-) {
-  twinText = `${memoryUpdate.carryForwardMessage}\n\n${twinText}`;
-}
 
-    
+      if (
+        memoryUpdate.shouldCarryForward &&
+        memoryUpdate.carryForwardMessage
+      ) {
+        twinText = `${memoryUpdate.carryForwardMessage}\n\n${twinText}`;
+      }
+
+
 
       const isDecisionLocked = detectDecisionLockIn(lowerTrimmed);
 
@@ -5387,17 +9254,17 @@ twinMemoryRef.current = memoryUpdate.memory;
       ) {
         window.__twinMemoryCount = 0;
       }
-      
- if (
-  lowerTrimmed.includes("i will") ||
-  lowerTrimmed.includes("i'm going to") ||
-  lowerTrimmed.includes("im going to") ||
-  lowerTrimmed.includes("i decided") ||
-  lowerTrimmed.includes("i choose")
-) {
-  interventionCountsRef.current = {};
-  passiveReasonCountsRef.current = {};
-}
+
+      if (
+        lowerTrimmed.includes("i will") ||
+        lowerTrimmed.includes("i'm going to") ||
+        lowerTrimmed.includes("im going to") ||
+        lowerTrimmed.includes("i decided") ||
+        lowerTrimmed.includes("i choose")
+      ) {
+        interventionCountsRef.current = {};
+        passiveReasonCountsRef.current = {};
+      }
 
       const counts = getPersistentCounts();
 
@@ -5460,11 +9327,11 @@ twinMemoryRef.current = memoryUpdate.memory;
         lowerTrimmed.includes("no plan");
 
       const soundsLikeIsolation =
-  lowerTrimmed.includes("alone") ||
-  lowerTrimmed.includes("by myself") ||
-  lowerTrimmed.includes("go alone") ||
-  lowerTrimmed.includes("leave alone") ||
-  lowerTrimmed.includes("walk alone");
+        lowerTrimmed.includes("alone") ||
+        lowerTrimmed.includes("by myself") ||
+        lowerTrimmed.includes("go alone") ||
+        lowerTrimmed.includes("leave alone") ||
+        lowerTrimmed.includes("walk alone");
 
       const soundsLikeRiskyMove =
         lowerTrimmed.includes("somewhere new") ||
@@ -5607,8 +9474,9 @@ twinMemoryRef.current = memoryUpdate.memory;
       if (isPreRiskIntent) {
         const convo = window.__twinConversationProfile || {};
 
-        const driftLevel = drift?.level;
-        const desyncLevel = twinSyncSnapshot.desync?.level;
+        const driftLevel: DriftLevel = drift.level ?? "none";
+        const desyncLevel: DesyncLevel =
+  twinSyncSnapshot.desync?.level ?? "synced";
         const noSupportActive = twinSyncSnapshot.noSupport?.active;
 
         const adaptiveUserProfile = window.__twinUserProfile || {
@@ -5633,86 +9501,86 @@ twinMemoryRef.current = memoryUpdate.memory;
         let preRiskReply = "";
 
         if (soundsLikeDrift) {
-  const interventionKey = "drift";
+          const interventionKey = "drift";
 
-  interventionCountsRef.current[interventionKey] =
-    (interventionCountsRef.current[interventionKey] || 0) + 1;
+          interventionCountsRef.current[interventionKey] =
+            (interventionCountsRef.current[interventionKey] || 0) + 1;
 
-  const repeatCount =
-    interventionCountsRef.current[interventionKey] - 1;
+          const repeatCount =
+            interventionCountsRef.current[interventionKey] - 1;
 
-  const baseMessage =
-    convo.indecisionCount > 2
-      ? `You've been uncertain for a few steps now. If you move without a destination, you'll drift fast. Pick something controlled like ${adaptiveMove.safestChoice} before you move.`
-      : `If you move without a destination right now, you'll drift. Choose ${adaptiveMove.safestChoice} or something equally controlled before you move.`;
+          const baseMessage =
+            convo.indecisionCount > 2
+              ? `You've been uncertain for a few steps now. If you move without a destination, you'll drift fast. Pick something controlled like ${adaptiveMove.safestChoice} before you move.`
+              : `If you move without a destination right now, you'll drift. Choose ${adaptiveMove.safestChoice} or something equally controlled before you move.`;
 
-  const intervention = shapeIntervention({
-    reason: "drift",
-    baseMessage,
-    repeatCount,
-    awarenessLevel: awareness.level,
-    driftLevel,
-    desyncLevel,
-    noSupportActive,
-    isPartyActive: live?.active,
-  });
+          const intervention = shapeIntervention({
+            reason: "drift",
+            baseMessage,
+            repeatCount,
+            awarenessLevel: awareness.level,
+            driftLevel,
+            desyncLevel,
+            noSupportActive,
+            isPartyActive: live?.active,
+          });
 
-  preRiskReply = intervention.message;
-}
+          preRiskReply = intervention.message;
+        }
 
-       if (soundsLikeIsolation) {
-  const interventionKey = "isolation";
+        if (soundsLikeIsolation) {
+          const interventionKey = "isolation";
 
-  interventionCountsRef.current[interventionKey] =
-    (interventionCountsRef.current[interventionKey] || 0) + 1;
+          interventionCountsRef.current[interventionKey] =
+            (interventionCountsRef.current[interventionKey] || 0) + 1;
 
-  const repeatCount = interventionCountsRef.current[interventionKey] - 1;
+          const repeatCount = interventionCountsRef.current[interventionKey] - 1;
 
-  const baseMessage =
-    adaptiveMove.toneMode === "protective"
-      ? `Being alone right now reduces your safety margin. Stay connected or move somewhere visible and controlled like ${adaptiveMove.safestChoice}.`
-      : `Going alone makes things less predictable. Stay somewhere visible or connected.`;
+          const baseMessage =
+            adaptiveMove.toneMode === "protective"
+              ? `Being alone right now reduces your safety margin. Stay connected or move somewhere visible and controlled like ${adaptiveMove.safestChoice}.`
+              : `Going alone makes things less predictable. Stay somewhere visible or connected.`;
 
-  const intervention = shapeIntervention({
-    reason: "isolation",
-    baseMessage,
-    repeatCount,
-    awarenessLevel: awareness.level,
-    driftLevel,
-    desyncLevel,
-    noSupportActive,
-    isPartyActive: live?.active,
-  });
+          const intervention = shapeIntervention({
+            reason: "isolation",
+            baseMessage,
+            repeatCount,
+            awarenessLevel: awareness.level,
+            driftLevel,
+            desyncLevel,
+            noSupportActive,
+            isPartyActive: live?.active,
+          });
 
-  preRiskReply = intervention.message;
-}
+          preRiskReply = intervention.message;
+        }
 
-       if (soundsLikeRiskyMove) {
-  const interventionKey = "risk";
+        if (soundsLikeRiskyMove) {
+          const interventionKey = "risk";
 
-  interventionCountsRef.current[interventionKey] =
-    (interventionCountsRef.current[interventionKey] || 0) + 1;
+          interventionCountsRef.current[interventionKey] =
+            (interventionCountsRef.current[interventionKey] || 0) + 1;
 
-  const repeatCount = interventionCountsRef.current[interventionKey] - 1;
+          const repeatCount = interventionCountsRef.current[interventionKey] - 1;
 
-  const baseMessage =
-    adaptiveMove.toneMode === "protective"
-      ? `You're about to add unpredictability. A new spot right now will make things harder to control. Stay with ${adaptiveMove.safestChoice} or something equally familiar and easy to leave from.`
-      : `A new spot adds risk right now. Keep it familiar, visible, and easy to exit.`;
+          const baseMessage =
+            adaptiveMove.toneMode === "protective"
+              ? `You're about to add unpredictability. A new spot right now will make things harder to control. Stay with ${adaptiveMove.safestChoice} or something equally familiar and easy to leave from.`
+              : `A new spot adds risk right now. Keep it familiar, visible, and easy to exit.`;
 
-  const intervention = shapeIntervention({
-    reason: "risk",
-    baseMessage,
-    repeatCount,
-    awarenessLevel: awareness.level,
-    driftLevel,
-    desyncLevel,
-    noSupportActive,
-    isPartyActive: live?.active,
-  });
+          const intervention = shapeIntervention({
+            reason: "risk",
+            baseMessage,
+            repeatCount,
+            awarenessLevel: awareness.level,
+            driftLevel,
+            desyncLevel,
+            noSupportActive,
+            isPartyActive: live?.active,
+          });
 
-  preRiskReply = intervention.message;
-}
+          preRiskReply = intervention.message;
+        }
 
         const guidance = window.__twinGuidanceState || {};
 
@@ -5790,18 +9658,19 @@ twinMemoryRef.current = memoryUpdate.memory;
         const hasSafeOption = (spots?.safeCount ?? 0) > 0;
         const hasBackupOption = (spots?.nearbyCount ?? 0) > 1;
 
-        const driftLevel = drift?.level;
-        const desyncLevel = twinSyncSnapshot.desync?.level;
+        const driftLevel: DriftLevel = drift.level ?? "none";
+        const desyncLevel: DesyncLevel =
+  twinSyncSnapshot.desync?.level ?? "synced";
         const noSupportActive = twinSyncSnapshot.noSupport?.active;
 
         const localToneMode =
           awareness.level === "critical" ||
-            trajectory.riskWindow === "imminent" ||
+            (trajectory.riskWindow as TrajectoryRiskWindow) === "approaching"||
             noSupportActive
             ? "protective"
             : awareness.level === "elevated" ||
-              driftLevel === "prolonged" ||
-              desyncLevel === "separated"
+              drift.level === "prolonged" ||
+              twinSyncSnapshot.desync?.level === "separated"
               ? "direct"
               : "calm";
 
@@ -5811,11 +9680,18 @@ twinMemoryRef.current = memoryUpdate.memory;
 
         if (awareness.level === "critical") {
           contextPrefix = "Things are stacking right now. ";
-        } else if (driftLevel === "prolonged") {
+        } else if ((driftLevel as DriftLevel) === "prolonged") {
           contextPrefix = "You've been elevated for a while. ";
-        } else if (desyncLevel === "separated") {
+        } else if ((desyncLevel as DesyncLevel) === "separated") {
           contextPrefix = "You're out of sync with your crew. ";
-        } else if (noSupportActive) {
+        } else if (
+          noSupportActive &&
+          (
+            (trajectory.riskWindow as TrajectoryRiskWindow) === "approaching" ||
+            (driftLevel as DriftLevel) === "prolonged" ||
+            (desyncLevel as DesyncLevel) === "separated"
+          )
+        ) {
           contextPrefix = "Support is thin around you. ";
         }
 
@@ -5976,144 +9852,133 @@ twinMemoryRef.current = memoryUpdate.memory;
         ].slice(-20)
       );
 
-       speak(`Error: ${errorText}`);
+      speak(`Error: ${errorText}`);
 
       lastTwinMessageTimeRef.current = Date.now();
-        } finally {
+    } finally {
       setIsThinking(false);
     }
-  }
-
- useEffect(() => {
-  if (typeof window === "undefined") return;
-
-  const Recognition =
-    window.SpeechRecognition || window.webkitSpeechRecognition;
-
-  if (!Recognition) {
-  setVoiceSupported(false);
-
-  const userAgent = window.navigator.userAgent.toLowerCase();
-
-  if (userAgent.includes("firefox")) {
-    setBrowserName("Firefox");
-  } else if (userAgent.includes("safari") && !userAgent.includes("chrome")) {
-    setBrowserName("Safari");
-  } else {
-    setBrowserName("this browser");
-  }
-
-  return;
-}
-
-  const recognition = new Recognition();
-  recognition.continuous = true;
-  recognition.interimResults = false;
-  recognition.lang = "en-US";
-
-  recognition.onstart = () => setIsListening(true);
-  
-  recognition.onerror = () => setIsListening(false);
-
-recognition.onend = () => {
-  setIsListening(false);
-
-  if (handsFreeRef.current && recognitionRef.current) {
-    setTimeout(() => {
-      try {
-        recognitionRef.current?.start();
-      } catch {
-        // ignore repeated start errors
-      }
-    }, 600);
-  }
-};
-
-recognition.onresult = (event) => {
-  const transcript =
-    event.results?.[event.resultIndex]?.[0]?.transcript?.trim() || "";
-
-  console.log("🎤 heard:", transcript);
-
-  if (!transcript) return;
-
-  setInput(transcript);
-
-  const lowered = transcript.toLowerCase();
-
-  if (handsFreeRef.current) {
-  console.log("🤖 hands-free sending:", transcript);
-
-  setTimeout(() => {
-    handleSend(transcript);
-  }, 100);
-
-  return;
-}
-
-  if (
-    lowered.includes("state check") ||
-    lowered.includes("check me") ||
-    lowered.startsWith("twin")
-  ) {
-    handleSend(transcript);
-  }
-};
-
-  recognitionRef.current = recognition;
-
-  return () => {
-    recognition.stop();
   };
-}, []);
 
-function speak(text: string) {
-  if (typeof window === "undefined") return;
-  if (!voiceOutputEnabled) return;
+  useEffect(() => {
+    if (typeof window === "undefined") return;
 
-  const synth = window.speechSynthesis;
-  if (!synth) return;
+    const Recognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
 
-  const utterance = new SpeechSynthesisUtterance(text);
+    if (!Recognition) {
+      setVoiceSupported(false);
 
-  utterance.rate = 1;
-  utterance.pitch = 1;
-  utterance.volume = 1;
+      const userAgent = window.navigator.userAgent.toLowerCase();
 
-  synth.cancel();
-  synth.speak(utterance);
-}
+      if (userAgent.includes("firefox")) {
+        setBrowserName("Firefox");
+      } else if (userAgent.includes("safari") && !userAgent.includes("chrome")) {
+        setBrowserName("Safari");
+      } else {
+        setBrowserName("this browser");
+      }
 
-    function toggleListening() {
-      const recognition = recognitionRef.current;
-      if (!recognition) return;
+      return;
+    }
 
-      if (isListening) {
-        recognition.stop();
+    const recognition = new Recognition();
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.lang = "en-US";
+
+    recognition.onstart = () => setIsListening(true);
+
+    recognition.onerror = () => setIsListening(false);
+
+    recognition.onend = () => {
+      setIsListening(false);
+
+      if (handsFreeRef.current && recognitionRef.current) {
+        setTimeout(() => {
+          try {
+            recognitionRef.current?.start();
+          } catch {
+            // ignore repeated start errors
+          }
+        }, 600);
+      }
+    };
+
+    recognition.onresult = (event) => {
+      const transcript =
+        event.results?.[event.resultIndex]?.[0]?.transcript?.trim() || "";
+
+      console.log("🎤 heard:", transcript);
+
+      if (!transcript) return;
+
+      setInput(transcript);
+
+      const lowered = transcript.toLowerCase();
+
+      if (handsFreeRef.current) {
+        console.log("🤖 hands-free sending:", transcript);
+
+        setTimeout(() => {
+          handleSend(transcript);
+        }, 100);
+
         return;
       }
 
-      try {
-        recognition.start();
-      } catch {
-        // ignore repeated start errors
+      if (
+        lowered.includes("state check") ||
+        lowered.includes("check me") ||
+        lowered.startsWith("twin")
+      ) {
+        handleSend(transcript);
       }
+    };
+
+    recognitionRef.current = recognition;
+
+    return () => {
+      recognition.stop();
+    };
+  }, []);
+
+  function speak(text: string) {
+    if (typeof window === "undefined") return;
+    if (!voiceOutputEnabled) return;
+
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+
+    const utterance = new SpeechSynthesisUtterance(text);
+
+    utterance.rate = 1;
+    utterance.pitch = 1;
+    utterance.volume = 1;
+
+    synth.cancel();
+    synth.speak(utterance);
+  }
+
+  function toggleListening() {
+    const recognition = recognitionRef.current;
+    if (!recognition) return;
+
+    if (isListening) {
+      recognition.stop();
+      return;
     }
 
-    const alert = useMemo(
-      () =>
-        getAlert(
-          live,
-          minutes,
-          crewLevel,
-          movementLevel,
-          environmentLevel,
-          spots,
-          twinSyncSnapshot.desync?.level,
-          twinSyncSnapshot.noSupport?.active,
-          trajectory
-        ),
-      [
+    try {
+      recognition.start();
+    } catch {
+      // ignore repeated start errors
+    }
+  }
+
+  const alert = useMemo(
+    () =>
+      getAlert(
         live,
         minutes,
         crewLevel,
@@ -6122,284 +9987,298 @@ function speak(text: string) {
         spots,
         twinSyncSnapshot.desync?.level,
         twinSyncSnapshot.noSupport?.active,
-        trajectory,
-      ]
-    );
+        trajectory
+      ),
+    [
+      live,
+      minutes,
+      crewLevel,
+      movementLevel,
+      environmentLevel,
+      spots,
+      twinSyncSnapshot.desync?.level,
+      twinSyncSnapshot.noSupport?.active,
+      trajectory,
+    ]
+  );
 
-    const theme = useMemo(
-      () =>
-        getAmbientTheme(
-          awareness.level,
-          environmentLevel,
-          twinSyncSnapshot.desync?.level,
-          drift.level,
-          twinSyncSnapshot.noSupport?.active,
-          trajectory
-        ),
-      [
+  const theme = useMemo(
+    () =>
+      getAmbientTheme(
         awareness.level,
         environmentLevel,
         twinSyncSnapshot.desync?.level,
         drift.level,
         twinSyncSnapshot.noSupport?.active,
-        trajectory,
-      ]
-    );
+        trajectory
+      ),
+    [
+      awareness.level,
+      environmentLevel,
+      twinSyncSnapshot.desync?.level,
+      drift.level,
+      twinSyncSnapshot.noSupport?.active,
+      trajectory,
+    ]
+  );
 
-return (
-  <ErrorBoundary>
-    <AuthGuard>
-    <main
-      className="safe-screen flex justify-center items-start px-4 pt-6 text-white"
-        style={{ background: theme.pageBg }}
-      >
-        <div className="w-full max-w-md space-y-6 px-4 pt-6 pb-10">
-          <div>
-            <h1 className="text-3xl font-semibold tracking-tight">TwinMe</h1>
-            <p className="text-white/50 text-sm">
-              Predictive support for {displayName}
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            {[
-              { label: "Awareness", value: awareness.score, sub: awareness.level },
-              {
-                label: "Heartbeat",
-                value: live?.heartbeatBpm || 0,
-                sub: `${minutes} min`,
-              },
-              { label: "Desync", value: twinSyncSnapshot.desync?.level, sub: "sync status" },
-              { label: "LearnMe", value: learnMe.label, sub: "pattern memory" },
-            ].map((item) => (
-              <div
-                key={item.label}
-                className={`rounded-2xl p-3 min-h-[72px] border ${theme.border} bg-white/5`}
-              >
-                <div className="text-xs text-white/50">{item.label}</div>
-                <div className="text-base md:text-xl font-semibold leading-tight">
-                  {item.value}
-                </div>
-                <div className="text-[11px] leading-4 text-white/45 mt-1">
-                  {item.sub}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-1 gap-6">
-            <div className="space-y-4 order-1">
-              <div className={`rounded-2xl p-4 border bg-white/5 ${theme.border}`}>
-                <h3 className="font-semibold mb-2">State</h3>
-                <p className={`text-sm ${levelClass(awareness.level)}`}>{nudge}</p>
-
-                <div className="mt-3 text-xs text-white/40">
-                  Next: {microGuidance.actions[0] || "Stay present."}
-                </div>
-              </div>
-
-              {alert && (
-                <div className="rounded-2xl border border-red-400/25 bg-red-500/10 p-4">
-                  <h3 className="font-semibold mb-2 text-red-100">Alert</h3>
-                  <p className="text-sm text-red-50/90">{alert}</p>
-                </div>
-              )}
+  return (
+    <ErrorBoundary>
+      <AuthGuard>
+        <main
+          className="safe-screen flex justify-center items-start px-4 pt-6 text-white"
+          style={{ background: theme.pageBg }}
+        >
+          <div className="w-full max-w-md space-y-6 px-4 pt-6 pb-10">
+            <div>
+              <h1 className="text-3xl font-semibold tracking-tight">TwinMe</h1>
+              <p className="text-white/50 text-sm">
+                Predictive support for {displayName}
+              </p>
             </div>
 
-            <div
-              className={`rounded-3xl p-5 border w-full min-w-0 flex flex-col mt-2 order-2 bg-white/5 ${theme.border} ${theme.glow}`}
-            >
-              <h3 className="font-semibold mb-3 text-base">Talk to TwinMe</h3>
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              {[
+                { label: "Awareness", value: awareness.score, sub: awareness.level },
+                {
+                  label: "Heartbeat",
+                  value: live?.heartbeatBpm || 0,
+                  sub: `${minutes} min`,
+                },
+                { label: "Desync", value: twinSyncSnapshot.desync?.level, sub: "sync status" },
+                { label: "LearnMe", value: learnMe.label, sub: "pattern memory" },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  className={`rounded-2xl p-3 min-h-[72px] border ${theme.border} bg-white/5`}
+                >
+                  <div className="text-xs text-white/50">{item.label}</div>
+                  <div className="text-base md:text-xl font-semibold leading-tight">
+                    {item.value}
+                  </div>
+                  <div className="text-[11px] leading-4 text-white/45 mt-1">
+                    {item.sub}
+                  </div>
+                </div>
+              ))}
+            </div>
 
-              <div
-                ref={chatScrollRef}
-                className="w-full rounded-2xl border border-white/10 bg-black/20 p-3 pt-4 min-h-[280px] max-h-[380px] overflow-y-auto overscroll-contain scroll-smooth pb-32 space-y-3"              >
-                {messages.map((m, i) => {
-                  const isLatest = i === messages.length - 1;
+            <div className="grid grid-cols-1 gap-6">
+              <div className="space-y-4 order-1">
+                <div className={`rounded-2xl p-4 border bg-white/5 ${theme.border}`}>
+                  <h3 className="font-semibold mb-2">State</h3>
+                  <p className={`text-sm ${levelClass(awareness.level)}`}>{nudge}</p>
 
-                  return (
-                    <div
-                      key={m.id}
-                      className={`flex ${m.role === "twin"
-                        ? "animate-[fadeIn_0.45s_ease-out]"
-                        : "animate-[fadeIn_0.25s_ease-out]"
-                        } ${m.role === "user" ? "justify-end" : "justify-start"}`}
-                    >
-                      <div
-                        className={`p-3.5 rounded-2xl max-w-[78%] shadow-sm ${m.role === "twin"
-                          ? getEscalationLevel(
-                            awareness,
-                            trajectory,
-                            twinSyncSnapshot.desync?.level,
-                            drift.level,
-                            twinSyncSnapshot.noSupport?.active,
-                            crewCollapse,
-                            environmentLevel,
-                            movementLevel
-                          ) === 3 && isLatest
-                            ? "bg-red-500/15 border border-red-400/30 animate-pulse"
-                            : awareness.level === "critical"
-                              ? "bg-red-500/10 border border-red-400/20"
-                              : "bg-blue-500/10 border border-blue-400/20"
-                          : "bg-white/10"
-                          }`}
-                      >
+                  <div className="mt-3 text-xs text-white/40">
+                    Next: {microGuidance.actions[0] || "Stay present."}
+                  </div>
+                </div>
 
-                        <p className="text-sm whitespace-pre-wrap break-words">
-                          {m.text}
-                        </p>
-
-                        {m.role === "twin" && isLatest && (
-                          <div className="mt-3 grid grid-cols-2 gap-2">
-                            <Link
-                              href="/spots"
-                              className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-center text-xs text-white/80 hover:bg-white/15 active:scale-[0.98] transition"
-                            >
-                              Open Spots
-                            </Link>
-
-                            <Link
-                              href="/crew"
-                              className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-center text-xs text-white/80 hover:bg-white/15 active:scale-[0.98] transition"
-                            >
-                              Check Crew
-                            </Link>
-
-                            <Link
-                              href="/exit"
-                              className="rounded-xl border border-red-400/20 bg-red-500/10 px-3 py-2 text-center text-xs text-red-100 hover:bg-red-500/15 active:scale-[0.98] transition"
-                            >
-                              Start Exit
-                            </Link>
-
-                            <button
-                              type="button"
-                              onClick={() => handleSend("state check")}
-                              className="rounded-xl border border-blue-400/20 bg-blue-500/10 px-3 py-2 text-xs text-blue-100"
-                            >
-                              State Check
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {isThinking && (
-                  <div className="flex justify-start">
-                    <div className="p-3 rounded-xl max-w-[75%] bg-blue-500/10 border border-blue-400/20">
-                      <div className="flex gap-1 items-center">
-                        <span className="w-2 h-2 bg-white/60 rounded-full animate-bounce"></span>
-                        <span className="w-2 h-2 bg-white/60 rounded-full animate-bounce [animation-delay:0.15s]"></span>
-                        <span className="w-2 h-2 bg-white/60 rounded-full animate-bounce [animation-delay:0.3s]"></span>
-                      </div>
-                    </div>
+                {alert && (
+                  <div className="rounded-2xl border border-red-400/25 bg-red-500/10 p-4">
+                    <h3 className="font-semibold mb-2 text-red-100">Alert</h3>
+                    <p className="text-sm text-red-50/90">{alert}</p>
                   </div>
                 )}
               </div>
 
- {!voiceSupported && (
-  <div className="rounded-2xl border border-yellow-400/20 bg-yellow-500/10 px-3 py-2 mt-3 mb-2 text-center">
-    <p className="text-xs text-yellow-100">
-      Voice is not supported in {browserName}. Open TwinMe in Chrome to use voice.
-    </p>
-  </div>
-)}
+              <div
+                className={`rounded-3xl p-5 border w-full min-w-0 flex flex-col mt-2 order-2 bg-white/5 ${theme.border} ${theme.glow}`}
+              >
+                <h3 className="font-semibold mb-3 text-base">Talk to TwinMe</h3>
+
+                <div
+                  ref={chatScrollRef}
+                  className="w-full rounded-2xl border border-white/10 bg-black/20 p-3 pt-4 min-h-[280px] max-h-[380px] overflow-y-auto overscroll-contain scroll-smooth pb-32 space-y-3"              >
+                  {messages.map((m, i) => {
+                    const isLatest = i === messages.length - 1;
+
+                    return (
+                      <div
+                        key={m.id}
+                        className={`flex ${m.role === "twin"
+                          ? "animate-[fadeIn_0.45s_ease-out]"
+                          : "animate-[fadeIn_0.25s_ease-out]"
+                          } ${m.role === "user" ? "justify-end" : "justify-start"}`}
+                      >
+                        <div
+                          className={`p-3.5 rounded-2xl max-w-[78%] shadow-sm ${m.role === "twin"
+                            ? getEscalationLevel(
+                              awareness,
+                              trajectory,
+                              twinSyncSnapshot.desync?.level,
+                              drift.level,
+                              twinSyncSnapshot.noSupport?.active,
+                              crewCollapse,
+                              environmentLevel,
+                              movementLevel
+                            ) === 3 && isLatest
+                              ? "bg-red-500/15 border border-red-400/30 animate-pulse"
+                              : awareness.level === "critical"
+                                ? "bg-red-500/10 border border-red-400/20"
+                                : "bg-blue-500/10 border border-blue-400/20"
+                            : "bg-white/10"
+                            }`}
+                        >
+
+                          <p className="text-sm whitespace-pre-wrap break-words">
+                            {m.text}
+                          </p>
+
+                          {m.role === "twin" &&
+                            isLatest &&
+                            (
+                              (trajectory.riskWindow as TrajectoryRiskWindow) === "approaching" ||
+                              twinSyncSnapshot.desync?.level === "separated"
+                            ) && (
+
+                              <div className="mt-3 grid grid-cols-2 gap-2">
+                                <Link
+                                  href="/spots"
+                                  className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-center text-xs text-white/80 hover:bg-white/15 active:scale-[0.98] transition"
+                                >
+                                  Open Spots
+                                </Link>
+
+                                <Link
+                                  href="/crew"
+                                  className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-center text-xs text-white/80 hover:bg-white/15 active:scale-[0.98] transition"
+                                >
+                                  Check Crew
+                                </Link>
+
+                                <Link
+                                  href="/exit"
+                                  className="rounded-xl border border-red-400/20 bg-red-500/10 px-3 py-2 text-center text-xs text-red-100 hover:bg-red-500/15 active:scale-[0.98] transition"
+                                >
+                                  Start Exit
+                                </Link>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleSend("state check")}
+                                  className="rounded-xl border border-blue-400/20 bg-blue-500/10 px-3 py-2 text-xs text-blue-100"
+                                >
+                                  State Check
+                                </button>
+                              </div>
+                            )}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {isThinking && (
+                    <div className="flex justify-start">
+                      <div className="p-3 rounded-xl max-w-[75%] bg-blue-500/10 border border-blue-400/20">
+                        <div className="flex gap-1 items-center">
+                          <span className="w-2 h-2 bg-white/60 rounded-full animate-bounce"></span>
+                          <span className="w-2 h-2 bg-white/60 rounded-full animate-bounce [animation-delay:0.15s]"></span>
+                          <span className="w-2 h-2 bg-white/60 rounded-full animate-bounce [animation-delay:0.3s]"></span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {!voiceSupported && (
+                  <div className="rounded-2xl border border-yellow-400/20 bg-yellow-500/10 px-3 py-2 mt-3 mb-2 text-center">
+                    <p className="text-xs text-yellow-100">
+                      Voice is not supported in {browserName}. Open TwinMe in Chrome to use voice.
+                    </p>
+                  </div>
+                )}
 
 
-              <div className="sticky bottom-0 left-0 right-0 pt-3 safe-bottom-pad mt-3 bg-gradient-to-t from-[#0A0A0B] to-transparent">
-                <div className="flex flex-col gap-3">
-                  <textarea
-                    ref={inputRef}
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    rows={1}
-                    enterKeyHint="send"
-                    autoCapitalize="sentences"
-                    autoCorrect="on"
-                    spellCheck
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSend();
-                      }
-                    }}
-                    placeholder="Tell TwinMe what's going on..."
-                    className="w-full min-h-[72px] resize-none touch-manipulation rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/35 outline-none focus:ring-2 focus:ring-white/20 transition"
-                  />
-<div className="grid grid-cols-2 gap-3">
-  <button
-    onClick={() => handleSend()}
-    className="w-full h-[52px] rounded-2xl bg-white text-black font-medium shadow-lg hover:opacity-90 transition"
-  >
-    Send
-  </button>
+                <div className="sticky bottom-0 left-0 right-0 pt-3 safe-bottom-pad mt-3 bg-gradient-to-t from-[#0A0A0B] to-transparent">
+                  <div className="flex flex-col gap-3">
+                    <textarea
+                      ref={inputRef}
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      rows={1}
+                      enterKeyHint="send"
+                      autoCapitalize="sentences"
+                      autoCorrect="on"
+                      spellCheck
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSend();
+                        }
+                      }}
+                      placeholder="Tell TwinMe what's going on..."
+                      className="w-full min-h-[72px] resize-none touch-manipulation rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/35 outline-none focus:ring-2 focus:ring-white/20 transition"
+                    />
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        onClick={() => handleSend()}
+                        className="w-full h-[52px] rounded-2xl bg-white text-black font-medium shadow-lg hover:opacity-90 transition"
+                      >
+                        Send
+                      </button>
 
-  <button
-    onClick={voiceSupported ? toggleListening : undefined}
-    className={`w-full h-[52px] rounded-2xl border font-medium transition ${
-      isListening
-        ? "border-red-400/40 bg-red-500/10 text-red-100"
-        : "border-white/10 bg-white/5 text-white"
-    }`}
-  >
-    {isListening ? "Listening..." : "Voice"}
-  </button>
+                      <button
+                        onClick={voiceSupported ? toggleListening : undefined}
+                        className={`w-full h-[52px] rounded-2xl border font-medium transition ${isListening
+                          ? "border-red-400/40 bg-red-500/10 text-red-100"
+                          : "border-white/10 bg-white/5 text-white"
+                          }`}
+                      >
+                        {isListening ? "Listening..." : "Voice"}
+                      </button>
 
-  <button
-    onClick={() => setVoiceOutputEnabled((prev) => !prev)}
-    className={`w-full h-[52px] rounded-2xl border font-medium transition ${
-      voiceOutputEnabled
-        ? "border-green-400/40 bg-green-500/10 text-green-100"
-        : "border-white/10 bg-white/5 text-white"
-    }`}
-  >
-    {voiceOutputEnabled ? "Voice ON" : "Voice OFF"}
-  </button>
+                      <button
+                        onClick={() => setVoiceOutputEnabled((prev) => !prev)}
+                        className={`w-full h-[52px] rounded-2xl border font-medium transition ${voiceOutputEnabled
+                          ? "border-green-400/40 bg-green-500/10 text-green-100"
+                          : "border-white/10 bg-white/5 text-white"
+                          }`}
+                      >
+                        {voiceOutputEnabled ? "Voice ON" : "Voice OFF"}
+                      </button>
 
-  <button
-   onClick={() => {
-  if (!voiceSupported) return;
+                      <button
+                        onClick={() => {
+                          if (!voiceSupported) return;
 
-  if (!voiceAccess.allowed) {
-  setShowUpgradePrompt(true);  
-    return;
-  }
+                          if (!voiceAccess.allowed) {
+                            setShowUpgradePrompt(true);
+                            return;
+                          }
 
-  setHandsFreeEnabled((prev) => {
-    const next = !prev;
+                          setHandsFreeEnabled((prev) => {
+                            const next = !prev;
 
-    if (next && recognitionRef.current && !isListening) {
-      try {
-        recognitionRef.current.start();
-      } catch {
-        // ignore repeated start errors
-      }
-    }
+                            if (next && recognitionRef.current && !isListening) {
+                              try {
+                                recognitionRef.current.start();
+                              } catch {
+                                // ignore repeated start errors
+                              }
+                            }
 
-    if (!next && recognitionRef.current) {
-      recognitionRef.current.stop();
-    }
-        
-    return next;
-  });
-}}
-    className={`w-full h-[52px] rounded-2xl border font-medium transition ${
-      handsFreeEnabled
-        ? "border-purple-400/40 bg-purple-500/10 text-purple-100"
-        : "border-white/10 bg-white/5 text-white"
-    }`}
-  >
-    {handsFreeEnabled ? "Hands-Free ON" : "Hands-Free"}
-  </button>
-</div>
+                            if (!next && recognitionRef.current) {
+                              recognitionRef.current.stop();
+                            }
+
+                            return next;
+                          });
+                        }}
+                        className={`w-full h-[52px] rounded-2xl border font-medium transition ${handsFreeEnabled
+                          ? "border-purple-400/40 bg-purple-500/10 text-purple-100"
+                          : "border-white/10 bg-white/5 text-white"
+                          }`}
+                      >
+                        {handsFreeEnabled ? "Hands-Free ON" : "Hands-Free"}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <style jsx>{`
+            <style jsx>{`
           @keyframes fadeIn {
             from {
               opacity: 0;
@@ -6411,26 +10290,26 @@ return (
             }
           }
         `}</style>
-               </div>
+          </div>
 
-               {showUpgradePrompt && (
-  <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 px-5 backdrop-blur-md">
-    <div className="w-full max-w-md">
-      <UpgradePrompt />
+          {showUpgradePrompt && (
+            <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 px-5 backdrop-blur-md">
+              <div className="w-full max-w-md">
+                <UpgradePrompt />
 
-      <button
-        type="button"
-        onClick={() => setShowUpgradePrompt(false)}
-        className="mt-4 w-full rounded-2xl border border-white/10 bg-white/5 py-3 text-sm text-white/70"
-      >
-        Maybe Later
-      </button>
-    </div>
-  </div>
-)}
+                <button
+                  type="button"
+                  onClick={() => setShowUpgradePrompt(false)}
+                  className="mt-4 w-full rounded-2xl border border-white/10 bg-white/5 py-3 text-sm text-white/70"
+                >
+                  Maybe Later
+                </button>
+              </div>
+            </div>
+          )}
 
- </main>
-    </AuthGuard>
-  </ErrorBoundary>
-);
+        </main>
+      </AuthGuard>
+    </ErrorBoundary >
+  );
 }

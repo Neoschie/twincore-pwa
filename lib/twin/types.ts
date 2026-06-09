@@ -54,6 +54,24 @@ export type TwinContextSnapshot = {
   crew: CrewStatus[];
   spots: SpotSignal[];
   exitState: ExitState | null;
+
+  environment?: {
+    level: string;
+    selectedName?: string | null;
+    selectedTone?: string | null;
+    nearbyCount?: number;
+    safeCount?: number;
+    riskCount?: number;
+    hotspotCount?: number;
+    trustedVisibleCount?: number;
+  };
+
+  commercial?: {
+    activeEvents?: number;
+    promotedEvents?: number;
+    trendingVenueName?: string | null;
+    momentumLevel?: "low" | "medium" | "high" | null;
+  };
 };
 
 export type AwarenessInsight = {

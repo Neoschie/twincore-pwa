@@ -108,18 +108,17 @@ export function getEcosystemSyncEvent(
     };
   }
 
-  if (input.noSupportActive) {
-    return {
-      shouldNotify: true,
-      reason: "crew-thin",
-      urgency,
-      message:
-        "Support is thin around you right now. Stay visible and avoid open-ended movement.",
-      signalKey: "crew:no-support",
-    };
+     if (input.noSupportActive) {
+    // No standalone no-support sync notification.
+    // Higher-risk conditions above/below handle true safety alerts.
   }
 
-  if (input.driftLevel === "prolonged" || input.movementLevel === "high") {
+  if (
+  input.driftLevel === "prolonged" &&
+  input.awarenessLevel === "critical" &&
+  input.desyncLevel === "separated"
+) {
+   
     return {
       shouldNotify: true,
       reason: "movement-drift",
@@ -154,13 +153,12 @@ export function getEcosystemSyncEvent(
     };
   }
 
-  if (input.isPartyActive && (input.minutesActive ?? 0) >= 45) {
+    if (input.isPartyActive && (input.minutesActive ?? 0) >= 45) {
     return {
-      shouldNotify: true,
+      shouldNotify: false,
       reason: "party-prolonged",
       urgency,
-      message:
-        "You have been active for a while. Slow the next move down and check your energy before continuing.",
+      message: null,
       signalKey: `party:prolonged:${Math.floor((input.minutesActive ?? 0) / 15)}`,
     };
   }

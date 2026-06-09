@@ -1179,7 +1179,7 @@ export default function PartyPage() {
     return getFriendlyLocationName(lastCoords);
   }, [lastCoords]);
   return (
-    <AuthGuard>
+    
       <main className="min-h-screen overflow-hidden bg-[#0A0A0B] text-white">
       <audio
         ref={audioRef}
@@ -1696,8 +1696,7 @@ export default function PartyPage() {
             TwinMe
           </Link>
         </div>
-      </div>
+         </div>
     </main>
-       </AuthGuard>
   );
 }

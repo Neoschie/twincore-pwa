@@ -71,13 +71,34 @@ function getDrift(snapshot: TwinContextSnapshot): DriftLevel {
     (spot) => spot.isNearby && spot.safetyTone === "risky"
   );
 
-  if ((partyEnergy >= 80 && nearbyRiskySpot) || (exitActive && snapshot.exitState?.alone)) {
-    return "prolonged";
-  }
+  const environmentLevel = snapshot.environment?.level ?? "unknown";
 
-  if (partyEnergy >= 65 || nearbyRiskySpot || exitActive) {
-    return "elevated";
-  }
+const momentumLevel =
+  snapshot.commercial?.momentumLevel ?? "low";
+
+const thinningSupport =
+  snapshot.crew.length >= 2 &&
+  snapshot.crew.filter((member) => {
+    const minutes = getMinutesSince(member.updatedAt);
+    return minutes === null || minutes > 20;
+  }).length >= 2;
+
+  if (
+  (partyEnergy >= 80 && nearbyRiskySpot) ||
+  environmentLevel === "unsafe" ||
+  (exitActive && snapshot.exitState?.alone)
+) {
+  return "prolonged";
+}
+
+ if (
+  partyEnergy >= 65 ||
+  nearbyRiskySpot ||
+  environmentLevel === "volatile" ||
+  exitActive
+) {
+  return "elevated";
+}
 
   return "none";
 }
@@ -90,6 +111,19 @@ function getAwareness(snapshot: TwinContextSnapshot) {
   const nearbyRiskySpot = snapshot.spots.some(
     (spot) => spot.isNearby && spot.safetyTone === "risky"
   );
+
+const environmentLevel = snapshot.environment?.level ?? "unknown";
+
+const momentumLevel =
+  snapshot.commercial?.momentumLevel ?? "low";
+
+const thinningSupport =
+  snapshot.crew.length >= 2 &&
+  snapshot.crew.filter((member) => {
+    const minutes = getMinutesSince(member.updatedAt);
+    return minutes === null || minutes > 20;
+  }).length >= 2;
+
   const exitAlone = snapshot.exitState?.active && snapshot.exitState?.alone;
   const headingHome = snapshot.exitState?.headingHome ?? false;
 
@@ -115,26 +149,54 @@ function getAwareness(snapshot: TwinContextSnapshot) {
 function getTrajectory(snapshot: TwinContextSnapshot, awarenessScore: number) {
   const exitActive = snapshot.exitState?.active ?? false;
   const exitAlone = snapshot.exitState?.alone ?? false;
+
   const nearbyRiskySpot = snapshot.spots.some(
     (spot) => spot.isNearby && spot.safetyTone === "risky"
   );
 
-  if (awarenessScore >= 80 || (exitActive && exitAlone && nearbyRiskySpot)) {
+  const environmentLevel = snapshot.environment?.level ?? "unknown";
+
+  const momentumLevel = snapshot.commercial?.momentumLevel ?? "low";
+
+  const thinningSupport =
+    snapshot.crew.length >= 2 &&
+    snapshot.crew.filter((member) => {
+      const minutes = getMinutesSince(member.updatedAt);
+      return minutes === null || minutes > 20;
+    }).length >= 2;
+
+  if (
+    awarenessScore >= 80 ||
+    (exitActive && exitAlone && nearbyRiskySpot) ||
+    environmentLevel === "unsafe"
+  ) {
     return {
       level: "imminent" as const,
-      reason: "Multiple live signals suggest immediate decision risk.",
+      riskWindow: "imminent" as const,
+      reason:
+        "Multiple live signals suggest immediate decision risk and environmental instability.",
     };
   }
 
-  if (awarenessScore >= 60 || exitActive || nearbyRiskySpot) {
+  if (
+    awarenessScore >= 60 ||
+    exitActive ||
+    nearbyRiskySpot ||
+    thinningSupport ||
+    environmentLevel === "volatile" ||
+    momentumLevel === "high"
+  ) {
     return {
       level: "approaching" as const,
-      reason: "Context is tightening and support may be thinning.",
+      riskWindow: "approaching" as const,
+      reason:
+        "Context is tightening, momentum is increasing, and support may be thinning.",
     };
   }
 
   return {
     level: "steady" as const,
+    riskWindow: "none" as const,
     reason: "No strong escalation pattern detected right now.",
   };
 }
