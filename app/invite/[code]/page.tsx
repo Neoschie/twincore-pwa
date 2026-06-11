@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import posthog from "posthog-js";
 import {
   acceptLocalInvite,
   buildInviteLink,
@@ -326,6 +327,12 @@ export default function InviteCodePage() {
           };
         });
 
+        if (!memberAlreadyExists) {
+          posthog.capture("crew_invite_accepted", {
+            crew_name: invite.crewName,
+            inviter_name: invite.inviterName,
+          });
+        }
         setJoined(true);
         setStatusMessage(
           memberAlreadyExists
@@ -354,6 +361,10 @@ export default function InviteCodePage() {
           return null;
         });
 
+        posthog.capture("crew_invite_accepted", {
+          crew_name: invite.crewName,
+          inviter_name: invite.inviterName,
+        });
         setJoined(true);
         setStatusMessage("You joined successfully. Welcome to TwinCore.");
       }

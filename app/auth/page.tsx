@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import posthog from "posthog-js";
 
 export default function AuthPage() {
   const router = useRouter();
@@ -39,6 +40,16 @@ export default function AuthPage() {
       setStatus(result.error.message);
       setIsLoading(false);
       return;
+    }
+
+    const user = result.data.user;
+    if (user) {
+      posthog.identify(user.id, { email: user.email });
+      if (mode === "signup") {
+        posthog.capture("user_signed_up", { email: user.email });
+      } else {
+        posthog.capture("user_signed_in", { email: user.email });
+      }
     }
 
     setStatus(

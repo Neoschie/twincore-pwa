@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import AuthGuard from "@/components/auth/AuthGuard";
+import posthog from "posthog-js";
 const STORAGE_KEY = "twincore_profile";
 const PARTY_AUDIO_SRC = "/party-mode.mp3";
 const JOINED_CREW_KEY = "twincore_joined_crew";
@@ -1114,10 +1115,12 @@ export default function PartyPage() {
     }
   }
   function handleStatusClick(status: PartyStatus) {
+    posthog.capture("party_status_updated", { status });
     setSelectedStatus(status);
   }
   async function handleSendCheckIn() {
     const currentStatus = selectedStatus ?? "Listening to music";
+    posthog.capture("party_checkin_sent", { status: currentStatus });
     setCheckInSent(true);
     if (!partyActive) {
       setPartyActive(true);
@@ -1134,6 +1137,7 @@ export default function PartyPage() {
   function handleTogglePartyMode() {
     if (!selectedStatus) return;
     const nextActive = !partyActive;
+    posthog.capture("party_mode_toggled", { active: nextActive });
     setPartyActive(nextActive);
     writePartyLiveState(selectedStatus, lastCoords, "toggle", nextActive);
   }

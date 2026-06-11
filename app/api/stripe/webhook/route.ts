@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe/server";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getPostHogClient } from "@/lib/posthog-server";
 
 export async function POST(req: Request) {
   const body = await req.text();
@@ -67,6 +68,14 @@ if (event.type === "checkout.session.completed") {
 
         updated_at: new Date().toISOString(),
       });
+
+    const posthog = getPostHogClient();
+    posthog.capture({
+      distinctId: userId,
+      event: "subscription_activated",
+      properties: { plan, user_id: userId },
+    });
+    await posthog.shutdown();
   }
 }
 

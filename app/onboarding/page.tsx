@@ -6,6 +6,7 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
 import { startSubscriptionPurchase } from "@/lib/subscription/purchase";
+import posthog from "posthog-js";
 
 export default function OnboardingPage() {
   const [step, setStep] = useState(1);
@@ -72,7 +73,10 @@ const [selectedMood, setSelectedMood] = useState("");
             <div className="space-y-3">
               <button
                 type="button"
-                onClick={() => setStep(2)}
+                onClick={() => {
+                  posthog.capture("onboarding_started");
+                  setStep(2);
+                }}
                 className="w-full h-14 rounded-2xl bg-white text-black font-semibold"
               >
                 Start Sync
@@ -118,6 +122,7 @@ const [selectedMood, setSelectedMood] = useState("");
           key={item.label}
           type="button"
           onClick={() => {
+  posthog.capture("onboarding_mood_selected", { mood: item.label });
   setSelectedMood(item.label);
   setStep(3);
 }}
@@ -318,6 +323,7 @@ const [selectedMood, setSelectedMood] = useState("");
   type="button"
  
   onClick={async () => {
+  posthog.capture("subscription_plan_selected", { plan: "premium" });
   const result = await startSubscriptionPurchase("premium");
 
   if (result.success && result.redirectTo) {
@@ -349,6 +355,7 @@ const [selectedMood, setSelectedMood] = useState("");
   type="button"
  
   onClick={async () => {
+  posthog.capture("subscription_plan_selected", { plan: "party_pass" });
   const result = await startSubscriptionPurchase("party_pass");
 
   if (result.success && result.redirectTo) {
@@ -369,6 +376,7 @@ const [selectedMood, setSelectedMood] = useState("");
      <button
   type="button"
   onClick={() => {
+    posthog.capture("onboarding_completed_free");
     localStorage.setItem("twincore_onboarding_complete", "true");
     window.location.href = "/twinme";
   }}

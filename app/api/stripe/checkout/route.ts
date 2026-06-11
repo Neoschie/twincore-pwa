@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe/server";
 import { createClient } from "@supabase/supabase-js";
+import { getPostHogClient } from "@/lib/posthog-server";
 
 export async function POST(req: Request) {
   try {
@@ -76,6 +77,14 @@ const appUrl =
       success_url: `${appUrl}/twinme?checkout=success`,
       cancel_url: `${appUrl}/onboarding?checkout=cancelled`,
     });
+
+    const posthog = getPostHogClient();
+    posthog.capture({
+      distinctId: user.id,
+      event: "checkout_initiated",
+      properties: { plan, user_id: user.id },
+    });
+    await posthog.shutdown();
 
     return NextResponse.json({
       url: session.url,

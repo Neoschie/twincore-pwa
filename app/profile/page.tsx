@@ -12,6 +12,7 @@ import {
   primaryButtonStyle,
   shellStyle,
 } from "@/components/twincore-ui";
+import posthog from "posthog-js";
 
 const STORAGE_KEY = "twincore_profile";
 const GHOST_MODE_KEY = "twincore_ghost_mode";
@@ -92,6 +93,10 @@ export default function ProfilePage() {
   }
 
   function saveProfile() {
+    posthog.capture("profile_saved", {
+      ghost_mode: profile.ghostMode,
+      trusted_only: profile.trustedOnly,
+    });
     localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
     localStorage.setItem(TRUSTED_KEY, JSON.stringify(profile.trustedList));
 
