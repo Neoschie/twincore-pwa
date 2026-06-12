@@ -14,6 +14,8 @@ import {
 } from "@/components/twincore-ui";
 import posthog from "posthog-js";
 
+import { supabase } from "@/lib/supabase/client";
+
 const STORAGE_KEY = "twincore_profile";
 const GHOST_MODE_KEY = "twincore_ghost_mode";
 const TRUSTED_KEY = "twincore_trusted";
@@ -42,7 +44,13 @@ const defaultProfile: ProfileData = {
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState<ProfileData>(defaultProfile);
-  const [saved, setSaved] = useState(false);
+  
+const handleSignOut = async () => {
+await supabase.auth.signOut();
+window.location.href = "/auth";
+};
+
+const [saved, setSaved] = useState(false);
   const [newTrusted, setNewTrusted] = useState("");
 
   useEffect(() => {
@@ -122,8 +130,8 @@ export default function ProfilePage() {
         title="Profile"
         action={
           <Link href="/" style={navButtonStyle}>
-            Home
-          </Link>
+  ← Dashboard
+</Link>
         }
       />
 
@@ -242,14 +250,32 @@ export default function ProfilePage() {
       </section>
 
       <button onClick={saveProfile} style={primaryButtonStyle}>
-        Save Profile
-      </button>
+  Save Profile
+</button>
 
-      {saved && (
-        <p style={{ marginTop: 10, color: "#86EFAC" }}>
-          Settings saved.
-        </p>
-      )}
+<button
+  onClick={handleSignOut}
+  style={{
+    marginTop: 12,
+    width: "100%",
+    borderRadius: 12,
+    border: "1px solid rgba(255,255,255,0.2)",
+    padding: "12px 16px",
+    fontSize: 14,
+    fontWeight: 700,
+    color: "white",
+    background: "transparent",
+    cursor: "pointer",
+  }}
+>
+  Sign Out
+</button>
+
+{saved && (
+  <p style={{ marginTop: 10, color: "#86EFAC" }}>
+    Settings saved.
+  </p>
+)}
 
       <div style={navGridThreeStyle}>
         <Link href="/" style={navButtonStyle}>

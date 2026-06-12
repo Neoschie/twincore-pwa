@@ -781,6 +781,12 @@ export default function SpotsPage() {
   return (
     <AuthGuard>
     <main className="min-h-screen overflow-hidden bg-[#0A0A0B] text-white">
+      <Link
+  href="/"
+  className="relative z-20 inline-flex rounded-xl border border-white/15 px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/10"
+>
+  ← Dashboard
+</Link>
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className={`absolute inset-0 ${ambientClasses.top}`} />
         <div

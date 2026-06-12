@@ -58,7 +58,17 @@ export default function AuthPage() {
     : "Signed in successfully."
 );
 
+const isSignup = mode === "signup";
+
+// supabase sign up/sign in logic happens here
+
 setIsLoading(false);
+
+if (isSignup) {
+  localStorage.removeItem("twincore_onboarding_complete");
+  router.push("/onboarding");
+  return;
+}
 
 const completedOnboarding =
   localStorage.getItem("twincore_onboarding_complete") === "true";
@@ -68,6 +78,7 @@ router.push(
     ? "/twinme"
     : "/onboarding"
 );
+
   }
 
   return (

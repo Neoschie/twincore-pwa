@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useEffect, useMemo, useState, type ComponentType } from "react";
 import {
   Activity,
@@ -345,10 +347,20 @@ export default function CrewPage() {
 
       <div className="relative py-6">
         <PageHeader
-          title="Crew"
-          subtitle="Live crew awareness"
-          rightSlot={<GlobalStatusBar />}
-        />
+  title="Crew"
+  subtitle="Live crew awareness"
+  rightSlot={
+    <div className="flex items-center gap-2">
+      <Link
+        href="/"
+        className="rounded-xl border border-white/15 px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/10"
+      >
+        ← Dashboard
+      </Link>
+      <GlobalStatusBar />
+    </div>
+  }
+/>
 
         <div className="space-y-5">
           <AnimatedCard className="rounded-3xl p-6 bg-[linear-gradient(180deg,#142033,#0d1624)] border border-blue-500/15 shadow-[0_20px_55px_rgba(0,0,0,0.35)]">

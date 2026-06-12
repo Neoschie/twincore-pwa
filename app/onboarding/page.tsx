@@ -22,6 +22,14 @@ const [selectedMood, setSelectedMood] = useState("");
   <div className="absolute top-[35%] left-[50%] h-[180px] w-[180px] -translate-x-1/2 rounded-full bg-white/[0.03] blur-2xl" />
 </div>
 <div className="relative z-10 w-full max-w-md pb-40">
+  <div className="mb-4">
+  <Link
+    href="/"
+    className="inline-flex rounded-xl border border-white/15 px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/10"
+  >
+    ← Dashboard
+  </Link>
+</div>
         <div className="mb-8 flex justify-center">
   <div className="relative">
     <div className="absolute inset-0 rounded-full bg-cyan-400/20 blur-2xl animate-pulse" />

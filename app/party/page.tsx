@@ -1185,6 +1185,14 @@ export default function PartyPage() {
   return (
     
       <main className="min-h-screen overflow-hidden bg-[#0A0A0B] text-white">
+      <div className="relative z-20 px-5 pt-5">
+  <Link
+    href="/"
+    className="inline-flex rounded-xl border border-white/15 px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/10"
+  >
+    ← Dashboard
+  </Link>
+</div>
       <audio
         ref={audioRef}
         src={PARTY_AUDIO_SRC}
