@@ -42,6 +42,8 @@ type CrewMemberRow = {
   invite_code?: string | null;
   display_name?: string | null;
   crew_name?: string | null;
+  member_name?: string | null;
+crew_owner?: string | null;
   joined_at?: string | null;
 };
 
@@ -236,8 +238,12 @@ export default function CrewPage() {
     const [{ data: statusData, error: statusError }, { data: membersData, error: membersError }] =
       await Promise.all([
         supabase.from("crew_status").select("*").order("updated_at", { ascending: false }),
-        supabase.from("crew_members").select("*").order("joined_at", { ascending: false }),
+       supabase.from("crew_members").select("*").order("id", { ascending: false }),
       ]);
+    
+
+  console.log("MEMBERS ERROR:", membersError);
+  console.log("STATUS ERROR:", statusError);
 
     const combined: CrewStatusRow[] = [];
 
@@ -246,22 +252,32 @@ export default function CrewPage() {
     }
 
     if (!membersError && Array.isArray(membersData) && membersData.length > 0) {
-      const mappedMembers = (membersData as CrewMemberRow[]).map((member) => ({
-        id: member.id,
-        name: member.display_name || "Crew Member",
-        status: "joined",
-        heartbeat_bpm: null,
-        vibe_label: "Connected",
-        location_name: member.crew_name || "TwinCore Crew",
-        updated_at: member.joined_at || new Date().toISOString(),
-        latitude: null,
-        longitude: null,
-      }));
+    const mappedMembers = (membersData as CrewMemberRow[]).map((member) => ({
+  id: member.id,
+  name:
+    member.member_name ||
+    member.display_name ||
+    "Crew Member",
+  status: "joined",
+  heartbeat_bpm: null,
+  vibe_label: "Connected",
+  location_name:
+    member.crew_name ||
+    member.crew_owner ||
+    "TwinCore Crew",
+  updated_at: new Date().toISOString(),
+  latitude: null,
+  longitude: null,
+}));
 
       combined.push(...mappedMembers);
     }
 
     const deduped = dedupeCrewRows(combined);
+    console.log("STATUS DATA:", statusData);
+    console.log("MEMBERS DATA:", membersData);
+    console.log("COMBINED:", combined);
+    console.log("DEDUPED:", deduped);
 
     if (deduped.length > 0) {
       setCrewRows(deduped);
