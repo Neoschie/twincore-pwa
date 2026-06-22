@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { supabase } from "@/lib/supabase/client";
 import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
@@ -17,7 +18,6 @@ import {
   EyeOff,
   Lock,
 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
 
 /* =========================
    TYPES
@@ -39,17 +39,25 @@ const featureCards = [
     tone: "ice",
   },
   {
-    title: "Crew",
-    description: "Live crew awareness and movement",
-    href: "/crew",
-    tone: "blue",
-  },
-  {
-    title: "Party Mode",
-    description: "Live status and energy tracking",
-    href: "/party",
-    tone: "warm",
-  },
+  title: "Crew",
+  description: "Live crew awareness and movement",
+  href: "/crew",
+  tone: "blue",
+},
+
+{
+  title: "Invite Crew",
+  description: "Create, share and accept crew invites",
+  href: "/join",
+  tone: "blue",
+},
+
+{
+  title: "Party Mode",
+  description: "Live status and energy tracking",
+  href: "/party",
+  tone: "warm",
+},
   {
     title: "TwinMe",
     description: "Real-time awareness and guidance",
@@ -151,9 +159,20 @@ export default function HomePage() {
   const [trustedOnly, setTrustedOnly] = useState(false);
 
   useEffect(() => {
-    const n = localStorage.getItem("twincore_display_name");
-    const s = localStorage.getItem("twincore_party_status");
-    const l = localStorage.getItem("twincore_last_shared_location");
+supabase.auth.getUser().then(({ data }) => {
+  const user = data.user;
+
+  if (!user) return;
+
+ const n = localStorage.getItem(`twincore_display_name_${user.id}`);
+const s = localStorage.getItem(`twincore_party_status_${user.id}`);
+const l = localStorage.getItem(`twincore_last_shared_location_${user.id}`);
+
+if (n) setName(n);
+if (s) setStatus(s);
+ if (l) setLocation(true);
+
+});
     const g =
       localStorage.getItem("twincore_ghost_mode") ||
       localStorage.getItem("ghost_mode");
@@ -161,23 +180,30 @@ export default function HomePage() {
       localStorage.getItem("twincore_trusted_only") ||
       localStorage.getItem("trusted_crew_only");
 
-    if (n) setName(n);
-    if (s) setStatus(s);
-    if (l) setLocation(true);
     setGhostMode(parseStoredBoolean(g));
     setTrustedOnly(parseStoredBoolean(t));
 
     async function loadCrew() {
-      const { data } = await supabase
-        .from("crew_status")
-        .select("id,name,status,updated_at,latitude,longitude")
-        .order("updated_at", { ascending: false })
-        .limit(8);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-      if (data) {
-        setCrewRows(data as CrewRow[]);
-      }
-    }
+  if (!user) {
+    setCrewRows([]);
+    return;
+  }
+
+  const { data } = await supabase
+    .from("crew_status")
+    .select("id,name,status,updated_at,latitude,longitude")
+    .eq("user_id", user.id)
+    .order("updated_at", { ascending: false })
+    .limit(8);
+
+  if (data) {
+    setCrewRows(data as CrewRow[]);
+  }
+}
 
     void loadCrew();
 

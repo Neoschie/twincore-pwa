@@ -20,12 +20,33 @@ import {
   Sparkles,
   Volume2,
 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase/client";
 import AuthGuard from "@/components/auth/AuthGuard";
 import posthog from "posthog-js";
-const STORAGE_KEY = "twincore_profile";
+const getProfileStorageKey = (userId: string) =>
+  `twincore_profile_${userId}`;
 const PARTY_AUDIO_SRC = "/party-mode.mp3";
-const JOINED_CREW_KEY = "twincore_joined_crew";
+
+const getLastSharedLocationKey = (userId: string) =>
+  `twincore_last_shared_location_${userId}`;
+
+const getPartyStatusKey = (userId: string) =>
+  `twincore_party_status_${userId}`;
+
+const getPartyActiveKey = (userId: string) =>
+  `twincore_party_active_${userId}`;
+
+const getPartyAutoTrackingKey = (userId: string) =>
+  `twincore_party_auto_tracking_${userId}`;
+
+const getPartyLiveKey = (userId: string) =>
+  `twincore_party_live_${userId}`;
+
+const getJoinedCrewKey = (userId: string) =>
+  `twincore_joined_crew_${userId}`;
+
+const getCrewStatusIdKey = (userId: string) =>
+  `twincore_crew_status_id_${userId}`;
 const PARTY_STATUSES = [
   "Outside",
   "Drinking",
@@ -291,13 +312,17 @@ function getFriendlyLocationName(coords: Coordinates) {
   return `${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`;
 }
 function getCrewStatusId() {
-  const existing = window.localStorage.getItem("twincore_crew_status_id");
+  user
+  ? window.localStorage.getItem(getCrewStatusIdKey(user.id))
+  : null
   if (existing) return existing;
   const created =
     typeof crypto !== "undefined" && "randomUUID" in crypto
       ? crypto.randomUUID()
       : `crew-${Date.now()}`;
-  window.localStorage.setItem("twincore_crew_status_id", created);
+  if (user) {
+  window.localStorage.setItem(getCrewStatusIdKey(user.id), created);
+}
   return created;
 }
 function normalizeErrorMessage(error: unknown) {
@@ -323,7 +348,9 @@ function roundCoordinate(value: number, decimals: number) {
 }
 function getJoinedCrew(): JoinedCrewStorage {
   try {
-    const raw = window.localStorage.getItem(JOINED_CREW_KEY);
+  const raw = user
+  ? window.localStorage.getItem(getJoinedCrewKey(user.id))
+  : null;
     if (!raw) return {};
     return JSON.parse(raw) as JoinedCrewStorage;
   } catch {
@@ -331,9 +358,15 @@ function getJoinedCrew(): JoinedCrewStorage {
   }
 }
 
-function getPrivacySettings(): PrivacySettings {
+async function getPrivacySettings(): PrivacySettings {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const {
+  data: { user },
+} = await supabase.auth.getUser();
+
+const raw = user
+  ? window.localStorage.getItem(getProfileStorageKey(user.id))
+  : null;
     if (!raw) return defaultPrivacy;
     const parsed = JSON.parse(raw) as Partial<PrivacySettings>;
     return {
@@ -579,21 +612,32 @@ export default function PartyPage() {
     actions: [],
     level: "none",
   });
+ 
   useEffect(() => {
-    const savedName = window.localStorage.getItem("twincore_display_name");
-    const savedStatus = window.localStorage.getItem("twincore_party_status");
+    async function loadPartyPage() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      const savedName = user
+        ? window.localStorage.getItem(`twincore_display_name_${user.id}`)
+        : null;
+
+      const savedStatus = window.localStorage.getItem(getPartyStatusKey(user.id));
+
     const savedLocation = window.localStorage.getItem(
-      "twincore_last_shared_location"
+      getLastSharedLocationKey(user.id)
     );
     const savedAutoTracking =
-      window.localStorage.getItem("twincore_party_auto_tracking") === "true";
-    const savedPartyActive =
-      window.localStorage.getItem("twincore_party_active") === "true";
+      window.localStorage.getItem(getPartyLiveKey(user.id)) === "true";
+    
+      const savedPartyActive =
+      window.localStorage.getItem(getPartyStatusKey(user.id)) === "true";
     if (savedName) {
       setDisplayName(savedName);
     }
 
-    const joinedCrew = getJoinedCrew();
+    const joinedCrew = user ? getJoinedCrew(user.id) : {};
     if (joinedCrew.crewOwner?.trim()) {
       setCrewOwner(joinedCrew.crewOwner.trim());
     } else if (savedName) {
@@ -603,7 +647,7 @@ export default function PartyPage() {
       setSelectedStatus(savedStatus as PartyStatus);
     } else {
       setSelectedStatus("Listening to music");
-      window.localStorage.setItem("twincore_party_status", "Listening to music");
+      window.localStorage.setItem(getPartyStatusKey(user.id), "Listening to music");
     }
     if (savedLocation) {
       try {
@@ -630,46 +674,79 @@ export default function PartyPage() {
     if (savedPartyActive) {
       setPartyActive(true);
     }
-    setPrivacy(getPrivacySettings());
+
+    if (user) {
+  setPrivacy(getPrivacySettings(user.id));
+}
+   
     const onStorage = () => {
-      setPrivacy(getPrivacySettings());
-      const nextName = window.localStorage.getItem("twincore_display_name");
+    
+      const nextName = user
+  ? window.localStorage.getItem(`twincore_display_name_${user.id}`)
+  : null;
       if (nextName) setDisplayName(nextName);
 
-      const nextJoinedCrew = getJoinedCrew();
+      const nextJoinedCrew = user ? getJoinedCrew(user.id) : {};
       if (nextJoinedCrew.crewOwner?.trim()) {
         setCrewOwner(nextJoinedCrew.crewOwner.trim());
       } else if (nextName) {
         setCrewOwner(nextName);
       }
-      const nextStatus = window.localStorage.getItem("twincore_party_status");
+      const nextStatus = window.localStorage.getItem(getPartyStatusKey(user.id));
       if (nextStatus && PARTY_STATUSES.includes(nextStatus as PartyStatus)) {
         setSelectedStatus(nextStatus as PartyStatus);
       }
       const nextPartyActive =
-        window.localStorage.getItem("twincore_party_active") === "true";
+        window.localStorage.getItem(getPartyStatusKey(user.id)) === "true";
       setPartyActive(nextPartyActive);
     };
+  
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
-  }, []);
+  }
+
+  loadPartyPage();
+}, []);
+
   useEffect(() => {
-    if (!selectedStatus) return;
-    window.localStorage.setItem("twincore_party_status", selectedStatus);
-  }, [selectedStatus]);
-  useEffect(() => {
+  if (!selectedStatus) return;
+
+  supabase.auth.getUser().then(({ data }) => {
+    const user = data.user;
+    if (!user) return;
+
     window.localStorage.setItem(
-      "twincore_party_auto_tracking",
+      getPartyStatusKey(user.id),
+      selectedStatus
+    );
+  });
+}, [selectedStatus]);
+
+  useEffect(() => {
+  supabase.auth.getUser().then(({ data }) => {
+    const user = data.user;
+    if (!user) return;
+
+    window.localStorage.setItem(
+      getPartyAutoTrackingKey(user.id),
       autoTracking ? "true" : "false"
     );
-  }, [autoTracking]);
-  useEffect(() => {
+  });
+}, [autoTracking]);
+
+useEffect(() => {
+  supabase.auth.getUser().then(({ data }) => {
+    const user = data.user;
+    if (!user) return;
+
     window.localStorage.setItem(
-      "twincore_party_active",
+      getPartyActiveKey(user.id),
       partyActive ? "true" : "false"
     );
-  }, [partyActive]);
-  useEffect(() => {
+  });
+}, [partyActive]);
+ 
+useEffect(() => {
     if (!isPlaying) {
       setPulse(false);
       return;
@@ -681,36 +758,58 @@ export default function PartyPage() {
       window.clearInterval(interval);
     };
   }, [isPlaying]);
-  function writePartyLiveState(
-    status: PartyStatus,
-    coords: Coordinates | null,
-    source: "status" | "checkin" | "tracking" | "toggle" | "bootstrap",
-    activeOverride?: boolean
-  ) {
-    const active = activeOverride ?? partyActive;
-    const liveState = {
-      active,
-      status,
-      source,
-      timestamp: new Date().toISOString(),
-      autoTracking,
-      ghostMode: privacy.ghostMode,
-      trustedOnly: privacy.trustedOnly,
-      vibeLabel: privacy.ghostMode
-        ? privacy.ghostLabel || "Low Visibility"
-        : getVibeLabelForStatus(status),
-      mood: privacy.ghostMode ? "ghost" : getMoodForStatus(status),
-      heartbeatBpm: getHeartbeatForStatus(status),
-      latitude: coords?.latitude ?? null,
-      longitude: coords?.longitude ?? null,
-    };
-    window.localStorage.setItem("twincore_party_live", JSON.stringify(liveState));
-    window.localStorage.setItem("twincore_party_status", status);
+  
+function writePartyLiveState(
+  userId: string,
+  status: PartyStatus,
+  coords: Coordinates | null,
+  source: "status" | "checkin" | "tracking" | "toggle" | "bootstrap",
+  activeOverride?: boolean
+) {
+  const active = activeOverride ?? partyActive;
+
+  const liveState = {
+    active,
+    status,
+    source,
+    timestamp: new Date().toISOString(),
+    autoTracking,
+    ghostMode: privacy.ghostMode,
+    trustedOnly: privacy.trustedOnly,
+    vibeLabel: privacy.ghostMode
+      ? privacy.ghostLabel || "Low Visibility"
+      : getVibeLabelForStatus(status),
+    mood: privacy.ghostMode ? "ghost" : getMoodForStatus(status),
+    heartbeatBpm: getHeartbeatForStatus(status),
+    latitude: coords?.latitude ?? null,
+    longitude: coords?.longitude ?? null,
+  };
+
+  window.localStorage.setItem(
+    getPartyLiveKey(userId),
+    JSON.stringify(liveState)
+  );
+
+  window.localStorage.setItem(getPartyStatusKey(userId), status);
+
+  window.localStorage.setItem(
+    getPartyActiveKey(userId),
+    active ? "true" : "false"
+  );
+
+  if (coords) {
     window.localStorage.setItem(
-      "twincore_party_active",
-      active ? "true" : "false"
+      getLastSharedLocationKey(userId),
+      JSON.stringify({
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        timestamp: new Date().toISOString(),
+        mapsUrl: `https://maps.google.com/?q=${coords.latitude},${coords.longitude}`,
+      })
     );
   }
+}
+
   async function syncCrewStatus(
     status: PartyStatus,
     trigger: "status" | "checkin" | "tracking" | "toggle",
@@ -732,27 +831,34 @@ export default function PartyPage() {
       );
       const coords = await getCurrentCoordinates();
       setLastCoords(coords);
+      
       const exactMapsUrl = `https://maps.google.com/?q=${coords.latitude},${coords.longitude}`;
       const exactLocationName = getFriendlyLocationName(coords);
-      window.localStorage.setItem(
-        "twincore_last_shared_location",
-        JSON.stringify({
-          latitude: coords.latitude,
-          longitude: coords.longitude,
-          timestamp: new Date().toISOString(),
-          mapsUrl: exactMapsUrl,
-        })
-      );
-      writePartyLiveState(status, coords, trigger, active);
+    window.localStorage.setItem(
+  getLastSharedLocationKey(user.id),
+  JSON.stringify({
+    latitude: coords.latitude,
+    longitude: coords.longitude,
+    timestamp: new Date().toISOString(),
+    mapsUrl: exactMapsUrl,
+  })
+);
+
+    writePartyLiveState(user.id, status, coords, trigger, active);  
       if (!supabase) {
         throw new Error("Supabase is not configured.");
       }
       const rowIdFromStorage = getCrewStatusId();
-      const { data: existingByName, error: lookupError } = await supabase
-        .from("crew_status")
-        .select("id,name")
-        .eq("name", displayName)
-        .maybeSingle();
+      if (!user) {
+  throw new Error("User is not signed in.");
+}
+
+const { data: existingByName, error: lookupError } = await supabase
+  .from("crew_status")
+  .select("id,name")
+  .eq("user_id", user.id)
+  .eq("name", displayName)
+  .maybeSingle();
       if (lookupError) {
         throw new Error(lookupError.message || "Could not look up crew row.");
       }
@@ -760,7 +866,9 @@ export default function PartyPage() {
         ((existingByName as { id?: string } | null)?.id as string | undefined) ||
         rowIdFromStorage;
       if (rowId !== rowIdFromStorage) {
-        window.localStorage.setItem("twincore_crew_status_id", rowId);
+      if (user) {
+  window.localStorage.setItem(getCrewStatusIdKey(user.id), rowId);
+}
       }
       const payloadLatitude =
         privacy.ghostMode && privacy.blurPresence
@@ -780,8 +888,9 @@ export default function PartyPage() {
         : getVibeLabelForStatus(status);
       const payloadMood = privacy.ghostMode ? "ghost" : getMoodForStatus(status);
       const payload = {
-        id: rowId,
-        name: displayName,
+  id: rowId,
+  user_id: user.id,
+  name: displayName,
         status: active ? status : "Safe",
         latitude: payloadLatitude,
         longitude: payloadLongitude,
@@ -833,16 +942,19 @@ export default function PartyPage() {
   async function loadCrewRowsForAwareness() {
     if (!supabase || !displayName) return [] as CrewStatusRow[];
 
-    const joined = getJoinedCrew();
+    if (!user) return [];
+
+const joined = getJoinedCrew(user.id);
     const owner = joined.crewOwner?.trim() || crewOwner || displayName;
 
     const memberNames = new Set<string>();
     memberNames.add(owner);
 
     const { data: memberRows, error: memberError } = await supabase
-      .from("crew_members")
-      .select("crew_owner, member_name")
-      .eq("crew_owner", owner);
+  .from("crew_members")
+  .select("crew_owner, member_name")
+  .eq("user_id", user.id)
+  .eq("crew_owner", owner);
 
     if (memberError) {
       throw new Error(memberError.message || "Unable to load crew members.");
@@ -861,9 +973,10 @@ export default function PartyPage() {
     }
 
     const { data: statusRows, error: statusError } = await supabase
-      .from("crew_status")
-      .select("id,name,status,updated_at")
-      .in("name", namesToLoad);
+  .from("crew_status")
+  .select("id,name,status,updated_at")
+  .eq("user_id", user.id)
+  .in("name", namesToLoad);
 
     if (statusError) {
       throw new Error(statusError.message || "Unable to load crew status.");
@@ -929,34 +1042,62 @@ export default function PartyPage() {
       void syncCrewStatus(selectedStatus, "tracking", true);
     }, 12000);
   }
-  useEffect(() => {
-    if (!selectedStatus) return;
+
+useEffect(() => {
+  if (!selectedStatus) return;
+
+  supabase.auth.getUser().then(({ data }) => {
+    const user = data.user;
+    if (!user) return;
+
     writePartyLiveState(
+      user.id,
       selectedStatus,
       lastCoords,
       firstSyncSkippedRef.current ? "status" : "bootstrap",
       partyActive
     );
-    if (!firstSyncSkippedRef.current) {
-      firstSyncSkippedRef.current = true;
-      return;
-    }
-    if (!partyActive) return;
-    void syncCrewStatus(selectedStatus, "status", true);
-  }, [selectedStatus]);
-  useEffect(() => {
-    if (!selectedStatus) return;
-    writePartyLiveState(selectedStatus, lastCoords, "toggle", partyActive);
-    if (!partyActive) {
-      stopAutoTracking();
-      return;
-    }
-    void syncCrewStatus(selectedStatus, "toggle", true);
-  }, [partyActive]);
-  useEffect(() => {
-    if (!selectedStatus) return;
-    writePartyLiveState(selectedStatus, lastCoords, "bootstrap", partyActive);
-  }, [privacy, autoTracking, lastCoords, selectedStatus, partyActive]);
+  });
+
+  if (!firstSyncSkippedRef.current) {
+    firstSyncSkippedRef.current = true;
+    return;
+  }
+
+  if (!partyActive) return;
+  void syncCrewStatus(selectedStatus, "status", true);
+}, [selectedStatus]);
+
+useEffect(() => {
+  if (!selectedStatus) return;
+
+  supabase.auth.getUser().then(({ data }) => {
+    const user = data.user;
+    if (!user) return;
+
+    writePartyLiveState(user.id, selectedStatus, lastCoords, "toggle", partyActive);
+  });
+
+  if (!partyActive) {
+    stopAutoTracking();
+    return;
+  }
+
+  void syncCrewStatus(selectedStatus, "toggle", true);
+}, [partyActive]);
+
+useEffect(() => {
+  if (!selectedStatus) return;
+
+  supabase.auth.getUser().then(({ data }) => {
+    const user = data.user;
+    if (!user) return;
+
+    writePartyLiveState(user.id, selectedStatus, lastCoords, "bootstrap", partyActive);
+  });
+}, [privacy, autoTracking, lastCoords, selectedStatus, partyActive]);
+
+
   useEffect(() => {
     if (!selectedStatus) return;
     if (autoTracking && partyActive) {
@@ -998,7 +1139,7 @@ export default function PartyPage() {
     if (!autoVoiceEnabled) return;
     const interval = setInterval(async () => {
       try {
-        const raw = window.localStorage.getItem("twincore_party_live");
+        const raw = window.localStorage.getItem(getPartyLiveKey(user.id));
         if (!raw) return;
         const live = JSON.parse(raw) as {
           active?: boolean;
@@ -1118,28 +1259,45 @@ export default function PartyPage() {
     posthog.capture("party_status_updated", { status });
     setSelectedStatus(status);
   }
+
   async function handleSendCheckIn() {
-    const currentStatus = selectedStatus ?? "Listening to music";
-    posthog.capture("party_checkin_sent", { status: currentStatus });
-    setCheckInSent(true);
-    if (!partyActive) {
-      setPartyActive(true);
-      writePartyLiveState(currentStatus, lastCoords, "checkin", true);
-      await syncCrewStatus(currentStatus, "checkin", true);
-    } else {
-      writePartyLiveState(currentStatus, lastCoords, "checkin", true);
-      await syncCrewStatus(currentStatus, "checkin", true);
-    }
-    window.setTimeout(() => {
-      setCheckInSent(false);
-    }, 2200);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return;
+
+  const currentStatus = selectedStatus ?? "Listening to music";
+
+  posthog.capture("party_checkin_sent", { status: currentStatus });
+  setCheckInSent(true);
+
+  if (!partyActive) {
+    setPartyActive(true);
+    writePartyLiveState(user.id, currentStatus, lastCoords, "checkin", true);
+    await syncCrewStatus(currentStatus, "checkin", true);
+  } else {
+    writePartyLiveState(user.id, currentStatus, lastCoords, "checkin", true);
+    await syncCrewStatus(currentStatus, "checkin", true);
   }
-  function handleTogglePartyMode() {
+
+  window.setTimeout(() => {
+    setCheckInSent(false);
+  }, 2200);
+}
+
+  async function handleTogglePartyMode() {
     if (!selectedStatus) return;
     const nextActive = !partyActive;
     posthog.capture("party_mode_toggled", { active: nextActive });
     setPartyActive(nextActive);
-    writePartyLiveState(selectedStatus, lastCoords, "toggle", nextActive);
+    const {
+  data: { user },
+} = await supabase.auth.getUser();
+
+if (!user) return;
+
+writePartyLiveState(user.id, selectedStatus, lastCoords, "toggle", nextActive);
   }
   function handleInterventionAction(action: string) {
     if (action.includes("Reconnect")) {
@@ -1350,7 +1508,7 @@ export default function PartyPage() {
               {autoTracking ? "Stop Tracking" : "Start Tracking"}
             </button>
           </div>
-          <div className="mt-3 grid grid-cols-2 gap-3">
+          <div className="mt-3 grid grid-cols-3 gap-3">
             <button
               type="button"
               onClick={() => setAutoVoiceEnabled((prev) => !prev)}
@@ -1365,6 +1523,14 @@ export default function PartyPage() {
             >
               {checkInSent ? "Check-in Sent" : "Send Check-in"}
             </button>
+
+          <Link
+  href="/join"
+  className="rounded-2xl bg-fuchsia-500 px-4 py-4 text-center text-sm font-semibold text-white transition duration-200 hover:bg-fuchsia-600 active:scale-[0.97]"
+>
+  🎉 Invite Tonight&apos;s Crew
+</Link>
+
           </div>
           <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
             <div className="mb-2 flex items-center gap-2 text-sm font-medium text-white/85">

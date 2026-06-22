@@ -14,7 +14,8 @@ import {
   sectionHeadingStyle,
 } from "@/components/twincore-ui";
 
-const PROFILE_STORAGE_KEY = "twincore_profile";
+const getProfileStorageKey = (userId: string) =>
+  `twincore_profile_${userId}`;
 const CREW_CODE_STORAGE_KEY = "twincore_crew_code";
 
 type ProfileData = {
@@ -31,20 +32,21 @@ export default function ContactCardPage() {
   const [crewCode, setCrewCode] = useState("");
   const [shareUrl, setShareUrl] = useState("https://twincore.co/join");
 
-  useEffect(() => {
-    const rawProfile = localStorage.getItem(PROFILE_STORAGE_KEY);
-    if (rawProfile) {
-      try {
-        const parsed = JSON.parse(rawProfile) as ProfileData;
-        setProfile(parsed);
-      } catch {}
-    }
+useEffect(() => {
+  async function loadContactCard() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-    const savedCrewCode = localStorage.getItem(CREW_CODE_STORAGE_KEY);
-    if (savedCrewCode) {
-      setCrewCode(savedCrewCode);
-    }
-  }, []);
+    const rawProfile = user
+      ? localStorage.getItem(getProfileStorageKey(user.id))
+      : null;
+
+    // keep the existing rawProfile parsing code here
+  }
+
+  loadContactCard();
+}, []);
 
   useEffect(() => {
     const nextUrl = crewCode

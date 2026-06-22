@@ -15,7 +15,7 @@ import {
   EyeOff,
   Ghost,
 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase/client";
 import StatusChip from "../_components/status-chip";
 import PageHeader from "../_components/page-header";
 import GlobalStatusBar from "../_components/global-status-bar";
@@ -23,7 +23,8 @@ import AnimatedCard from "../_components/animated-card";
 
 import AuthGuard from "@/components/auth/AuthGuard";
 
-const STORAGE_KEY = "twincore_profile";
+const getProfileStorageKey = (userId: string) =>
+  `twincore_profile_${userId}`;
 
 type CrewStatusRow = {
   id?: string;
@@ -160,9 +161,9 @@ function getMockRadarPosition(index: number, total: number) {
   };
 }
 
-function getPrivacySettings(): PrivacySettings {
+function getPrivacySettings(userId: string): PrivacySettings {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = window.localStorage.getItem(getProfileStorageKey(userId));
     if (!raw) return defaultPrivacy;
 
     const parsed = JSON.parse(raw) as Partial<PrivacySettings>;
@@ -228,92 +229,121 @@ export default function CrewPage() {
   const [liveTick, setLiveTick] = useState(false);
   const [privacy, setPrivacy] = useState<PrivacySettings>(defaultPrivacy);
 
-  async function loadCrewSignals() {
-    if (!supabase) {
-      setCrewRows([]);
-      setCrewMessage("Crew connection unavailable");
-      return;
-    }
+async function loadCrewSignals() {
+  if (!supabase) {
+    setCrewRows([]);
+    setCrewMessage("Crew connection unavailable");
+    return;
+  }
 
-    const [{ data: statusData, error: statusError }, { data: membersData, error: membersError }] =
-      await Promise.all([
-        supabase.from("crew_status").select("*").order("updated_at", { ascending: false }),
-       supabase.from("crew_members").select("*").order("id", { ascending: false }),
-      ]);
-    
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
+  if (!user) {
+    setCrewRows([]);
+    setCrewMessage("Please sign in to see your crew.");
+    return;
+  }
+
+  const [
+    { data: statusData, error: statusError },
+    { data: membersData, error: membersError },
+  ] = await Promise.all([
+    supabase
+      .from("crew_status")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("updated_at", { ascending: false }),
+
+    supabase
+      .from("crew_members")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("id", { ascending: false }),
+  ]);
+
+  console.log("CREW PAGE USER:", user.email);
+  console.log("CREW PAGE USER ID:", user.id);
   console.log("MEMBERS ERROR:", membersError);
   console.log("STATUS ERROR:", statusError);
 
-    const combined: CrewStatusRow[] = [];
+  const combined: CrewStatusRow[] = [];
 
-    if (!statusError && Array.isArray(statusData) && statusData.length > 0) {
-      combined.push(...(statusData as CrewStatusRow[]));
-    }
-
-    if (!membersError && Array.isArray(membersData) && membersData.length > 0) {
-    const mappedMembers = (membersData as CrewMemberRow[]).map((member) => ({
-  id: member.id,
-  name:
-    member.member_name ||
-    member.display_name ||
-    "Crew Member",
-  status: "joined",
-  heartbeat_bpm: null,
-  vibe_label: "Connected",
-  location_name:
-    member.crew_name ||
-    member.crew_owner ||
-    "TwinCore Crew",
-  updated_at: new Date().toISOString(),
-  latitude: null,
-  longitude: null,
-}));
-
-      combined.push(...mappedMembers);
-    }
-
-    const deduped = dedupeCrewRows(combined);
-    console.log("STATUS DATA:", statusData);
-    console.log("MEMBERS DATA:", membersData);
-    console.log("COMBINED:", combined);
-    console.log("DEDUPED:", deduped);
-
-    if (deduped.length > 0) {
-      setCrewRows(deduped);
-      setCrewMessage("Crew pulse connected");
-      return;
-    }
-
-    setCrewRows([]);
-    setCrewMessage("Crew energy unavailable");
+  if (!statusError && Array.isArray(statusData) && statusData.length > 0) {
+    combined.push(...(statusData as CrewStatusRow[]));
   }
 
-  useEffect(() => {
-    setPrivacy(getPrivacySettings());
+  if (!membersError && Array.isArray(membersData) && membersData.length > 0) {
+    const mappedMembers = (membersData as CrewMemberRow[]).map((member) => ({
+      id: member.id,
+      name: member.member_name || member.display_name || "Crew Member",
+      status: "joined",
+      heartbeat_bpm: null,
+      vibe_label: "Connected",
+      location_name: member.crew_name || member.crew_owner || "TwinCore Crew",
+      updated_at: new Date().toISOString(),
+      latitude: null,
+      longitude: null,
+    }));
+
+    combined.push(...mappedMembers);
+  }
+
+  const deduped = dedupeCrewRows(combined);
+
+  if (deduped.length > 0) {
+    setCrewRows(deduped);
+    setCrewMessage("Crew pulse connected");
+    return;
+  }
+
+ setCrewRows([]);
+setCrewMessage(
+  "No crew connected yet. TwinCore works best when your trusted people are connected. Invite trusted people to stay connected, share movement, and check in together."
+);
+}
+
+useEffect(() => {
+  let currentUserId: string | null = null;
+
+  async function loadUserPrivacy() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) return;
+
+    currentUserId = user.id;
+    setPrivacy(getPrivacySettings(user.id));
+  }
+
+  loadUserPrivacy();
+  void loadCrewSignals();
+
+  const interval = window.setInterval(() => {
     void loadCrewSignals();
+    setLiveTick((prev) => !prev);
+  }, 8000);
 
-    const interval = window.setInterval(() => {
-      void loadCrewSignals();
-      setLiveTick((prev) => !prev);
-    }, 8000);
+  const pulseInterval = window.setInterval(() => {
+    setLiveTick((prev) => !prev);
+  }, 1800);
 
-    const pulseInterval = window.setInterval(() => {
-      setLiveTick((prev) => !prev);
-    }, 1800);
+  const onStorage = () => {
+    if (currentUserId) {
+      setPrivacy(getPrivacySettings(currentUserId));
+    }
+  };
 
-    const onStorage = () => {
-      setPrivacy(getPrivacySettings());
-    };
+  window.addEventListener("storage", onStorage);
 
-    window.addEventListener("storage", onStorage);
-
-    return () => {
-      window.clearInterval(interval);
-      window.clearInterval(pulseInterval);
-      window.removeEventListener("storage", onStorage);
-    };
-  }, []);
+  return () => {
+    window.clearInterval(interval);
+    window.clearInterval(pulseInterval);
+    window.removeEventListener("storage", onStorage);
+  };
+}, []);
 
   const displayRows = useMemo(
     () => crewRows.map((row) => getDisplayRow(row, privacy)),
@@ -386,14 +416,35 @@ export default function CrewPage() {
                 LIVE CREW STREAM
               </div>
 
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white">
-                Crew looks steady
-              </h2>
+   <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white">
+  {crewStats.total > 0 ? "Crew looks steady" : "No crew connected yet"}
+</h2>
 
-              <p className="mt-3 max-w-md text-sm leading-6 text-white/70">
-                {crewMessage}. Trusted-only visibility is{" "}
-                {privacy.trustedOnly ? "active" : "off"} on this device.
-              </p>
+<div className="mt-4 flex flex-wrap gap-3">
+  <Link
+    href="/join"
+    className="rounded-xl bg-fuchsia-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-fuchsia-600"
+  >
+    + Invite Crew Member
+  </Link>
+
+  <Link
+    href="/join"
+    className="rounded-xl border border-white/15 px-4 py-2 text-sm font-semibold text-white/80 transition hover:bg-white/10"
+  >
+    Join Invite
+  </Link>
+</div>
+
+<p className="mt-3 max-w-md text-sm leading-6 text-white/70">
+
+  {crewStats.total > 0
+    ? `${crewMessage}. Trusted-only visibility is ${
+        privacy.trustedOnly ? "active" : "off"
+      } on this device.`
+    : "TwinCore works best when trusted people are connected. Invite people you care about to share movement, check-ins, Party Mode, Spots and TwinMe insights together."}
+
+</p>
             </div>
 
             <div className="grid grid-cols-3 gap-3">

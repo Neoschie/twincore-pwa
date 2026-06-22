@@ -11,7 +11,8 @@ export type InviteRecord = {
 };
 
 const STORAGE_KEY = "twincore_invites";
-const CREW_STORAGE_KEY = "twincore_joined_crew";
+const getCrewStorageKey = (userId: string) =>
+  `twincore_joined_crew_${userId}`;
 
 function canUseStorage() {
   return typeof window !== "undefined";
@@ -75,7 +76,7 @@ export function createLocalInvite(inviterName: string, crewName: string) {
   return invite;
 }
 
-export function acceptLocalInvite(code: string) {
+export function acceptLocalInvite(code: string, userId: string) {
   const safeCode = normalizeInviteCode(code);
   const invites = readLocalInvites();
   const inviteIndex = invites.findIndex((item) => item.code === safeCode);
@@ -93,7 +94,7 @@ export function acceptLocalInvite(code: string) {
 
   if (canUseStorage()) {
     localStorage.setItem(
-      CREW_STORAGE_KEY,
+      getCrewStorageKey(userId),
       JSON.stringify({
         inviteCode: updatedInvite.code,
         crewName: updatedInvite.crewName,
@@ -106,10 +107,10 @@ export function acceptLocalInvite(code: string) {
   return updatedInvite;
 }
 
-export function getJoinedCrew() {
+export function getJoinedCrew(userId: string) {
   if (!canUseStorage()) return null;
   try {
-    const raw = localStorage.getItem(CREW_STORAGE_KEY);
+    const raw = localStorage.getItem(getCrewStorageKey(userId));
     if (!raw) return null;
     return JSON.parse(raw) as {
       inviteCode: string;

@@ -43,6 +43,12 @@ export default function AuthPage() {
     }
 
     const user = result.data.user;
+
+localStorage.removeItem("twincore_onboarding_complete");
+    
+    console.log("AUTH RESULT USER:", user?.email);
+    console.log("AUTH RESULT USER ID:", user?.id);
+    alert(`Logged in as: ${user?.email}`);
     if (user) {
       posthog.identify(user.id, { email: user.email });
       if (mode === "signup") {
@@ -66,18 +72,21 @@ setIsLoading(false);
 
 if (isSignup) {
   localStorage.removeItem("twincore_onboarding_complete");
-  router.push("/onboarding");
+  router.push("/");
   return;
 }
+
+const {
+  data: { user: currentUser },
+} = await supabase.auth.getUser();
+
+console.log("CURRENT USER:", currentUser?.email);
+console.log("CURRENT USER ID:", currentUser?.id);
 
 const completedOnboarding =
   localStorage.getItem("twincore_onboarding_complete") === "true";
 
-router.push(
-  completedOnboarding
-    ? "/twinme"
-    : "/onboarding"
-);
+router.push("/");
 
   }
 

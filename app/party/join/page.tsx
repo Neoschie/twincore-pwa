@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { supabase } from "@/lib/supabase/client";
 import { useEffect, useState } from "react";
 import {
   PageHeader,
@@ -13,15 +14,26 @@ import {
   sectionHeadingStyle,
 } from "@/components/twincore-ui";
 
-const PROFILE_STORAGE_KEY = "twincore_profile";
+const getProfileStorageKey = (userId: string) =>
+  `twincore_profile_${userId}`;
+
+const getJoinedCrewCodeKey = (userId: string) =>
+  `twincore_joined_crew_code_${userId}`;
 
 export default function JoinPage() {
   const [displayName, setDisplayName] = useState("Guest");
   const [crewCode, setCrewCode] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
 
-  useEffect(() => {
-    const rawProfile = localStorage.getItem(PROFILE_STORAGE_KEY);
+ useEffect(() => {
+  async function loadJoinPage() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    const rawProfile = user
+      ? localStorage.getItem(getProfileStorageKey(user.id))
+      : null;
 
     if (rawProfile) {
       try {
@@ -38,15 +50,27 @@ export default function JoinPage() {
     if (codeFromUrl) {
       setCrewCode(codeFromUrl.toUpperCase());
     }
-  }, []);
+  }
 
-  function joinCrew() {
+  loadJoinPage();
+}, []);
+
+  async function joinCrew() {
     if (!crewCode.trim()) {
       setStatusMessage("No crew code found.");
       return;
     }
 
-    localStorage.setItem("twincore_joined_crew_code", crewCode);
+    const {
+  data: { user },
+} = await supabase.auth.getUser();
+
+if (!user) {
+  setStatusMessage("Please sign in first.");
+  return;
+}
+
+localStorage.setItem(getJoinedCrewCodeKey(user.id), crewCode);
     setStatusMessage(`${displayName} joined crew ${crewCode}.`);
     alert(`${displayName} joined crew ${crewCode}.`);
   }

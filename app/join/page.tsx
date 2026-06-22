@@ -1,21 +1,57 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createLocalInvite, normalizeInviteCode } from "@/lib/invite-system";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase/client";
+
+type StoredProfile = {
+  displayName?: string;
+  photoUrl?: string;
+};
+
+const getProfileStorageKey = (userId: string) =>
+  `twincore_profile_${userId}`;
 
 export default function JoinPage() {
   const router = useRouter();
 
   const [inviteCode, setInviteCode] = useState("");
   const [inviterName, setInviterName] = useState("Neo");
+  const [inviterAvatarUrl, setInviterAvatarUrl] = useState("");
   const [crewName, setCrewName] = useState("TwinCore Crew");
   const [creating, setCreating] = useState(false);
   const [createdLink, setCreatedLink] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
   const [copied, setCopied] = useState(false);
+  
+  useEffect(() => {
+  async function loadInviterProfile() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) return;
+
+    const raw = localStorage.getItem(getProfileStorageKey(user.id));
+    if (!raw) return;
+
+    try {
+      const parsed = JSON.parse(raw) as StoredProfile;
+
+      if (parsed.displayName?.trim()) {
+        setInviterName(parsed.displayName.trim());
+      }
+
+      if (parsed.photoUrl?.trim()) {
+        setInviterAvatarUrl(parsed.photoUrl.trim());
+      }
+    } catch {}
+  }
+
+  loadInviterProfile();
+}, []);
 
   const cleanedCode = useMemo(() => normalizeInviteCode(inviteCode), [inviteCode]);
 
@@ -34,10 +70,19 @@ export default function JoinPage() {
     setCreatedLink("");
 
     try {
-      const localInvite = createLocalInvite(inviterName, crewName);
-      const link = `${window.location.origin}/invite/${localInvite.code}`;
+      const {
+  data: { user },
+} = await supabase.auth.getUser();
 
-      if (!supabase) {
+if (!user) {
+  setStatusMessage("Please sign in first.");
+  return;
+}
+
+const localInvite = createLocalInvite(inviterName, crewName);
+const link = `${window.location.origin}/invite/${localInvite.code}`;
+
+if (!supabase) {
         setCreatedLink(link);
         setInviteCode(localInvite.code);
         setStatusMessage("Supabase is not connected in this build.");
@@ -47,12 +92,14 @@ export default function JoinPage() {
       const { data, error } = await supabase
         .from("crew_invites")
         .insert({
-          code: localInvite.code,
-          inviter_name: localInvite.inviterName,
-          crew_name: localInvite.crewName,
-          status: localInvite.status,
-          created_at: localInvite.createdAt,
-        })
+  user_id: user.id,
+  code: localInvite.code,
+  inviter_name: localInvite.inviterName,
+  inviter_avatar_url: inviterAvatarUrl || null,
+  crew_name: localInvite.crewName,
+  status: localInvite.status,
+  created_at: localInvite.createdAt,
+})
         .select();
 
       if (error) {
@@ -81,6 +128,24 @@ export default function JoinPage() {
   }
 
   async function handleCopy() {
+
+    async function handleShare() {
+  if (!createdLink) return;
+
+  try {
+    if (navigator.share) {
+      await navigator.share({
+        title: "Join my TwinCore Crew",
+        text: "Join my trusted TwinCore crew.",
+        url: createdLink,
+      });
+    } else {
+      await navigator.clipboard.writeText(createdLink);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  } catch {}
+}
     if (!createdLink) return;
 
     try {
@@ -92,25 +157,44 @@ export default function JoinPage() {
     }
   }
 
+  async function handleShare() {
+  if (!createdLink) return;
+
+  try {
+    if (navigator.share) {
+      await navigator.share({
+        title: "Join my TwinCore Crew",
+        text: "Join my trusted TwinCore crew.",
+        url: createdLink,
+      });
+    } else {
+      await navigator.clipboard.writeText(createdLink);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  } catch {}
+}
+
   return (
     <main className="min-h-screen bg-[#050816] text-white">
       <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col px-4 py-8 sm:px-6">
-        <div className="mb-6">
-          <div className="inline-flex items-center rounded-full border border-fuchsia-400/30 bg-fuchsia-400/10 px-3 py-1 text-xs font-medium text-fuchsia-200">
-            Crew Access
-          </div>
-          <h1 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">
-            Join or create an invite
-          </h1>
-          <p className="mt-2 max-w-2xl text-sm text-white/70 sm:text-base">
-            Enter a code to join an existing TwinCore invite, or generate a fresh link for another user.
-          </p>
-        </div>
+       <div className="mb-6">
+  <div className="inline-flex items-center rounded-full border border-fuchsia-400/30 bg-fuchsia-400/10 px-3 py-1 text-xs font-medium text-fuchsia-200">
+    Crew Invitations
+  </div>
+
+  <h1 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">
+    Crew Invitation Center
+  </h1>
+
+  <p className="mt-2 max-w-2xl text-sm text-white/70 sm:text-base">
+    Create a crew invite, share it with trusted people, or enter a code to join someone else&apos;s TwinCore crew.
+  </p>
+</div>
 
         <div className="space-y-6">
           <section className="rounded-3xl border border-white/10 bg-white/5 p-5 shadow-2xl backdrop-blur sm:p-6">
-            <h2 className="text-lg font-semibold">Join with invite code</h2>
-            <div className="mt-4 space-y-4">
+<h2 className="text-lg font-semibold">Join an Existing Crew</h2>            <div className="mt-4 space-y-4">
               <div>
                 <label htmlFor="inviteCode" className="mb-2 block text-sm text-white/70">
                   Invite code
@@ -144,7 +228,7 @@ export default function JoinPage() {
           </section>
 
           <section className="rounded-3xl border border-white/10 bg-white/5 p-5 shadow-2xl backdrop-blur sm:p-6">
-            <h2 className="text-lg font-semibold">Create a fresh invite</h2>
+            <h2 className="text-lg font-semibold">Create a Crew Invite</h2>
 
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <div>
@@ -184,30 +268,61 @@ export default function JoinPage() {
             </div>
 
             {createdLink ? (
-              <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4">
-                <div className="text-xs uppercase tracking-[0.22em] text-fuchsia-200/80">
-                  Share this link
-                </div>
-                <div className="mt-2 break-all text-sm text-white/85">{createdLink}</div>
+  <div className="mt-5 rounded-3xl border border-fuchsia-400/20 bg-fuchsia-400/5 p-5 shadow-[0_12px_30px_rgba(0,0,0,0.25)]">
 
-                <div className="mt-4 flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    onClick={handleCopy}
-                    className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
-                  >
-                    {copied ? "Copied" : "Copy link"}
-                  </button>
+    <div className="text-xs font-semibold uppercase tracking-[0.22em] text-fuchsia-200">
+      Crew Invite Ready 🎉
+    </div>
 
-                  <a
-                    href={createdLink}
-                    className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
-                  >
-                    Open link
-                  </a>
-                </div>
-              </div>
-            ) : null}
+    <p className="mt-2 text-sm text-white/70">
+      Share this invite with trusted people to connect Party Mode,
+      Crew, Spots and TwinMe.
+    </p>
+
+    <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-3">
+      <div className="break-all text-sm text-white/90">
+        {createdLink}
+      </div>
+    </div>
+
+    <div className="mt-4 flex flex-wrap gap-3">
+
+      <button
+        type="button"
+        onClick={handleCopy}
+        className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-fuchsia-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-fuchsia-600"
+      >
+        {copied ? "Copied ✓" : "Copy Link"}
+      </button>
+
+      <a
+        href={createdLink}
+        className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
+      >
+
+<button
+  type="button"
+  onClick={handleShare}
+  className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
+>
+  Share
+</button>
+
+<button
+  type="button"
+  onClick={handleShare}
+  className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
+>
+  Share
+</button>
+
+        Open Invite
+      </a>
+
+    </div>
+
+  </div>
+) : null}
 
             {statusMessage ? (
               <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/80">

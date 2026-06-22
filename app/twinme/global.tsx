@@ -29,7 +29,7 @@ type LocalSignals = {
   hour: number;
 };
 
-function readLocalSignals(): LocalSignals {
+async function readLocalSignals(): Promise<LocalSignals> {
   if (typeof window === "undefined") {
     return {
       partyStatus: null,
@@ -39,9 +39,41 @@ function readLocalSignals(): LocalSignals {
     };
   }
 
-  const partyStatus = window.localStorage.getItem("twincore_party_status");
+  const { supabase } = await import("@/lib/supabase/client");
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const partyStatus = user
+    ? window.localStorage.getItem(`twincore_party_status_${user.id}`)
+    : null;
+
+  const sharedLocation = user
+    ? window.localStorage.getItem(`twincore_last_shared_location_${user.id}`)
+    : null;
+
   const exitStatus = window.localStorage.getItem("twincore_exit_crew_status");
-  const sharedLocation = window.localStorage.getItem("twincore_last_shared_location");
+
+  return {
+    partyStatus,
+    exitStatus,
+    hasSharedLocation: Boolean(sharedLocation),
+    hour: new Date().getHours(),
+  };
+}
+  if (typeof window === "undefined") {
+    return {
+      partyStatus: null,
+      exitStatus: null,
+      hasSharedLocation: false,
+      hour: 12,
+    };
+  }
+
+  
+  const exitStatus = window.localStorage.getItem("twincore_exit_crew_status");
+  
 
   return {
     partyStatus,
@@ -336,7 +368,7 @@ if (hideDashboard) return null;
     setMounted(true);
 
     const refreshSignals = () => {
-      setSignals(readLocalSignals());
+      readLocalSignals().then(setSignals);
     };
 
     refreshSignals();

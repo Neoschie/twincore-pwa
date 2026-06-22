@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase/client";
 import { buildTwinSignals } from "@/lib/twin/buildSignals";
 import type {
   TwinContextSnapshot,
@@ -316,7 +316,8 @@ const TWINCORE_BASELINE_KEY = "twincore_internal_baseline";
 const TWINCORE_LEARNING_KEY = "twincore_learning_profile";
 const TWINCORE_MESSAGES_KEY = "twincore_twinme_messages";
 const TWINCORE_POSITION_HISTORY_KEY = "twincore_position_history";
-const TWINCORE_PROFILE_KEY = "twincore_profile";
+const getTwinCoreProfileKey = (userId: string) =>
+  `twincore_profile_${userId}`;
 const TWINCORE_MEMORY_KEY = "twincore_twinme_memory";
 const TWINCORE_CONVERSATION_PROFILE_KEY = "twincore_conversation_profile";
 const TWINCORE_LAST_RESPONSES_KEY = "twincore_last_responses";
@@ -1480,14 +1481,23 @@ async function getRealCrewContext(displayName: string): Promise<CrewStatus[]> {
   if (!displayName || !supabase) return [];
 
   try {
-    const joinedRaw = window.localStorage.getItem("twincore_joined_crew");
+    const {
+  data: { user },
+} = await supabase.auth.getUser();
+
+const joinedRaw = user
+  ? window.localStorage.getItem(`twincore_joined_crew_${user.id}`)
+  : null;
     const joined = joinedRaw ? (JSON.parse(joinedRaw) as { crewOwner?: string }) : {};
     const owner = joined.crewOwner?.trim() || displayName;
 
-    const { data: members, error: memberError } = await supabase
-      .from("crew_members")
-      .select("crew_owner, member_name")
-      .eq("crew_owner", owner);
+    if (!user) return [];
+
+const { data: members, error: memberError } = await supabase
+  .from("crew_members")
+  .select("crew_owner, member_name")
+  .eq("user_id", user.id)
+  .eq("crew_owner", owner);
 
     if (memberError) return [];
 
@@ -1504,9 +1514,10 @@ async function getRealCrewContext(displayName: string): Promise<CrewStatus[]> {
     if (!list.length) return [];
 
     const { data: statuses, error: statusError } = await supabase
-      .from("crew_status")
-      .select("*")
-      .in("name", list);
+  .from("crew_status")
+  .select("*")
+  .eq("user_id", user.id)
+  .in("name", list);
 
     if (statusError) return [];
 
@@ -1516,8 +1527,11 @@ async function getRealCrewContext(displayName: string): Promise<CrewStatus[]> {
   }
 }
 
-function getLiveContext(): PartyLive | null {
-  return readJson<PartyLive | null>("twincore_party_live", null);
+function getLiveContext(userId: string): PartyLive | null {
+  return readJson<PartyLive | null>(
+    `twincore_party_live_${userId}`,
+    null
+  );
 }
 
 async function getCrewContext(displayName: string): Promise<CrewStatus[]> {
@@ -1555,9 +1569,9 @@ function updatePositionHistory(live: PartyLive | null): void {
   writeJson(TWINCORE_POSITION_HISTORY_KEY, next);
 }
 
-function getDisplayName(): string {
+function getDisplayNameForUser(userId: string): string {
   const profile = readJson<{ displayName?: string } | null>(
-    TWINCORE_PROFILE_KEY,
+    getTwinCoreProfileKey(userId),
     null
   );
 
@@ -8164,13 +8178,30 @@ const exitState: ExitState | null = null;
 
 
   useEffect(() => {
-    const name = getDisplayName();
-    setDisplayName(name);
+   supabase.auth.getUser().then(({ data }) => {
+  const currentUser = data.user;
+
+  if (!currentUser) {
+    setDisplayName("Neo");
+    return;
+  }
+
+  const name = getDisplayNameForUser(currentUser.id);
+  setDisplayName(name);
+});
 
     const refresh = async () => {
-      const nextLive = getLiveContext();
-      const nextSpots = getSpotsContext();
-      const nextCrew = await getCrewContext(name);
+      const {
+  data: { user },
+} = await supabase.auth.getUser();
+
+if (!user) return;
+
+const name = getDisplayNameForUser(user.id);
+
+const nextLive = getLiveContext(user.id);
+const nextSpots = getSpotsContext();
+const nextCrew = await getCrewContext(name);
 
       setLive(nextLive);
       setSpots(nextSpots);

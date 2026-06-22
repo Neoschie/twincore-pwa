@@ -316,3 +316,35 @@ button {
   padding-bottom: max(1rem, calc(var(--safe-bottom) + 1rem));
 }
 }
+
+@keyframes twinHeartbeat {
+  0%, 100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+
+  12% {
+    transform: scale(1.08);
+    filter: brightness(1.35);
+  }
+
+  24% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+
+  38% {
+    transform: scale(1.04);
+    filter: brightness(1.18);
+  }
+
+  52% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+}
+
+.twin-heartbeat {
+  animation: twinHeartbeat 2.2s ease-in-out infinite;
+  
+}

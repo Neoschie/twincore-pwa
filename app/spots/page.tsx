@@ -17,7 +17,7 @@ import {
   Activity,
   Zap,
 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase/client";
 
 import AuthGuard from "@/components/auth/AuthGuard";
 
@@ -285,6 +285,12 @@ function MiniMeter({ label, value }: { label: string; value: number }) {
   );
 }
 
+const getPartyStatusKey = (userId: string) =>
+  `twincore_party_status_${userId}`;
+
+const getLastSharedLocationKey = (userId: string) =>
+  `twincore_last_shared_location_${userId}`;
+
 export default function SpotsPage() {
   const [displayName, setDisplayName] = useState("Neo");
   const [partyStatus, setPartyStatus] = useState<string | null>(null);
@@ -301,10 +307,22 @@ export default function SpotsPage() {
   const [trustedIds, setTrustedIds] = useState<string[]>([]);
   const [trustedNames, setTrustedNames] = useState<string[]>([]);
 
-  useEffect(() => {
-    const savedName = window.localStorage.getItem("twincore_display_name");
-    const savedStatus = window.localStorage.getItem("twincore_party_status");
-    const savedLocation = window.localStorage.getItem("twincore_last_shared_location");
+ useEffect(() => {
+  async function loadSpotsPage() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    const savedName = user
+      ? window.localStorage.getItem(`twincore_display_name_${user.id}`)
+      : null;
+   const savedStatus = user
+  ? window.localStorage.getItem(getPartyStatusKey(user.id))
+  : null;
+
+    const savedLocation = user
+  ? window.localStorage.getItem(getLastSharedLocationKey(user.id))
+  : null;
 
     const savedGhostMode =
       window.localStorage.getItem("twincore_ghost_mode") ||
@@ -332,12 +350,15 @@ export default function SpotsPage() {
     setTrustedIds(parseStoredStringArray(savedTrustedIds).map(normalizeValue));
     setTrustedNames(parseStoredStringArray(savedTrustedNames).map(normalizeValue));
 
-    const interval = window.setInterval(() => {
+       const interval = window.setInterval(() => {
       setLiveTick((prev) => !prev);
     }, 1800);
 
     return () => window.clearInterval(interval);
-  }, []);
+  }
+
+  loadSpotsPage();
+}, []);
 
   useEffect(() => {
     if (ghostMode) {
@@ -361,17 +382,22 @@ export default function SpotsPage() {
         setHasSharedLocation(true);
         setLocationError(null);
 
-        window.localStorage.setItem(
-          "twincore_last_shared_location",
-          JSON.stringify({
+        supabase.auth.getUser().then(({ data }) => {
+  const currentUser = data.user;
+
+  if (!currentUser) return;
+
+  window.localStorage.setItem(
+    getLastSharedLocationKey(currentUser.id),
+    JSON.stringify({
             latitude: nextCoords.lat,
             longitude: nextCoords.lng,
             timestamp: new Date().toISOString(),
             mapsUrl: `https://maps.google.com/?q=${nextCoords.lat},${nextCoords.lng}`,
           })
         );
-      },
-      () => {
+      });
+
         setLocationError("Location access is off. Turn it on for live crew radar.");
       },
       {

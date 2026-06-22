@@ -16,12 +16,12 @@ import posthog from "posthog-js";
 
 import { supabase } from "@/lib/supabase/client";
 
-const STORAGE_KEY = "twincore_profile";
-const GHOST_MODE_KEY = "twincore_ghost_mode";
-const TRUSTED_KEY = "twincore_trusted";
+const getProfileStorageKey = (userId: string) =>
+  `twincore_profile_${userId}`;
 
 type ProfileData = {
   displayName: string;
+  photoUrl: string;
   vibe: string;
   city: string;
   ghostMode: boolean;
@@ -33,8 +33,10 @@ type ProfileData = {
 
 const defaultProfile: ProfileData = {
   displayName: "Neo",
+  photoUrl: "",
   vibe: "Calm but lit",
   city: "London, ON",
+
   ghostMode: false,
   ghostLabel: "Low Visibility",
   blurPresence: true,
@@ -46,16 +48,40 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<ProfileData>(defaultProfile);
   
 const handleSignOut = async () => {
-await supabase.auth.signOut();
-window.location.href = "/auth";
+  posthog.reset();
+
+  sessionStorage.clear();
+
+  await supabase.auth.signOut({ scope: "global" });
+
+  window.location.replace("/auth");
 };
 
 const [saved, setSaved] = useState(false);
-  const [newTrusted, setNewTrusted] = useState("");
+const [newTrusted, setNewTrusted] = useState("");
 
-  useEffect(() => {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const trustedRaw = localStorage.getItem(TRUSTED_KEY);
+useEffect(() => {
+  async function loadProfile() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    console.log("PROFILE ACTIVE EMAIL:", user?.email);
+console.log("PROFILE ACTIVE USER ID:", user?.id);
+console.log(
+  "PROFILE STORAGE KEY:",
+  user ? getProfileStorageKey(user.id) : "no user"
+);
+console.log("PROFILE RAW DATA:", user ? localStorage.getItem(getProfileStorageKey(user.id)) : null);
+
+    console.log("PROFILE PAGE USER:", user?.email);
+console.log("PROFILE PAGE USER ID:", user?.id);
+console.log("PROFILE KEY USED:", user ? getProfileStorageKey(user.id) : "no user");
+console.log("ALL LOCAL STORAGE:", { ...localStorage });
+
+    if (!user) return;
+
+    const raw = localStorage.getItem(getProfileStorageKey(user.id));
 
     if (raw) {
       try {
@@ -67,19 +93,12 @@ const [saved, setSaved] = useState(false);
         }));
       } catch {}
     }
+  }
 
-    if (trustedRaw) {
-      try {
-        const parsed = JSON.parse(trustedRaw);
-        setProfile((prev) => ({
-          ...prev,
-          trustedList: parsed || [],
-        }));
-      } catch {}
-    }
-  }, []);
+  loadProfile();
+}, []);
 
-  function addTrusted() {
+function addTrusted() {
     if (!newTrusted.trim()) return;
 
     setProfile({
@@ -100,29 +119,52 @@ const [saved, setSaved] = useState(false);
     });
   }
 
-  function saveProfile() {
-    posthog.capture("profile_saved", {
-      ghost_mode: profile.ghostMode,
-      trusted_only: profile.trustedOnly,
-    });
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
-    localStorage.setItem(TRUSTED_KEY, JSON.stringify(profile.trustedList));
+  async function saveProfile() {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-    localStorage.setItem(
-      GHOST_MODE_KEY,
-      JSON.stringify({
-        enabled: profile.ghostMode,
-        label: profile.ghostLabel,
-        blurPresence: profile.blurPresence,
-      })
-    );
+  console.log("SAVE PROFILE USER:", user?.email);
+console.log("SAVE PROFILE USER ID:", user?.id);
+console.log("SAVE PROFILE DATA:", profile);
 
-    localStorage.setItem("twincore_display_name", profile.displayName);
+  if (!user) {
+  alert("No signed-in user found. Profile was not saved.");
+  return;
+}
 
-    setSaved(true);
+  posthog.capture("profile_saved", {
+    ghost_mode: profile.ghostMode,
+    trusted_only: profile.trustedOnly,
+  });
 
-    setTimeout(() => setSaved(false), 2000);
-  }
+  localStorage.setItem(
+    getProfileStorageKey(user.id),
+    JSON.stringify(profile)
+  );
+
+  localStorage.setItem(
+    `twincore_trusted_${user.id}`,
+    JSON.stringify(profile.trustedList)
+  );
+
+  localStorage.setItem(
+    `twincore_ghost_mode_${user.id}`,
+    JSON.stringify({
+      enabled: profile.ghostMode,
+      label: profile.ghostLabel,
+      blurPresence: profile.blurPresence,
+    })
+  );
+
+  localStorage.setItem(
+    `twincore_display_name_${user.id}`,
+    profile.displayName
+  );
+
+  setSaved(true);
+  setTimeout(() => setSaved(false), 2000);
+}
 
   return (
     <main style={shellStyle}>
@@ -138,6 +180,7 @@ const [saved, setSaved] = useState(false);
       {/* BASIC */}
       <section style={cardStyle}>
         <label style={labelStyle}>Display Name</label>
+       
         <input
           value={profile.displayName}
           onChange={(e) =>
@@ -145,7 +188,44 @@ const [saved, setSaved] = useState(false);
           }
           style={inputStyle}
         />
+<label style={labelStyle}>Profile Photo URL</label>
 
+<input
+  value={profile.photoUrl}
+  onChange={(e) =>
+    setProfile({
+      ...profile,
+      photoUrl: e.target.value,
+    })
+  }
+  placeholder="https://example.com/photo.jpg"
+  style={inputStyle}
+/> 
+
+{profile.photoUrl && (
+  <div
+    style={{
+      marginTop: 12,
+      marginBottom: 12,
+      display: "flex",
+      justifyContent: "center",
+    }}
+  >
+    <img
+      src={profile.photoUrl}
+      alt="Profile Preview"
+      style={{
+        width: 90,
+        height: 90,
+        borderRadius: "50%",
+        objectFit: "cover",
+        border: "2px solid rgba(236,72,153,.5)",
+        boxShadow:
+          "0 0 25px rgba(217,70,239,.45)",
+      }}
+    />
+  </div>
+)}
         <label style={labelStyle}>Vibe</label>
         <input
           value={profile.vibe}
