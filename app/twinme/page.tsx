@@ -7736,6 +7736,45 @@ function getAdaptiveNextMove({
 /* -------------------------
    THEME / VISUALS
 --------------------------*/
+function getTwinMeOrbState(awarenessScore: number) {
+  if (awarenessScore > 85) {
+    return {
+      label: "Builder",
+      smoke: "bg-emerald-400/15",
+      ring: "border-emerald-300/30",
+      text: "text-emerald-300",
+      insight: "Momentum is strong. You're building.",
+    };
+  }
+
+  if (awarenessScore > 70) {
+    return {
+      label: "Focused",
+      smoke: "bg-cyan-400/15",
+      ring: "border-cyan-300/30",
+      text: "text-cyan-300",
+      insight: "Deep focus detected. Stay in flow.",
+    };
+  }
+
+  if (awarenessScore > 55) {
+    return {
+      label: "Reflective",
+      smoke: "bg-fuchsia-400/15",
+      ring: "border-fuchsia-300/30",
+      text: "text-fuchsia-300",
+      insight: "Processing and integrating. Give yourself space.",
+    };
+  }
+
+  return {
+    label: "Recovering",
+    smoke: "bg-orange-400/15",
+    ring: "border-orange-300/30",
+    text: "text-orange-300",
+    insight: "Rest is progress. Be gentle with yourself.",
+  };
+}
 
 function getAmbientTheme(
   awarenessLevel: AwarenessLevel,
@@ -8778,6 +8817,11 @@ const nextCrew = await getCrewContext(name);
     movementLevel,
     voiceEnabled,
   ]);
+
+const orbState = useMemo(
+  () => getTwinMeOrbState(awareness.score),
+  [awareness.score]
+);
 
   const awarenessSummary = useMemo(
     () => getAwarenessSummary(awareness.level),
@@ -10093,15 +10137,7 @@ blur-xl
 opacity-40
 transition-all
 duration-1000
-${
-  awareness.score > 85
-    ? "bg-emerald-400/15"
-    : awareness.score > 70
-    ? "bg-cyan-400/15"
-    : awareness.score > 55
-    ? "bg-fuchsia-400/15"
-    : "bg-orange-400/15"
-}
+${orbState.smoke}
 `}
  />
   <div className="absolute inset-10 rounded-full bg-gradient-to-br from-cyan-300/10 via-transparent to-fuchsia-400/10 blur-lg animate-pulse" />
@@ -10113,10 +10149,13 @@ ${
     </div>
 
     <div className="text-[9px] font-bold uppercase tracking-[0.2em] text-cyan-200">
-      {awareness.score > 85 ? "Builder" : awareness.score > 70 ? "Focused" : awareness.score > 55 ? "Reflective" : "Recovering"}
+      {orbState.label}
     </div>
   </div>
 </div>
+<p className={`mt-3 text-center text-xs font-semibold ${orbState.text}`}>
+  {orbState.insight}
+</p>
 
   <div className="relative mt-6 rounded-3xl border border-white/10 bg-black/25 p-4">
     <p className="text-sm leading-6 text-white/75">
