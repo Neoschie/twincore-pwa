@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
@@ -10148,11 +10149,23 @@ const orbState = useMemo(
           <div className="absolute -right-4 top-10 h-24 w-24 rounded-full bg-cyan-400/20 blur-2xl animate-pulse" />
           <div className="absolute bottom-4 h-10 w-32 rounded-full bg-fuchsia-500/20 blur-xl" />
 
-          <div className="relative flex h-28 w-28 items-center justify-center rounded-full border border-white/10 bg-black/55 shadow-[0_0_55px_rgba(168,85,247,0.30)] backdrop-blur-xl ${orbState.pulse}">
-            <div className="absolute inset-0 rounded-full bg-gradient-to-br from-fuchsia-500/15 via-transparent to-cyan-400/15" />
-            <div className="relative text-5xl font-black leading-none text-fuchsia-200">
-              ∞
-            </div>
+          <Image
+  src="/brand/twinme-orb.png"
+  alt="TwinMe Orb"
+  width={112}
+  height={112}
+  priority
+  className="
+    relative
+    h-28
+    w-28
+    object-contain
+    rounded-full
+    select-none
+    pointer-events-none
+    drop-shadow-[0_0_35px_rgba(217,70,239,0.45)]
+  "
+/>
           </div>
         </div>
 
@@ -10515,7 +10528,7 @@ const orbState = useMemo(
             }
           }
         `}</style>
-</div>
+
           {showUpgradePrompt && (
             <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 px-5 backdrop-blur-md">
               <div className="w-full max-w-md">
