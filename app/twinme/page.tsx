@@ -7747,6 +7747,23 @@ function getTwinMeOrbState(awarenessScore: number) {
     };
   }
 
+function TwinMeOrbMark({
+  orbState,
+}: {
+  orbState: ReturnType<typeof getTwinMeOrbState>;
+}) {
+  return (
+    <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/10 bg-black/40 shadow-[0_0_25px_rgba(168,85,247,0.25)] backdrop-blur-xl">
+      <div className={`absolute inset-0 rounded-full blur-xl ${orbState.smoke}`} />
+      <div className={`absolute inset-1 rounded-full border ${orbState.ring} animate-[spin_18s_linear_infinite]`} />
+
+      <div className="relative text-xl font-black leading-none text-fuchsia-200">
+        ∞
+      </div>
+    </div>
+  );
+}
+
   if (awarenessScore > 70) {
     return {
       label: "Focused",
@@ -10074,10 +10091,21 @@ const orbState = useMemo(
   <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(34,211,238,0.16),transparent_42%),radial-gradient(circle_at_bottom,rgba(217,70,239,0.10),transparent_45%)]" />
 
   <div className="relative flex items-start justify-between gap-3">
-    <div>
+    <div className="flex items-start gap-3">
+  <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/10 bg-black/40 shadow-[0_0_25px_rgba(168,85,247,0.25)] backdrop-blur-xl">
+  <div className={`absolute inset-0 rounded-full blur-xl ${orbState.smoke}`} />
+  <div className={`absolute inset-1 rounded-full border ${orbState.ring} animate-[spin_18s_linear_infinite]`} />
+
+  <div className="relative text-xl font-black leading-none text-fuchsia-200">
+    ∞
+  </div>
+</div>
+
+  <div>
       <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-cyan-100">
         <span className="h-2 w-2 rounded-full bg-cyan-300 animate-pulse" />
         Identity Core Online
+      </div>
       </div>
 
       <h1 className="mt-4 text-4xl font-black tracking-tight text-white">
