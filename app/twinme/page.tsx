@@ -10129,7 +10129,17 @@ const orbState = useMemo(
 
 <div className={`absolute bottom-7 left-12 h-20 w-20 rounded-full ${orbState.smoke} blur-3xl opacity-45 animate-[pulse_8s_ease-in-out_infinite]`} />
 
-          <div className={`absolute inset-2 rounded-full border ${orbState.ring} animate-[spin_26s_linear_infinite]`} />
+{orbState.spark ? (
+  <>
+    <div className="absolute left-10 top-8 h-2 w-2 rounded-full bg-emerald-300 animate-ping" />
+
+    <div className="absolute right-10 top-16 h-2 w-2 rounded-full bg-cyan-300 animate-ping" />
+
+    <div className="absolute bottom-10 right-14 h-2 w-2 rounded-full bg-fuchsia-300 animate-ping" />
+  </>
+) : null}
+
+          <div className={`absolute inset-2 rounded-full border ${orbState.ring} ${orbState.spin}`} />
           <div className="absolute inset-5 rounded-full border border-cyan-300/25 animate-[spin_36s_linear_infinite]" />
           <div className="absolute inset-8 rounded-full border border-fuchsia-300/25 animate-[spin_18s_linear_infinite]" />
           <div className="absolute inset-12 rounded-full bg-gradient-to-br from-fuchsia-400/20 via-cyan-300/20 to-blue-400/20 blur-lg animate-pulse" />
@@ -10138,7 +10148,7 @@ const orbState = useMemo(
           <div className="absolute -right-4 top-10 h-24 w-24 rounded-full bg-cyan-400/20 blur-2xl animate-pulse" />
           <div className="absolute bottom-4 h-10 w-32 rounded-full bg-fuchsia-500/20 blur-xl" />
 
-          <div className="relative flex h-28 w-28 items-center justify-center rounded-full border border-white/10 bg-black/55 shadow-[0_0_55px_rgba(168,85,247,0.30)] backdrop-blur-xl animate-[pulse_7s_ease-in-out_infinite]">
+          <div className="relative flex h-28 w-28 items-center justify-center rounded-full border border-white/10 bg-black/55 shadow-[0_0_55px_rgba(168,85,247,0.30)] backdrop-blur-xl ${orbState.pulse}">
             <div className="absolute inset-0 rounded-full bg-gradient-to-br from-fuchsia-500/15 via-transparent to-cyan-400/15" />
             <div className="relative text-5xl font-black leading-none text-fuchsia-200">
               ∞
