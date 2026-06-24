@@ -10114,6 +10114,77 @@ const nextCrew = await getCrewContext(name);
       </div>
     ))}
   </div>
+  </div>
+
+
+{/* PRESENCE INSIGHTS */}
+
+<div className="mt-5 grid grid-cols-1 gap-3">
+
+<div className="rounded-3xl border border-cyan-300/10 bg-black/25 p-4 backdrop-blur-xl">
+
+<div className="text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-200">
+
+TwinMe noticed
+
+</div>
+
+
+<div className="mt-2 text-sm leading-6 text-white/75">
+
+{awareness.score > 80
+
+? "Builder tendencies appear stronger today. Momentum is increasing."
+
+: awareness.score > 60
+
+? "TwinMe notices growing consistency patterns."
+
+: "TwinMe is awaiting stronger signals before updating long-term identity patterns."}
+
+</div>
+
+</div>
+
+
+<div className="grid grid-cols-2 gap-3">
+
+<div className="rounded-2xl bg-white/[0.03] p-3">
+
+<div className="text-xs text-white/45">
+
+Momentum
+
+</div>
+
+<div className="mt-1 font-black text-emerald-300">
+
+Rising
+
+</div>
+
+</div>
+
+<div className="rounded-2xl bg-white/[0.03] p-3">
+
+<div className="text-xs text-white/45">
+
+Alignment
+
+</div>
+
+<div className="mt-1 font-black text-cyan-300">
+
+96%
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
 </div>
 
             <div className="grid grid-cols-1 gap-6">
@@ -10343,7 +10414,6 @@ const nextCrew = await getCrewContext(name);
             }
           }
         `}</style>
-          </div>
 
           {showUpgradePrompt && (
             <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 px-5 backdrop-blur-md">
