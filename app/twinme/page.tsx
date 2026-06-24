@@ -8933,18 +8933,17 @@ const orbState = useMemo(
   );
 
   const twinMeObservation = useMemo(() => {
+    if (awareness.score > 85) {
+      return "Builder tendencies dominated recent interactions. Consistency appears stronger and identity alignment has improved.";
+    }
 
-  if (awareness.score > 85) {
-    return "Builder tendencies dominated recent interactions. Consistency appears stronger and identity alignment has improved.";
-  }
+    if (awareness.score > 70) {
+      return "TwinMe noticed steadier engagement patterns. Momentum is gradually increasing and reflective pauses are becoming shorter.";
+    }
 
-  if (awareness.score > 70) {
-    return "TwinMe noticed steadier engagement patterns. Momentum is gradually increasing and reflective pauses are becoming shorter.";
-  }
-
-  if (awareness.score > 55) {
-    return "Reflection depth increased. TwinMe is observing more internal processing before decisions are made.";
-  }
+    if (awareness.score > 55) {
+      return "Reflection depth increased. TwinMe is observing more internal processing before decisions are made.";
+    }
 
   return "TwinMe is collecting additional signals before updating long-term identity assumptions.";
 
@@ -10360,18 +10359,15 @@ ${orbState.aura}
     </div>
 
     <div className="mt-5 rounded-3xl border border-fuchsia-300/15 bg-fuchsia-400/5 p-4">
+      <div className="text-[10px] font-black uppercase tracking-[0.22em] text-fuchsia-200">
+        TwinMe noticed
+      </div>
 
-  <div className="text-[10px] font-black uppercase tracking-[0.22em] text-fuchsia-200">
-    TwinMe noticed
-  </div>
+      <div className="mt-3 text-sm leading-7 text-white/75">
+        {twinMeObservation}
+      </div>
 
-  <div className="mt-3 text-sm leading-7 text-white/75">
-    {twinMeObservation}
-  </div>
-  
-  </div>
-  </div>
-            <div className="grid grid-cols-1 gap-6">
+      <div className="grid grid-cols-1 gap-6">
               <div className="space-y-4 order-1">
                 <div className={`rounded-2xl p-4 border bg-white/5 ${theme.border}`}>
                   <h3 className="font-semibold mb-2">State</h3>
@@ -10598,6 +10594,8 @@ ${orbState.aura}
             }
           }
         `}</style>
+          
+          </div>
           </div>
           {showUpgradePrompt && (
             <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 px-5 backdrop-blur-md">
@@ -10614,9 +10612,10 @@ ${orbState.aura}
               </div>
             </div>
           )}
-
+          </div>
         </main>
       </AuthGuard>
     </ErrorBoundary >
-  );
-}
+    
+     );
+  }
