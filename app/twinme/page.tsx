@@ -10053,23 +10053,24 @@ const nextCrew = await getCrewContext(name);
     </Link>
   </div>
 
-  <div className="relative mt-6 flex justify-center">
-    <div className="relative flex h-36 w-36 items-center justify-center">
-      <div className="absolute inset-0 rounded-full bg-cyan-400/10 blur-3xl animate-pulse" />
-      <div className="absolute inset-2 rounded-full border border-cyan-300/20 animate-[spin_30s_linear_infinite]" />
-      <div className="absolute inset-5 rounded-full border border-fuchsia-300/20 animate-[spin_18s_linear_infinite]" />
-      <div className="absolute inset-8 rounded-full bg-gradient-to-br from-cyan-300/20 via-fuchsia-400/15 to-emerald-300/15 blur-md" />
+ <div className="relative flex h-36 w-36 items-center justify-center">
+  <div className="absolute inset-0 rounded-full bg-cyan-400/10 blur-3xl animate-pulse" />
+  <div className="absolute inset-2 rounded-full border border-cyan-300/20 animate-[spin_30s_linear_infinite]" />
+  <div className="absolute inset-5 rounded-full border border-fuchsia-300/20 animate-[spin_18s_linear_infinite]" />
+  <div className="absolute inset-7 rounded-full border border-emerald-300/20 animate-[spin_50s_linear_infinite]" />
+  <div className="absolute inset-10 rounded-full bg-gradient-to-br from-cyan-300/10 via-transparent to-fuchsia-400/10 blur-lg animate-pulse" />
+  <div className="absolute inset-8 rounded-full bg-gradient-to-br from-cyan-300/20 via-fuchsia-400/15 to-emerald-300/15 blur-md" />
 
-      <div className="relative flex h-24 w-24 flex-col items-center justify-center rounded-full border border-cyan-300/25 bg-black/60 shadow-[0_0_45px_rgba(34,211,238,0.25)] backdrop-blur-xl">
-        <div className="text-3xl font-black text-white">
-          {awareness.score}
-        </div>
-        <div className="text-[9px] font-bold uppercase tracking-[0.2em] text-cyan-200">
-          Awareness
-        </div>
-      </div>
+  <div className="relative flex h-24 w-24 flex-col items-center justify-center rounded-full border border-cyan-300/25 bg-black/60 shadow-[0_0_45px_rgba(34,211,238,0.25)] backdrop-blur-xl">
+    <div className="text-3xl font-black text-white">
+      {awareness.score}
+    </div>
+
+    <div className="text-[9px] font-bold uppercase tracking-[0.2em] text-cyan-200">
+      {awareness.score > 85 ? "Builder" : awareness.score > 70 ? "Focused" : awareness.score > 55 ? "Reflective" : "Recovering"}
     </div>
   </div>
+</div>
 
   <div className="relative mt-6 rounded-3xl border border-white/10 bg-black/25 p-4">
     <p className="text-sm leading-6 text-white/75">
