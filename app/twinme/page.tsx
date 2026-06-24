@@ -7738,13 +7738,17 @@ function getAdaptiveNextMove({
 --------------------------*/
 function getTwinMeOrbState(awarenessScore: number) {
   if (awarenessScore > 85) {
-    return {
-      label: "Builder",
-      smoke: "bg-emerald-400/15",
-      ring: "border-emerald-300/30",
-      text: "text-emerald-300",
-      insight: "Momentum is strong. You're building.",
-    };
+   return {
+  label: "Builder",
+  smoke: "bg-emerald-400/15",
+  ring: "border-emerald-300/30",
+  text: "text-emerald-300",
+  insight: "Momentum is strong. You're building.",
+
+  spin: "animate-[spin_22s_linear_infinite]",
+  pulse: "animate-[pulse_5s_ease-in-out_infinite]",
+  spark: true,
+};
   }
 
 function TwinMeOrbMark({
@@ -7766,31 +7770,43 @@ function TwinMeOrbMark({
 
   if (awarenessScore > 70) {
     return {
-      label: "Focused",
-      smoke: "bg-cyan-400/15",
-      ring: "border-cyan-300/30",
-      text: "text-cyan-300",
-      insight: "Deep focus detected. Stay in flow.",
-    };
+  label: "Focused",
+  smoke: "bg-cyan-400/15",
+  ring: "border-cyan-300/30",
+  text: "text-cyan-300",
+  insight: "Deep focus detected. Stay in flow.",
+
+  spin: "animate-[spin_30s_linear_infinite]",
+  pulse: "animate-[pulse_7s_ease-in-out_infinite]",
+  spark: false,
+};
   }
 
   if (awarenessScore > 55) {
     return {
-      label: "Reflective",
-      smoke: "bg-fuchsia-400/15",
-      ring: "border-fuchsia-300/30",
-      text: "text-fuchsia-300",
-      insight: "Processing and integrating. Give yourself space.",
-    };
+  label: "Reflective",
+  smoke: "bg-fuchsia-400/15",
+  ring: "border-fuchsia-300/30",
+  text: "text-fuchsia-300",
+  insight: "Processing and integrating. Give yourself space.",
+
+  spin: "animate-[spin_55s_linear_infinite]",
+  pulse: "animate-[pulse_9s_ease-in-out_infinite]",
+  spark: false,
+};
   }
 
   return {
-    label: "Recovering",
-    smoke: "bg-orange-400/15",
-    ring: "border-orange-300/30",
-    text: "text-orange-300",
-    insight: "Rest is progress. Be gentle with yourself.",
-  };
+  label: "Recovering",
+  smoke: "bg-orange-400/15",
+  ring: "border-orange-300/30",
+  text: "text-orange-300",
+  insight: "Rest is progress. Be gentle with yourself.",
+
+  spin: "animate-[spin_70s_linear_infinite]",
+  pulse: "animate-[pulse_11s_ease-in-out_infinite]",
+  spark: false,
+};
 }
 
 function getAmbientTheme(
