@@ -62,6 +62,7 @@ import {
 
 
 import ErrorBoundary from "@/components/system/ErrorBoundary";
+import { label } from "framer-motion/client";
 /* -------------------------
    TYPES
 --------------------------*/
@@ -10288,11 +10289,36 @@ ${orbState.aura}
 
     <div className="space-y-3">
       {[
-        { label: "Builder Momentum", sub: "Strong execution patterns.", value: "+12%", color: "text-emerald-300" },
-        { label: "Reflection Depth", sub: "Deeper self-awareness.", value: "+18%", color: "text-fuchsia-300" },
-        { label: "Emotional Stability", sub: "Stable and resilient.", value: "72%", color: "text-cyan-300" },
-        { label: "Crew Cohesion", sub: "Aligned and supportive.", value: "Healthy", color: "text-orange-300" },
-        { label: "Prediction Confidence", sub: "High accuracy today.", value: "93%", color: "text-blue-300" },
+        {
+          label: "Builder Traits",
+          sub: "Dominant in recent interactions.",
+          value: "82%",
+          color: "text-emerald-300",
+        },
+        {
+          label: "Reflection Depth",
+          sub: "Internal processing is increasing.",
+          value: "+18%",
+          color: "text-fuchsia-300",
+        },
+        {
+          label: "Prediction Confidence",
+          sub: "TwinMe has strong signal clarity.",
+          value: "93%",
+          color: "text-cyan-300",
+        },
+        {
+          label: "Crew Cohesion",
+          sub: "Support patterns look healthy.",
+          value: "Healthy",
+          color: "text-orange-300",
+        },
+        {
+          label: "Active Thread",
+          sub: "One unfinished intention remains active.",
+          value: "1",
+          color: "text-blue-300",
+        },
       ].map((item) => (
         <div
           key={item.label}
@@ -10315,7 +10341,7 @@ ${orbState.aura}
     </div>
 
     <div className="mt-4 text-center text-sm font-semibold text-fuchsia-300">
-      All systems are synchronized.
+      TwinMe is observing stronger alignment patterns.
     </div>
   </div>
 </div>
