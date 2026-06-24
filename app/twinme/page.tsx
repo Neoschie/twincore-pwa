@@ -10106,7 +10106,13 @@ const orbState = useMemo(
     <div className="relative mt-6 grid grid-cols-1 gap-6 md:grid-cols-[1fr_1.2fr] md:items-center">
       <div className="flex flex-col items-center">
         <div className="relative flex h-56 w-56 items-center justify-center">
-          <div className={`absolute inset-0 rounded-full blur-3xl opacity-70 ${orbState.smoke} animate-pulse`} />
+          <div className={`absolute inset-0 rounded-full blur-3xl opacity-80 ${orbState.smoke} animate-[pulse_6s_ease-in-out_infinite]`} />
+          <div className={`absolute -top-2 left-10 h-24 w-10 rounded-full ${orbState.smoke} blur-2xl opacity-60 animate-[spin_22s_linear_infinite]`} />
+
+<div className={`absolute right-8 top-5 h-28 w-12 rounded-full ${orbState.smoke} blur-2xl opacity-50 animate-[spin_28s_linear_infinite]`} />
+
+<div className={`absolute bottom-7 left-12 h-20 w-20 rounded-full ${orbState.smoke} blur-3xl opacity-45 animate-[pulse_8s_ease-in-out_infinite]`} />
+
           <div className={`absolute inset-2 rounded-full border ${orbState.ring} animate-[spin_26s_linear_infinite]`} />
           <div className="absolute inset-5 rounded-full border border-cyan-300/25 animate-[spin_36s_linear_infinite]" />
           <div className="absolute inset-8 rounded-full border border-fuchsia-300/25 animate-[spin_18s_linear_infinite]" />
@@ -10116,7 +10122,7 @@ const orbState = useMemo(
           <div className="absolute -right-4 top-10 h-24 w-24 rounded-full bg-cyan-400/20 blur-2xl animate-pulse" />
           <div className="absolute bottom-4 h-10 w-32 rounded-full bg-fuchsia-500/20 blur-xl" />
 
-          <div className="relative flex h-28 w-28 items-center justify-center rounded-full border border-white/10 bg-black/55 shadow-[0_0_55px_rgba(168,85,247,0.30)] backdrop-blur-xl">
+          <div className="relative flex h-28 w-28 items-center justify-center rounded-full border border-white/10 bg-black/55 shadow-[0_0_55px_rgba(168,85,247,0.30)] backdrop-blur-xl animate-[pulse_7s_ease-in-out_infinite]">
             <div className="absolute inset-0 rounded-full bg-gradient-to-br from-fuchsia-500/15 via-transparent to-cyan-400/15" />
             <div className="relative text-5xl font-black leading-none text-fuchsia-200">
               ∞
