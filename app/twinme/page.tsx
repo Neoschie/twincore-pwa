@@ -10026,47 +10026,95 @@ const nextCrew = await getCrewContext(name);
           style={{ background: theme.pageBg }}
         >
           <div className="w-full max-w-md space-y-6 px-4 pt-6 pb-10">
-            <div className="flex items-start justify-between gap-3">
-  <div>
-    <h1 className="text-3xl font-semibold tracking-tight">TwinMe</h1>
-    <p className="text-white/50 text-sm">
-      Predictive support for {displayName}
+           <div className="relative overflow-hidden rounded-[2rem] border border-cyan-300/20 bg-white/[0.04] p-5 shadow-[0_0_60px_rgba(34,211,238,0.10)] backdrop-blur-xl">
+  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(34,211,238,0.16),transparent_42%),radial-gradient(circle_at_bottom,rgba(217,70,239,0.10),transparent_45%)]" />
+
+  <div className="relative flex items-start justify-between gap-3">
+    <div>
+      <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-cyan-100">
+        <span className="h-2 w-2 rounded-full bg-cyan-300 animate-pulse" />
+        Identity Core Online
+      </div>
+
+      <h1 className="mt-4 text-4xl font-black tracking-tight text-white">
+        TwinMe
+      </h1>
+
+      <p className="mt-2 text-sm leading-6 text-white/60">
+        Predictive identity support for {displayName}
+      </p>
+    </div>
+
+    <Link
+      href="/"
+      className="rounded-xl border border-white/15 px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/10 active:scale-[0.98] transition"
+    >
+      ← Dashboard
+    </Link>
+  </div>
+
+  <div className="relative mt-6 flex justify-center">
+    <div className="relative flex h-36 w-36 items-center justify-center">
+      <div className="absolute inset-0 rounded-full bg-cyan-400/10 blur-3xl animate-pulse" />
+      <div className="absolute inset-2 rounded-full border border-cyan-300/20 animate-[spin_30s_linear_infinite]" />
+      <div className="absolute inset-5 rounded-full border border-fuchsia-300/20 animate-[spin_18s_linear_infinite]" />
+      <div className="absolute inset-8 rounded-full bg-gradient-to-br from-cyan-300/20 via-fuchsia-400/15 to-emerald-300/15 blur-md" />
+
+      <div className="relative flex h-24 w-24 flex-col items-center justify-center rounded-full border border-cyan-300/25 bg-black/60 shadow-[0_0_45px_rgba(34,211,238,0.25)] backdrop-blur-xl">
+        <div className="text-3xl font-black text-white">
+          {awareness.score}
+        </div>
+        <div className="text-[9px] font-bold uppercase tracking-[0.2em] text-cyan-200">
+          Awareness
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div className="relative mt-6 rounded-3xl border border-white/10 bg-black/25 p-4">
+    <p className="text-sm leading-6 text-white/75">
+      Good evening, {displayName}. TwinMe is reading your current state, crew alignment, environment pressure, and learned rhythm.
     </p>
   </div>
 
-  <Link
-    href="/"
-    className="rounded-xl border border-white/15 px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/10"
-  >
-    ← Dashboard
-  </Link>
-</div>
+  <div className="relative mt-5 grid grid-cols-2 gap-3">
+    {[
+      { label: "State", value: awareness.level, sub: "emotional weather" },
+      {
+        label: "Heartbeat",
+        value: live?.heartbeatBpm || 0,
+        sub: `${minutes} min active`,
+      },
+      {
+        label: "Desync",
+        value: twinSyncSnapshot.desync?.level,
+        sub: "crew alignment",
+      },
+      {
+        label: "LearnMe",
+        value: learnMe.label,
+        sub: "pattern memory",
+      },
+    ].map((item) => (
+      <div
+        key={item.label}
+        className={`rounded-2xl border ${theme.border} bg-white/[0.04] p-3 min-h-[82px] backdrop-blur-xl`}
+      >
+        <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/40">
+          {item.label}
+        </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              {[
-                { label: "Awareness", value: awareness.score, sub: awareness.level },
-                {
-                  label: "Heartbeat",
-                  value: live?.heartbeatBpm || 0,
-                  sub: `${minutes} min`,
-                },
-                { label: "Desync", value: twinSyncSnapshot.desync?.level, sub: "sync status" },
-                { label: "LearnMe", value: learnMe.label, sub: "pattern memory" },
-              ].map((item) => (
-                <div
-                  key={item.label}
-                  className={`rounded-2xl p-3 min-h-[72px] border ${theme.border} bg-white/5`}
-                >
-                  <div className="text-xs text-white/50">{item.label}</div>
-                  <div className="text-base md:text-xl font-semibold leading-tight">
-                    {item.value}
-                  </div>
-                  <div className="text-[11px] leading-4 text-white/45 mt-1">
-                    {item.sub}
-                  </div>
-                </div>
-              ))}
-            </div>
+        <div className="mt-2 truncate text-base font-black leading-tight text-white">
+          {item.value}
+        </div>
+
+        <div className="mt-1 text-[11px] leading-4 text-white/45">
+          {item.sub}
+        </div>
+      </div>
+    ))}
+  </div>
+</div>
 
             <div className="grid grid-cols-1 gap-6">
               <div className="space-y-4 order-1">
