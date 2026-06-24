@@ -10126,6 +10126,97 @@ const nextCrew = await getCrewContext(name);
 
 <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-200">
 
+<div className="mt-4 rounded-3xl border border-cyan-300/10 bg-black/20 p-4 backdrop-blur-xl">
+
+<div className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-200">
+
+Observatory
+
+</div>
+
+
+<div className="mt-3 space-y-3">
+
+
+<div className="flex items-center justify-between">
+
+<span className="text-sm text-white/60">
+
+Builder Momentum
+
+</span>
+
+
+<span className="font-bold text-emerald-300">
+
++12%
+
+</span>
+
+</div>
+
+
+
+<div className="flex items-center justify-between">
+
+<span className="text-sm text-white/60">
+
+Consistency
+
+</span>
+
+
+<span className="font-bold text-cyan-300">
+
+Stable
+
+</span>
+
+</div>
+
+
+
+<div className="flex items-center justify-between">
+
+<span className="text-sm text-white/60">
+
+Drift Pattern
+
+</span>
+
+
+<span className="font-bold text-fuchsia-300">
+
+Minimal
+
+</span>
+
+</div>
+
+
+
+<div className="flex items-center justify-between">
+
+<span className="text-sm text-white/60">
+
+Crew Stability
+
+</span>
+
+
+<span className="font-bold text-emerald-300">
+
+Healthy
+
+</span>
+
+</div>
+
+
+</div>
+
+</div>
+
 TwinMe noticed
 
 </div>
