@@ -311,7 +311,7 @@ type AdaptiveGuidanceProfile = {
 /* -------------------------
    STORAGE KEYS
 --------------------------*/
-
+const DEBUG_TWIN = process.env.NODE_ENV === "development";
 const TWINCORE_BASELINE_KEY = "twincore_internal_baseline";
 const TWINCORE_LEARNING_KEY = "twincore_learning_profile";
 const TWINCORE_MESSAGES_KEY = "twincore_twinme_messages";
@@ -5230,11 +5230,12 @@ const selfTrajectoryOpening = getSelfTrajectoryOpening(
   selfTrajectory
 );
 
-console.log("🔥 TWIN DEBUG START");
+if (DEBUG_TWIN) {
+  console.log("🔥 TWIN DEBUG START");
 
-console.warn("🔥 DEBUG HIT");
+  console.warn("🔥 DEBUG HIT");
 
-console.log("Twin Debug", {
+  console.log("Twin Debug", {
 
   baseTwinResponseIntent,
 
@@ -5337,7 +5338,8 @@ narrativeSynthesisOpening,
 
   ecosystemPressure,
 
-});
+  });
+}
 
 if (responsePriority === "protection" && identityProtectionOpening) {
   return identityProtectionOpening;
@@ -6931,19 +6933,19 @@ function getPredictiveSignals(
     return signals;
   }
 
-  if ((trajectory.riskWindow as TrajectoryRiskWindow) === "approaching") {
-    signals.push({
-      level: "red",
-      title: "High-risk window opening",
-      body: "Your current pace and pattern suggest a higher-risk state is about to compound.",
-    });
-  } else if ((trajectory.riskWindow as TrajectoryRiskWindow) === "approaching") {
-    signals.push({
-      level: "orange",
-      title: "Pressure building",
-      body: "Your pace is trending upward. If this continues, risk is likely to rise soon.",
-    });
-  }
+  if ((trajectory.riskWindow as TrajectoryRiskWindow) === "imminent") {
+  signals.push({
+    level: "red",
+    title: "High-risk window opening",
+    body: "Your current pace and pattern suggest a higher-risk state is about to compound.",
+  });
+} else if ((trajectory.riskWindow as TrajectoryRiskWindow) === "approaching") {
+  signals.push({
+    level: "orange",
+    title: "Pressure building",
+    body: "Your pace is trending upward. If this continues, risk is likely to rise soon.",
+  });
+}
 
   if ((desyncLevel as DesyncLevel) === "separated") {
     signals.push({
@@ -8474,43 +8476,6 @@ const nextCrew = await getCrewContext(name);
       if (now - lastPredictiveNudgeRef.current < cooldown) return;
 
       const profile = getPersistentProfile();
-
-      const CONVERSATION_STATE_KEY = "twincore_conversation_state";
-
-function loadConversationState(): ConversationState {
-  if (typeof window === "undefined") {
-    return {
-      emotionalMomentum: "stable",
-    };
-  }
-
-  try {
-    const raw = localStorage.getItem(CONVERSATION_STATE_KEY);
-
-    if (!raw) {
-      return {
-        emotionalMomentum: "stable",
-      };
-    }
-
-    return JSON.parse(raw);
-  } catch {
-    return {
-      emotionalMomentum: "stable",
-    };
-  }
-}
-
-function saveConversationState(state: ConversationState) {
-  if (typeof window === "undefined") return;
-
-  try {
-    localStorage.setItem(
-      CONVERSATION_STATE_KEY,
-      JSON.stringify(state)
-    );
-  } catch {}
-}
 
       const predictionConfidence = getPredictionConfidence({
         awareness,
