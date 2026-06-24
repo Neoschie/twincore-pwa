@@ -7749,6 +7749,7 @@ function getTwinMeOrbState(awarenessScore: number) {
   spin: "animate-[spin_22s_linear_infinite]",
   pulse: "animate-[pulse_5s_ease-in-out_infinite]",
   spark: true,
+  aura:"shadow-[0_0_70px_rgba(34,197,94,.55)]",
 };
   }
 
@@ -7780,6 +7781,7 @@ function TwinMeOrbMark({
   spin: "animate-[spin_30s_linear_infinite]",
   pulse: "animate-[pulse_7s_ease-in-out_infinite]",
   spark: false,
+  aura:"shadow-[0_0_60px_rgba(34,211,238,.45)]",
 };
   }
 
@@ -7794,6 +7796,7 @@ function TwinMeOrbMark({
   spin: "animate-[spin_55s_linear_infinite]",
   pulse: "animate-[pulse_9s_ease-in-out_infinite]",
   spark: false,
+  aura:"shadow-[0_0_70px_rgba(217,70,239,.45)]",
 };
   }
 
@@ -7807,6 +7810,7 @@ function TwinMeOrbMark({
   spin: "animate-[spin_70s_linear_infinite]",
   pulse: "animate-[pulse_11s_ease-in-out_infinite]",
   spark: false,
+  aura:"shadow-[0_0_70px_rgba(251,146,60,.40)]",
 };
 }
 
@@ -10130,15 +10134,20 @@ const orbState = useMemo(
 
 <div className={`absolute bottom-7 left-12 h-20 w-20 rounded-full ${orbState.smoke} blur-3xl opacity-45 animate-[pulse_8s_ease-in-out_infinite]`} />
 
-{orbState.spark ? (
-  <>
-    <div className="absolute left-10 top-8 h-2 w-2 rounded-full bg-emerald-300 animate-ping" />
+   {orbState.spark ? (
+<>
+<div className="absolute left-10 top-8 h-2 w-2 rounded-full bg-emerald-300 animate-ping" />
 
-    <div className="absolute right-10 top-16 h-2 w-2 rounded-full bg-cyan-300 animate-ping" />
+<div className="absolute right-10 top-16 h-2 w-2 rounded-full bg-cyan-300 animate-ping" />
 
-    <div className="absolute bottom-10 right-14 h-2 w-2 rounded-full bg-fuchsia-300 animate-ping" />
-  </>
-) : null}
+<div className="absolute bottom-10 right-14 h-2 w-2 rounded-full bg-fuchsia-300 animate-ping" />
+
+<div className="absolute left-16 bottom-12 h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
+
+<div className="absolute right-16 bottom-20 h-1.5 w-1.5 rounded-full bg-emerald-300 animate-ping" />
+
+</>
+) : null} 
 
           <div className={`absolute inset-2 rounded-full border ${orbState.ring} ${orbState.spin}`} />
           <div className="absolute inset-5 rounded-full border border-cyan-300/25 animate-[spin_36s_linear_infinite]" />
@@ -10155,16 +10164,25 @@ const orbState = useMemo(
   width={112}
   height={112}
   priority
-  className="
-    relative
-    h-28
-    w-28
-    object-contain
-    rounded-full
-    select-none
-    pointer-events-none
-    drop-shadow-[0_0_35px_rgba(217,70,239,0.45)]
-  "
+  className={`
+relative
+h-28
+w-28
+
+object-contain
+
+rounded-full
+
+select-none
+
+pointer-events-none
+
+transition-all
+
+duration-1000
+
+${orbState.aura}
+`}
 />
           </div>
         </div>
