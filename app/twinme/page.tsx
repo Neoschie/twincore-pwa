@@ -10082,6 +10082,28 @@ const nextCrew = await getCrewContext(name);
   <div className="absolute inset-2 rounded-full border border-cyan-300/20 animate-[spin_30s_linear_infinite]" />
   <div className="absolute inset-5 rounded-full border border-fuchsia-300/20 animate-[spin_18s_linear_infinite]" />
   <div className="absolute inset-7 rounded-full border border-emerald-300/20 animate-[spin_50s_linear_infinite]" />
+  {/* Identity Alignment Halo */}
+
+<div
+  className={`
+absolute
+inset-3
+rounded-full
+blur-xl
+opacity-40
+transition-all
+duration-1000
+${
+  awareness.score > 85
+    ? "bg-emerald-400/15"
+    : awareness.score > 70
+    ? "bg-cyan-400/15"
+    : awareness.score > 55
+    ? "bg-fuchsia-400/15"
+    : "bg-orange-400/15"
+}
+`}
+ />
   <div className="absolute inset-10 rounded-full bg-gradient-to-br from-cyan-300/10 via-transparent to-fuchsia-400/10 blur-lg animate-pulse" />
   <div className="absolute inset-8 rounded-full bg-gradient-to-br from-cyan-300/20 via-fuchsia-400/15 to-emerald-300/15 blur-md" />
 
