@@ -10040,9 +10040,33 @@ const nextCrew = await getCrewContext(name);
         TwinMe
       </h1>
 
-      <p className="mt-2 text-sm leading-6 text-white/60">
-        Predictive identity support for {displayName}
-      </p>
+      <div className="mt-3 space-y-2">
+
+  <p className="text-sm font-semibold text-cyan-100">
+    Good evening, {displayName}.
+  </p>
+
+  <p className="text-sm leading-6 text-white/65">
+
+    {
+      awareness.score > 85
+
+      ? "Builder momentum strengthened today. TwinMe detected increased consistency and stronger identity alignment."
+
+      : awareness.score > 70
+
+      ? "TwinMe noticed steadier engagement patterns. Momentum appears to be gradually improving."
+
+      : awareness.score > 55
+
+      ? "TwinMe is observing reflective behavior and allowing additional space for internal processing."
+
+      : "TwinMe is collecting signals and waiting for stronger patterns before updating long-term identity assumptions."
+    }
+
+  </p>
+
+</div>
     </div>
 
     <Link
