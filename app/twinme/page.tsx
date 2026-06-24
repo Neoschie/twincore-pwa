@@ -10087,311 +10087,175 @@ const orbState = useMemo(
           style={{ background: theme.pageBg }}
         >
           <div className="w-full max-w-md space-y-6 px-4 pt-6 pb-10">
-           <div className="relative overflow-hidden rounded-[2rem] border border-cyan-300/20 bg-white/[0.04] p-5 shadow-[0_0_60px_rgba(34,211,238,0.10)] backdrop-blur-xl">
-  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(34,211,238,0.16),transparent_42%),radial-gradient(circle_at_bottom,rgba(217,70,239,0.10),transparent_45%)]" />
+          <div className="space-y-4">
+  <div className="relative overflow-hidden rounded-[2rem] border border-cyan-300/20 bg-white/[0.04] p-5 shadow-[0_0_60px_rgba(34,211,238,0.10)] backdrop-blur-xl">
+    <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(217,70,239,0.16),transparent_38%),radial-gradient(circle_at_top_right,rgba(34,211,238,0.18),transparent_42%)]" />
 
-  <div className="relative flex items-start justify-between gap-3">
-    <div className="flex items-start gap-3">
-  <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/10 bg-black/40 shadow-[0_0_25px_rgba(168,85,247,0.25)] backdrop-blur-xl">
-  <div className={`absolute inset-0 rounded-full blur-xl ${orbState.smoke}`} />
-  <div className={`absolute inset-1 rounded-full border ${orbState.ring} animate-[spin_18s_linear_infinite]`} />
-
-  <div className="relative text-xl font-black leading-none text-fuchsia-200">
-    ∞
-  </div>
-</div>
-
-  <div>
-      <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-cyan-100">
-        <span className="h-2 w-2 rounded-full bg-cyan-300 animate-pulse" />
-        Identity Core Online
-      </div>
+    <div className="relative flex items-center justify-between gap-3">
+      <div className="inline-flex items-center gap-2 rounded-full border border-fuchsia-300/20 bg-fuchsia-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-fuchsia-100">
+        <span className="h-2 w-2 rounded-full bg-fuchsia-300 animate-pulse" />
+        Identity Core
       </div>
 
-      <h1 className="mt-4 text-4xl font-black tracking-tight text-white">
-        TwinMe
-      </h1>
-
-      <div className="mt-3 space-y-2">
-
-  <p className="text-sm font-semibold text-cyan-100">
-    Good evening, {displayName}.
-  </p>
-
-  <p className="text-sm leading-6 text-white/65">
-
-    {
-      awareness.score > 85
-
-      ? "Builder momentum strengthened today. TwinMe detected increased consistency and stronger identity alignment."
-
-      : awareness.score > 70
-
-      ? "TwinMe noticed steadier engagement patterns. Momentum appears to be gradually improving."
-
-      : awareness.score > 55
-
-      ? "TwinMe is observing reflective behavior and allowing additional space for internal processing."
-
-      : "TwinMe is collecting signals and waiting for stronger patterns before updating long-term identity assumptions."
-    }
-
-  </p>
-
-</div>
+      <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-emerald-100">
+        <span className="h-2 w-2 rounded-full bg-emerald-300 animate-pulse" />
+        Online
+      </div>
     </div>
 
-    <Link
-      href="/"
-      className="rounded-xl border border-white/15 px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/10 active:scale-[0.98] transition"
-    >
-      ← Dashboard
-    </Link>
-  </div>
+    <div className="relative mt-6 grid grid-cols-1 gap-6 md:grid-cols-[1fr_1.2fr] md:items-center">
+      <div className="flex flex-col items-center">
+        <div className="relative flex h-56 w-56 items-center justify-center">
+          <div className={`absolute inset-0 rounded-full blur-3xl opacity-70 ${orbState.smoke} animate-pulse`} />
+          <div className={`absolute inset-2 rounded-full border ${orbState.ring} animate-[spin_26s_linear_infinite]`} />
+          <div className="absolute inset-5 rounded-full border border-cyan-300/25 animate-[spin_36s_linear_infinite]" />
+          <div className="absolute inset-8 rounded-full border border-fuchsia-300/25 animate-[spin_18s_linear_infinite]" />
+          <div className="absolute inset-12 rounded-full bg-gradient-to-br from-fuchsia-400/20 via-cyan-300/20 to-blue-400/20 blur-lg animate-pulse" />
 
- <div className="relative flex h-36 w-36 items-center justify-center">
-  <div className="absolute inset-0 rounded-full bg-cyan-400/10 blur-3xl animate-pulse" />
-  <div className="absolute inset-2 rounded-full border border-cyan-300/20 animate-[spin_30s_linear_infinite]" />
-  <div className="absolute inset-5 rounded-full border border-fuchsia-300/20 animate-[spin_18s_linear_infinite]" />
-  <div className="absolute inset-7 rounded-full border border-emerald-300/20 animate-[spin_50s_linear_infinite]" />
-  {/* Identity Alignment Halo */}
+          <div className="absolute -left-4 top-8 h-24 w-24 rounded-full bg-fuchsia-500/20 blur-2xl animate-pulse" />
+          <div className="absolute -right-4 top-10 h-24 w-24 rounded-full bg-cyan-400/20 blur-2xl animate-pulse" />
+          <div className="absolute bottom-4 h-10 w-32 rounded-full bg-fuchsia-500/20 blur-xl" />
 
-<div
-  className={`
-absolute
-inset-3
-rounded-full
-blur-xl
-opacity-40
-transition-all
-duration-1000
-${orbState.smoke}
-`}
- />
-  <div className="absolute inset-10 rounded-full bg-gradient-to-br from-cyan-300/10 via-transparent to-fuchsia-400/10 blur-lg animate-pulse" />
-  <div className="absolute inset-8 rounded-full bg-gradient-to-br from-cyan-300/20 via-fuchsia-400/15 to-emerald-300/15 blur-md" />
+          <div className="relative flex h-28 w-28 items-center justify-center rounded-full border border-white/10 bg-black/55 shadow-[0_0_55px_rgba(168,85,247,0.30)] backdrop-blur-xl">
+            <div className="absolute inset-0 rounded-full bg-gradient-to-br from-fuchsia-500/15 via-transparent to-cyan-400/15" />
+            <div className="relative text-5xl font-black leading-none text-fuchsia-200">
+              ∞
+            </div>
+          </div>
+        </div>
 
-  <div className="relative flex h-24 w-24 flex-col items-center justify-center rounded-full border border-cyan-300/25 bg-black/60 shadow-[0_0_45px_rgba(34,211,238,0.25)] backdrop-blur-xl">
-    <div className="text-3xl font-black text-white">
-      {awareness.score}
+        <div className={`mt-3 text-center text-xs font-bold uppercase tracking-[0.2em] ${orbState.text}`}>
+          {orbState.label}
+        </div>
+
+        <div className="mt-1 text-center text-xs text-white/50">
+          {orbState.insight}
+        </div>
+      </div>
+
+      <div>
+        <div className="flex items-center gap-3">
+          <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/10 bg-black/40 shadow-[0_0_25px_rgba(168,85,247,0.25)] backdrop-blur-xl">
+            <div className={`absolute inset-0 rounded-full blur-xl ${orbState.smoke}`} />
+            <div className={`absolute inset-1 rounded-full border ${orbState.ring} animate-[spin_18s_linear_infinite]`} />
+            <div className="relative text-xl font-black leading-none text-fuchsia-200">
+              ∞
+            </div>
+          </div>
+
+          <div>
+            <h1 className="text-5xl font-black tracking-tight bg-gradient-to-r from-fuchsia-300 via-violet-300 to-cyan-300 bg-clip-text text-transparent">
+              TwinMe
+            </h1>
+            <p className="mt-1 text-sm text-white/65">
+              Your adaptive digital twin.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-6 h-px w-full bg-gradient-to-r from-fuchsia-400/70 via-cyan-300/40 to-transparent" />
+
+        <div className="mt-6">
+          <p className="text-2xl font-light text-white">
+            Good evening <span className="font-semibold text-fuchsia-300">{displayName}</span>.
+          </p>
+
+          <div className="mt-5 rounded-3xl border border-white/10 bg-black/25 p-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-fuchsia-300/20 bg-fuchsia-400/10 text-fuchsia-200">
+                ♥
+              </div>
+
+              <p className="text-sm leading-6 text-white/75">
+                {awareness.score > 85
+                  ? "Builder momentum strengthened. TwinMe detected increased consistency and stronger identity alignment."
+                  : awareness.score > 70
+                  ? "TwinMe noticed steadier engagement patterns. Momentum appears to be gradually improving."
+                  : awareness.score > 55
+                  ? "TwinMe is observing reflective behavior and allowing additional space for internal processing."
+                  : "TwinMe is collecting signals and waiting for stronger patterns before updating long-term identity assumptions."}
+              </p>
+            </div>
+          </div>
+
+          <Link
+            href="/"
+            className="mt-5 inline-flex w-full items-center justify-center rounded-2xl border border-fuchsia-300/25 bg-fuchsia-400/10 px-5 py-3 text-sm font-bold text-fuchsia-100 shadow-[0_0_25px_rgba(217,70,239,0.15)] transition hover:bg-fuchsia-400/15 active:scale-[0.98]"
+          >
+            ← Dashboard
+          </Link>
+        </div>
+      </div>
     </div>
-
-    <div className="text-[9px] font-bold uppercase tracking-[0.2em] text-cyan-200">
-      {orbState.label}
-    </div>
-  </div>
-</div>
-<p className={`mt-3 text-center text-xs font-semibold ${orbState.text}`}>
-  {orbState.insight}
-</p>
-
-  <div className="relative mt-6 rounded-3xl border border-white/10 bg-black/25 p-4">
-    <p className="text-sm leading-6 text-white/75">
-      Good evening, {displayName}. TwinMe is reading your current state, crew alignment, environment pressure, and learned rhythm.
-    </p>
   </div>
 
-  <div className="relative mt-5 grid grid-cols-2 gap-3">
+  <div className="grid grid-cols-2 gap-3">
     {[
-      { label: "State", value: awareness.level, sub: "emotional weather" },
-      {
-        label: "Heartbeat",
-        value: live?.heartbeatBpm || 0,
-        sub: `${minutes} min active`,
-      },
-      {
-        label: "Desync",
-        value: twinSyncSnapshot.desync?.level,
-        sub: "crew alignment",
-      },
-      {
-        label: "LearnMe",
-        value: learnMe.label,
-        sub: "pattern memory",
-      },
+      { label: "Interaction Quality", value: "91%", sub: "Excellent", color: "text-emerald-300" },
+      { label: "Growth Velocity", value: "+14%", sub: "Accelerating", color: "text-fuchsia-300" },
+      { label: "Consistency", value: "87%", sub: "Strong", color: "text-cyan-300" },
+      { label: "Alignment", value: "94%", sub: "High", color: "text-violet-300" },
     ].map((item) => (
       <div
         key={item.label}
-        className={`rounded-2xl border ${theme.border} bg-white/[0.04] p-3 min-h-[82px] backdrop-blur-xl`}
+        className="rounded-3xl border border-white/10 bg-white/[0.035] p-4 text-center backdrop-blur-xl"
       >
-        <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/40">
+        <div className="text-xs leading-5 text-white/70">
           {item.label}
         </div>
-
-        <div className="mt-2 truncate text-base font-black leading-tight text-white">
+        <div className={`mt-3 text-3xl font-black ${item.color}`}>
           {item.value}
         </div>
-
-        <div className="mt-1 text-[11px] leading-4 text-white/45">
+        <div className="mt-1 text-xs text-white/50">
           {item.sub}
         </div>
       </div>
     ))}
   </div>
+
+  <div className="rounded-3xl border border-cyan-300/15 bg-white/[0.035] p-4 backdrop-blur-xl">
+    <div className="mb-4 flex items-center justify-between">
+      <div className="text-sm font-bold uppercase tracking-[0.16em] text-white/70">
+        Observatory Insights
+      </div>
+      <div className="inline-flex items-center gap-1 text-xs font-bold text-emerald-300">
+        Live <span className="h-2 w-2 rounded-full bg-emerald-300 animate-pulse" />
+      </div>
+    </div>
+
+    <div className="space-y-3">
+      {[
+        { label: "Builder Momentum", sub: "Strong execution patterns.", value: "+12%", color: "text-emerald-300" },
+        { label: "Reflection Depth", sub: "Deeper self-awareness.", value: "+18%", color: "text-fuchsia-300" },
+        { label: "Emotional Stability", sub: "Stable and resilient.", value: "72%", color: "text-cyan-300" },
+        { label: "Crew Cohesion", sub: "Aligned and supportive.", value: "Healthy", color: "text-orange-300" },
+        { label: "Prediction Confidence", sub: "High accuracy today.", value: "93%", color: "text-blue-300" },
+      ].map((item) => (
+        <div
+          key={item.label}
+          className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/25 p-3"
+        >
+          <div>
+            <div className="text-sm font-semibold text-white">
+              {item.label}
+            </div>
+            <div className="text-xs text-white/50">
+              {item.sub}
+            </div>
+          </div>
+
+          <div className={`text-lg font-black ${item.color}`}>
+            {item.value}
+          </div>
+        </div>
+      ))}
+    </div>
+
+    <div className="mt-4 text-center text-sm font-semibold text-fuchsia-300">
+      All systems are synchronized.
+    </div>
   </div>
-
-
-{/* PRESENCE INSIGHTS */}
-
-<div className="mt-5 grid grid-cols-1 gap-3">
-
-<div className="rounded-3xl border border-cyan-300/10 bg-black/25 p-4 backdrop-blur-xl">
-
-<div className="text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-200">
-
-<div className="mt-4 rounded-3xl border border-cyan-300/10 bg-black/20 p-4 backdrop-blur-xl">
-
-<div className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-200">
-
-Observatory
-
 </div>
-
-
-<div className="mt-3 space-y-3">
-
-
-<div className="flex items-center justify-between">
-
-<span className="text-sm text-white/60">
-
-Builder Momentum
-
-</span>
-
-
-<span className="font-bold text-emerald-300">
-
-+12%
-
-</span>
-
-</div>
-
-
-
-<div className="flex items-center justify-between">
-
-<span className="text-sm text-white/60">
-
-Consistency
-
-</span>
-
-
-<span className="font-bold text-cyan-300">
-
-Stable
-
-</span>
-
-</div>
-
-
-
-<div className="flex items-center justify-between">
-
-<span className="text-sm text-white/60">
-
-Drift Pattern
-
-</span>
-
-
-<span className="font-bold text-fuchsia-300">
-
-Minimal
-
-</span>
-
-</div>
-
-
-
-<div className="flex items-center justify-between">
-
-<span className="text-sm text-white/60">
-
-Crew Stability
-
-</span>
-
-
-<span className="font-bold text-emerald-300">
-
-Healthy
-
-</span>
-
-</div>
-
-
-</div>
-
-</div>
-
-TwinMe noticed
-
-</div>
-
-
-<div className="mt-2 text-sm leading-6 text-white/75">
-
-{awareness.score > 80
-
-? "Builder tendencies appear stronger today. Momentum is increasing."
-
-: awareness.score > 60
-
-? "TwinMe notices growing consistency patterns."
-
-: "TwinMe is awaiting stronger signals before updating long-term identity patterns."}
-
-</div>
-
-</div>
-
-
-<div className="grid grid-cols-2 gap-3">
-
-<div className="rounded-2xl bg-white/[0.03] p-3">
-
-<div className="text-xs text-white/45">
-
-Momentum
-
-</div>
-
-<div className="mt-1 font-black text-emerald-300">
-
-Rising
-
-</div>
-
-</div>
-
-<div className="rounded-2xl bg-white/[0.03] p-3">
-
-<div className="text-xs text-white/45">
-
-Alignment
-
-</div>
-
-<div className="mt-1 font-black text-cyan-300">
-
-96%
-
-</div>
-
-</div>
-
-</div>
-
-</div>
-
-</div>
-
             <div className="grid grid-cols-1 gap-6">
               <div className="space-y-4 order-1">
                 <div className={`rounded-2xl p-4 border bg-white/5 ${theme.border}`}>
@@ -10619,7 +10483,7 @@ Alignment
             }
           }
         `}</style>
-
+</div>
           {showUpgradePrompt && (
             <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 px-5 backdrop-blur-md">
               <div className="w-full max-w-md">
