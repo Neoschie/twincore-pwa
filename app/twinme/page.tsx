@@ -10132,7 +10132,10 @@ const orbState = useMemo(
           style={{ background: theme.pageBg }}
         >
           <div className="w-full max-w-md space-y-6 px-4 pt-6 pb-10">
-          <TwinMeHero displayName={displayName} />
+          <TwinMeHero
+  displayName={displayName}
+  orbState={orbState}
+/>
 
       <div className="grid grid-cols-1 gap-6">
               <div className="space-y-4 order-1">
