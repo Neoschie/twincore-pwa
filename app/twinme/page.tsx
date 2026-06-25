@@ -10366,22 +10366,7 @@ const orbState = useMemo(
           <TwinMeUpgradePrompt
   open={showUpgradePrompt}
   onClose={() => setShowUpgradePrompt(false)}
-/>
-          {showUpgradePrompt && (
-            <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 px-5 backdrop-blur-md">
-              <div className="w-full max-w-md">
-                <UpgradePrompt />
-
-                <button
-                  type="button"
-                  onClick={() => setShowUpgradePrompt(false)}
-                  className="mt-4 w-full rounded-2xl border border-white/10 bg-white/5 py-3 text-sm text-white/70"
-                >
-                  Maybe Later
-                </button>
-              </div>
-            </div>
-          )}
+   />
           
         </main>
       </AuthGuard>
