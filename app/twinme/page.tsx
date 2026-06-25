@@ -10297,17 +10297,7 @@ const orbState = useMemo(
   theme={theme}
   awareness={awareness}
   twinMeObservation={twinMeObservation}
-/>
-
-    <div className="mt-5 rounded-3xl border border-fuchsia-300/15 bg-fuchsia-400/5 p-4">
-      <div className="text-[10px] font-black uppercase tracking-[0.22em] text-fuchsia-200">
-        TwinMe noticed
-      </div>
-
-      <div className="mt-3 text-sm leading-7 text-white/75">
-        {twinMeObservation}
-      </div>
-
+  />
       <div className="grid grid-cols-1 gap-6">
               <div className="space-y-4 order-1">
                 <div className={`rounded-2xl p-4 border bg-white/5 ${theme.border}`}>
@@ -10553,10 +10543,9 @@ const orbState = useMemo(
               </div>
             </div>
           )}
-          </div>
+          
         </main>
       </AuthGuard>
-    </ErrorBoundary >
-    
-     );
-  }
+    </ErrorBoundary>
+   );
+}
