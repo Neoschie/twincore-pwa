@@ -10285,117 +10285,16 @@ handsFreeEnabled={handsFreeEnabled}
                     </p>
                   </div>
                 )}
-
-
-                <div className="sticky bottom-0 left-0 right-0 pt-3 safe-bottom-pad mt-3 bg-gradient-to-t from-[#0A0A0B] to-transparent">
-                  <div className="flex flex-col gap-3">
-                    <textarea
-                      ref={inputRef}
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      rows={1}
-                      enterKeyHint="send"
-                      autoCapitalize="sentences"
-                      autoCorrect="on"
-                      spellCheck
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          handleSend();
-                        }
-                      }}
-                      placeholder="Tell TwinMe what's going on..."
-                      className="w-full min-h-[72px] resize-none touch-manipulation rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/35 outline-none focus:ring-2 focus:ring-white/20 transition"
-                    />
-                    <div className="grid grid-cols-2 gap-3">
-                      <button
-                        onClick={() => handleSend()}
-                        className="w-full h-[52px] rounded-2xl bg-white text-black font-medium shadow-lg hover:opacity-90 transition"
-                      >
-                        Send
-                      </button>
-
-                      <button
-                        onClick={voiceSupported ? toggleListening : undefined}
-                        className={`w-full h-[52px] rounded-2xl border font-medium transition ${isListening
-                          ? "border-red-400/40 bg-red-500/10 text-red-100"
-                          : "border-white/10 bg-white/5 text-white"
-                          }`}
-                      >
-                        {isListening ? "Listening..." : "Voice"}
-                      </button>
-
-                      <button
-                        onClick={() => setVoiceOutputEnabled((prev) => !prev)}
-                        className={`w-full h-[52px] rounded-2xl border font-medium transition ${voiceOutputEnabled
-                          ? "border-green-400/40 bg-green-500/10 text-green-100"
-                          : "border-white/10 bg-white/5 text-white"
-                          }`}
-                      >
-                        {voiceOutputEnabled ? "Voice ON" : "Voice OFF"}
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          if (!voiceSupported) return;
-
-                          if (!voiceAccess.allowed) {
-                            setShowUpgradePrompt(true);
-                            return;
-                          }
-
-                          setHandsFreeEnabled((prev) => {
-                            const next = !prev;
-
-                            if (next && recognitionRef.current && !isListening) {
-                              try {
-                                recognitionRef.current.start();
-                              } catch {
-                                // ignore repeated start errors
-                              }
-                            }
-
-                            if (!next && recognitionRef.current) {
-                              recognitionRef.current.stop();
-                            }
-
-                            return next;
-                          });
-                        }}
-                        className={`w-full h-[52px] rounded-2xl border font-medium transition ${handsFreeEnabled
-                          ? "border-purple-400/40 bg-purple-500/10 text-purple-100"
-                          : "border-white/10 bg-white/5 text-white"
-                          }`}
-                      >
-                        {handsFreeEnabled ? "Hands-Free ON" : "Hands-Free"}
-                      </button>
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
-
-            <style jsx>{`
-          @keyframes fadeIn {
-            from {
-              opacity: 0;
-              transform: translateY(16px);
-            }
-            to {
-              opacity: 1;
-              transform: translateY(0);
-            }
-          }
-        `}</style>
-          
           </div>
+
           <TwinMeUpgradePrompt
-  open={showUpgradePrompt}
-  onClose={() => setShowUpgradePrompt(false)}
-   />
-          
+            open={showUpgradePrompt}
+            onClose={() => setShowUpgradePrompt(false)}
+          />
         </main>
       </AuthGuard>
     </ErrorBoundary>
-   );
+  );
 }
