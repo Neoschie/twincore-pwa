@@ -10167,8 +10167,19 @@ const orbState = useMemo(
   isThinking={isThinking}
 />
 <TwinMeInput
-  value={input}
-  onChange={setInput}
+
+value={input}
+
+onChange={setInput}
+
+onSend={handleSend}
+
+isListening={isListening}
+
+voiceOutputEnabled={voiceOutputEnabled}
+
+handsFreeEnabled={handsFreeEnabled}
+
 />
 
                 <h3 className="font-semibold mb-3 text-base">Talk to TwinMe</h3>

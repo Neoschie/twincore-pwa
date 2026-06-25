@@ -1,14 +1,34 @@
 type Props = {
   value: string;
   onChange: (v: string) => void;
+
+  onSend: () => void;
+
+  isListening: boolean;
+
+  voiceOutputEnabled: boolean;
+
+  handsFreeEnabled: boolean;
+
 };
 
 export function TwinMeInput({
-  value,
-  onChange,
-}: Props) {
 
-  return (
+value,
+
+onChange,
+
+onSend,
+
+isListening,
+
+voiceOutputEnabled,
+
+handsFreeEnabled
+
+}:Props){
+
+return(
 
 <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-4 backdrop-blur-xl">
 
@@ -33,6 +53,7 @@ placeholder:text-white/40
 <div className="mt-3 flex gap-2">
 
 <button
+onClick={onSend}
 className="
 flex-1
 rounded-2xl
@@ -58,14 +79,43 @@ text-white/70
 "
 >
 
-🎤
+{isListening ? "🎙️" : "🎤"}
 
 </button>
 
 </div>
 
+<div className="mt-3 flex gap-2">
+
+<div className="text-xs text-white/45">
+
+Voice:
+
+<span className="ml-1 text-cyan-300">
+
+{voiceOutputEnabled ? "ON" : "OFF"}
+
+</span>
+
 </div>
 
-  );
+
+<div className="text-xs text-white/45">
+
+Hands-Free:
+
+<span className="ml-1 text-fuchsia-300">
+
+{handsFreeEnabled ? "ON" : "OFF"}
+
+</span>
+
+</div>
+
+</div>
+
+</div>
+
+);
 
 }
