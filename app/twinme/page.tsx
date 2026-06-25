@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { TwinMeOrb } from "@/components/twinme/TwinMeOrb";
 import { TwinMeObservatory } from "@/components/twinme/TwinMeObservatory";
+import { TwinMeHero } from "@/components/twinme/TwinMeHero";
 import { supabase } from "@/lib/supabase/client";
 import { buildTwinSignals } from "@/lib/twin/buildSignals";
 import type {
