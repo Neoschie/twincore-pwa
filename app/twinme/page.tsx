@@ -8,6 +8,7 @@ import { TwinMeOrb } from "@/components/twinme/TwinMeOrb";
 import { TwinMeObservatory } from "@/components/twinme/TwinMeObservatory";
 import { TwinMeHero } from "@/components/twinme/TwinMeHero";
 import { TwinMeUpgradePrompt } from "@/components/twinme/TwinMeUpgradePrompt";
+import { TwinMeChat } from "@/components/twinme/TwinMeChat";
 import { supabase } from "@/lib/supabase/client";
 import { buildTwinSignals } from "@/lib/twin/buildSignals";
 import type {
@@ -10159,6 +10160,7 @@ const orbState = useMemo(
               <div
                 className={`rounded-3xl p-5 border w-full min-w-0 flex flex-col mt-2 order-2 bg-white/5 ${theme.border} ${theme.glow}`}
               >
+                <TwinMeChat displayName={displayName} />
                 <h3 className="font-semibold mb-3 text-base">Talk to TwinMe</h3>
 
                 <div
