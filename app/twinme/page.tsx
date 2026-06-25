@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { TwinMeOrb } from "@/components/twinme/TwinMeOrb";
 import { TwinMeObservatory } from "@/components/twinme/TwinMeObservatory";
 import { TwinMeHero } from "@/components/twinme/TwinMeHero";
+import { TwinMeUpgradePrompt } from "@/components/twinme/TwinMeUpgradePrompt";
 import { supabase } from "@/lib/supabase/client";
 import { buildTwinSignals } from "@/lib/twin/buildSignals";
 import type {
@@ -10362,6 +10363,10 @@ const orbState = useMemo(
         `}</style>
           
           </div>
+          <TwinMeUpgradePrompt
+  open={showUpgradePrompt}
+  onClose={() => setShowUpgradePrompt(false)}
+/>
           {showUpgradePrompt && (
             <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 px-5 backdrop-blur-md">
               <div className="w-full max-w-md">
