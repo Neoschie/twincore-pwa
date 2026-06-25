@@ -10160,7 +10160,11 @@ const orbState = useMemo(
               <div
                 className={`rounded-3xl p-5 border w-full min-w-0 flex flex-col mt-2 order-2 bg-white/5 ${theme.border} ${theme.glow}`}
               >
-                <TwinMeChat displayName={displayName} />
+                <TwinMeChat
+  displayName={displayName}
+  messages={messages}
+  isThinking={isThinking}
+/>
                 <h3 className="font-semibold mb-3 text-base">Talk to TwinMe</h3>
 
                 <div
