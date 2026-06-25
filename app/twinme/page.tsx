@@ -10131,6 +10131,7 @@ const orbState = useMemo(
           style={{ background: theme.pageBg }}
         >
           <div className="w-full max-w-md space-y-6 px-4 pt-6 pb-10">
+          <TwinMeHero displayName={displayName} />
           <div className="space-y-4">
   <div className="relative overflow-hidden rounded-[2rem] border border-cyan-300/20 bg-white/[0.04] p-5 shadow-[0_0_60px_rgba(34,211,238,0.10)] backdrop-blur-xl">
     <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(217,70,239,0.16),transparent_38%),radial-gradient(circle_at_top_right,rgba(34,211,238,0.18),transparent_42%)]" />
