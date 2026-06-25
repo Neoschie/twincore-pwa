@@ -9,6 +9,7 @@ import { TwinMeObservatory } from "@/components/twinme/TwinMeObservatory";
 import { TwinMeHero } from "@/components/twinme/TwinMeHero";
 import { TwinMeUpgradePrompt } from "@/components/twinme/TwinMeUpgradePrompt";
 import { TwinMeChat } from "@/components/twinme/TwinMeChat";
+import { TwinMeInput } from "@/components/twinme/TwinMeInput";
 import { supabase } from "@/lib/supabase/client";
 import { buildTwinSignals } from "@/lib/twin/buildSignals";
 import type {
@@ -10165,6 +10166,11 @@ const orbState = useMemo(
   messages={messages}
   isThinking={isThinking}
 />
+<TwinMeInput
+  value={input}
+  onChange={setInput}
+/>
+
                 <h3 className="font-semibold mb-3 text-base">Talk to TwinMe</h3>
 
                 <div
