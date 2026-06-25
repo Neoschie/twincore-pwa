@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { TwinMeOrb } from "@/components/twinme/TwinMeOrb";
+import { TwinMeObservatory } from "@/components/twinme/TwinMeObservatory";
 import { supabase } from "@/lib/supabase/client";
 import { buildTwinSignals } from "@/lib/twin/buildSignals";
 import type {
@@ -10291,6 +10292,12 @@ const orbState = useMemo(
         </div>
       ))}
     </div>
+
+<TwinMeObservatory
+  theme={theme}
+  awareness={awareness}
+  twinMeObservation={twinMeObservation}
+/>
 
     <div className="mt-5 rounded-3xl border border-fuchsia-300/15 bg-fuchsia-400/5 p-4">
       <div className="text-[10px] font-black uppercase tracking-[0.22em] text-fuchsia-200">
