@@ -10157,6 +10157,17 @@ const orbState = useMemo(
 
               <h3 className="font-semibold mb-3 text-base">Talk to TwinMe</h3>
 
+<TwinMeChat
+  displayName={displayName}
+  messages={messages}
+  isThinking={isThinking}
+  onStateCheck={() => handleSend("state check")}
+  showActionButtons={
+    (trajectory.riskWindow as TrajectoryRiskWindow) === "approaching" ||
+    twinSyncSnapshot.desync?.level === "separated"
+  }
+/>
+
               <div
                 ref={chatScrollRef}
                 className="w-full rounded-2xl border border-white/10 bg-black/20 p-3 pt-4 min-h-[280px] max-h-[380px] overflow-y-auto overscroll-contain scroll-smooth pb-32 space-y-3"
