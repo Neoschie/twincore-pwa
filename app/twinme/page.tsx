@@ -10155,117 +10155,22 @@ const orbState = useMemo(
                 )}
               </div>
 
-              <h3 className="font-semibold mb-3 text-base">Talk to TwinMe</h3>
+              <div className="space-y-4 order-2">
+                <h3 className="font-semibold mb-3 text-base">Talk to TwinMe</h3>
 
-<TwinMeChat
-  displayName={displayName}
-  messages={messages}
-  isThinking={isThinking}
-  onStateCheck={() => handleSend("state check")}
-  showActionButtons={
-    (trajectory.riskWindow as TrajectoryRiskWindow) === "approaching" ||
-    twinSyncSnapshot.desync?.level === "separated"
-  }
-/>
-
-              <div
-                ref={chatScrollRef}
-                className="w-full rounded-2xl border border-white/10 bg-black/20 p-3 pt-4 min-h-[280px] max-h-[380px] overflow-y-auto overscroll-contain scroll-smooth pb-32 space-y-3"
-              >
-                {messages.map((m, i) => {
-                  const isLatest = i === messages.length - 1;
-
-                  return (
-                    <div
-                      key={m.id}
-                      className={`flex ${m.role === "twin"
-                        ? "animate-[fadeIn_0.45s_ease-out]"
-                        : "animate-[fadeIn_0.25s_ease-out]"
-                        } ${m.role === "user" ? "justify-end" : "justify-start"}`}
-                    >
-                      <div
-                        className={`p-3.5 rounded-2xl max-w-[78%] shadow-sm ${m.role === "twin"
-                          ? getEscalationLevel(
-                              awareness,
-                              trajectory,
-                              twinSyncSnapshot.desync?.level,
-                              drift.level,
-                              twinSyncSnapshot.noSupport?.active,
-                              crewCollapse,
-                              environmentLevel,
-                              movementLevel
-                            ) === 3 && isLatest
-                              ? "bg-red-500/15 border border-red-400/30 animate-pulse"
-                              : awareness.level === "critical"
-                                ? "bg-red-500/10 border border-red-400/20"
-                                : "bg-blue-500/10 border border-blue-400/20"
-                          : "bg-white/10"
-                          }`}
-                      >
-                        <p className="text-sm whitespace-pre-wrap break-words">
-                          {m.text}
-                        </p>
-
-                        {m.role === "twin" &&
-                          isLatest &&
-                          ((trajectory.riskWindow as TrajectoryRiskWindow) === "approaching" ||
-                            twinSyncSnapshot.desync?.level === "separated") && (
-                            <div className="mt-3 grid grid-cols-2 gap-2">
-                              <Link
-                                href="/spots"
-                                className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-center text-xs text-white/80 hover:bg-white/15 active:scale-[0.98] transition"
-                              >
-                                Open Spots
-                              </Link>
-
-                              <Link
-                                href="/crew"
-                                className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-center text-xs text-white/80 hover:bg-white/15 active:scale-[0.98] transition"
-                              >
-                                Check Crew
-                              </Link>
-
-                              <Link
-                                href="/exit"
-                                className="rounded-xl border border-red-400/20 bg-red-500/10 px-3 py-2 text-center text-xs text-red-100 hover:bg-red-500/15 active:scale-[0.98] transition"
-                              >
-                                Start Exit
-                              </Link>
-
-                              <button
-                                type="button"
-                                onClick={() => handleSend("state check")}
-                                className="rounded-xl border border-blue-400/20 bg-blue-500/10 px-3 py-2 text-xs text-blue-100"
-                              >
-                                State Check
-                              </button>
-                            </div>
-                          )}
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {isThinking && (
-                  <div className="flex justify-start">
-                    <div className="p-3 rounded-xl max-w-[75%] bg-blue-500/10 border border-blue-400/20">
-                      <div className="flex gap-1 items-center">
-                        <span className="w-2 h-2 bg-white/60 rounded-full animate-bounce"></span>
-                        <span className="w-2 h-2 bg-white/60 rounded-full animate-bounce [animation-delay:0.15s]"></span>
-                        <span className="w-2 h-2 bg-white/60 rounded-full animate-bounce [animation-delay:0.3s]"></span>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                <TwinMeChat
+                  displayName={displayName}
+                  messages={messages}
+                  isThinking={isThinking}
+                  onStateCheck={() => handleSend("state check")}
+                  showActionButtons={
+                    (trajectory.riskWindow as TrajectoryRiskWindow) === "approaching" ||
+                    twinSyncSnapshot.desync?.level === "separated"
+                  }
+                  voiceSupported={voiceSupported}
+                  browserName={browserName}
+                />
               </div>
-
-              {!voiceSupported && (
-                <div className="rounded-2xl border border-yellow-400/20 bg-yellow-500/10 px-3 py-2 mt-3 mb-2 text-center">
-                  <p className="text-xs text-yellow-100">
-                    Voice is not supported in {browserName}. Open TwinMe in Chrome to use voice.
-                  </p>
-                </div>
-              )}
             </div>
 
             <TwinMeUpgradePrompt
