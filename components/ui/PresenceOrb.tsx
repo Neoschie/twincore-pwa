@@ -8,7 +8,7 @@ type PresenceState =
   | "thinking"
   | "protective";
 
-type Props = {
+export type PresenceOrbProps = {
 
 state?: PresenceState;
 
@@ -34,7 +34,7 @@ energy=.65,
 
 intensity=.8,
 
-}:Props){
+}: PresenceOrbProps) {
 
 const glow={
 calm:"from-cyan-400/25 via-blue-500/20 to-transparent",
