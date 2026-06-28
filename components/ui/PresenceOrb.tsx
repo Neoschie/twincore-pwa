@@ -28,27 +28,49 @@ thinking:"from-violet-500/30 via-cyan-400/20 to-transparent",
 protective:"from-red-500/30 via-fuchsia-500/20 to-transparent",
 }[state];
 
-return(
+return (
 
 <div
-className="relative"
-style={{
-width:size,
-height:size,
-}}
+  className="relative flex items-center justify-center"
+  style={{
+    width: size,
+    height: size,
+  }}
 >
 
-<div
-className={`
-absolute
-inset-0
-rounded-full
-bg-gradient-radial
-${glow}
-blur-[110px]
-animate-presenceGlow
-`}
-/>
+  {/* Aura */}
+  <div
+    className={`
+      absolute
+      inset-0
+      rounded-full
+      bg-gradient-radial
+      ${glow}
+      blur-[110px]
+      animate-presenceGlow
+    `}
+  />
+
+  {/* Future Particles */}
+  <div
+    className="
+      absolute
+      inset-0
+      pointer-events-none
+    "
+  />
+
+  {/* Future Energy Ring */}
+  <div
+    className="
+      absolute
+      inset-[8%]
+      rounded-full
+      border
+      border-white/5
+      opacity-30
+    "
+  />
 
 <div
 className="
