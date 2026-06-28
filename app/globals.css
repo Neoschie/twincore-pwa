@@ -389,6 +389,54 @@ opacity:.25;
   }
 }
 
+@keyframes presenceBreath{
+
+0%,100%{
+
+transform:scale(.97);
+
+}
+
+50%{
+
+transform:scale(1.03);
+
+}
+
+}
+
+@keyframes presenceGlow{
+
+0%,100%{
+
+opacity:.45;
+
+transform:scale(.92);
+
+}
+
+50%{
+
+opacity:.9;
+
+transform:scale(1.08);
+
+}
+
+}
+
+.animate-presenceBreath{
+
+animation:presenceBreath 9s ease-in-out infinite;
+
+}
+
+.animate-presenceGlow{
+
+animation:presenceGlow 7s ease-in-out infinite;
+
+}
+
 }
 }
 
