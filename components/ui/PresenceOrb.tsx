@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-
+import { PresenceParticles } from "./PresenceParticles";
 type PresenceState =
   | "calm"
   | "reflective"
@@ -51,14 +51,15 @@ return (
     `}
   />
 
-  {/* Future Particles */}
   <div
-    className="
-      absolute
-      inset-0
-      pointer-events-none
-    "
-  />
+  className="
+    absolute
+    inset-0
+    pointer-events-none
+  "
+>
+  <PresenceParticles />
+</div>
 
   {/* Future Energy Ring */}
   <div

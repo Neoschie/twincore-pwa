@@ -437,6 +437,41 @@ animation:presenceGlow 7s ease-in-out infinite;
 
 }
 
+@keyframes presenceParticle {
+
+  0%{
+    transform:
+      translateY(10px)
+      scale(.4);
+
+    opacity:0;
+  }
+
+  20%{
+    opacity:.7;
+  }
+
+  80%{
+    opacity:.25;
+  }
+
+  100%{
+    transform:
+      translateY(-34px)
+      scale(1.2);
+
+    opacity:0;
+  }
+
+}
+
+.animate-presenceParticle{
+
+  animation:
+    presenceParticle linear infinite;
+
+}
+
 }
 }
 
