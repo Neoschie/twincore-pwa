@@ -23,17 +23,11 @@ intensity?: number;
 };
 
 export function PresenceOrb({
-
-state="reflective",
-
-size=420,
-
-presence=.7,
-
-energy=.65,
-
-intensity=.8,
-
+  state = "calm",
+  size = 520,
+  presence = 1,
+  energy = 0,
+  intensity = 0,
 }: PresenceOrbProps) {
 
 const glow={

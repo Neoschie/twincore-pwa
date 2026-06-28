@@ -70,6 +70,7 @@ import {
 
 import ErrorBoundary from "@/components/system/ErrorBoundary";
 import { label } from "framer-motion/client";
+import { buildPresence } from "@/lib/presence/buildPresence";
 /* -------------------------
    TYPES
 --------------------------*/
@@ -8874,6 +8875,10 @@ const orbState = useMemo(
     () => getAwarenessSummary(awareness.level),
     [awareness.level]
   );
+
+const presence = buildPresence({
+  awarenessScore: awareness.score,
+});
 
   const nudge = useMemo(
     () =>
