@@ -9,8 +9,17 @@ type PresenceState =
   | "protective";
 
 type Props = {
-  state?: PresenceState;
-  size?: number;
+
+state?: PresenceState;
+
+size?: number;
+
+presence?: number;
+
+energy?: number;
+
+intensity?: number;
+
 };
 
 export function PresenceOrb({
@@ -18,6 +27,12 @@ export function PresenceOrb({
 state="reflective",
 
 size=420,
+
+presence=.7,
+
+energy=.65,
+
+intensity=.8,
 
 }:Props){
 
@@ -33,9 +48,16 @@ return (
 <div
   className="relative flex items-center justify-center"
   style={{
-    width: size,
-    height: size,
-  }}
+
+width:size,
+
+height:size,
+
+opacity:presence,
+
+filter:`brightness(${1+energy*.15}) saturate(${1+intensity*.18})`
+
+}}
 >
 
   {/* Aura */}
