@@ -71,6 +71,7 @@ import {
 import ErrorBoundary from "@/components/system/ErrorBoundary";
 import { label } from "framer-motion/client";
 import { buildPresence } from "@/lib/presence/buildPresence";
+import { buildGreeting } from "@/lib/presence/buildGreeting";
 /* -------------------------
    TYPES
 --------------------------*/
@@ -8877,6 +8878,11 @@ const orbState = useMemo(
   );
 
 const presence = buildPresence({
+  awarenessScore: awareness.score,
+});
+
+const greeting = buildGreeting({
+  displayName,
   awarenessScore: awareness.score,
 });
 
