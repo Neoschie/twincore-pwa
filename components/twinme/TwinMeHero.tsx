@@ -12,12 +12,19 @@ type TwinMeOrbState = {
   aura?: string;
 };
 
+type Greeting = {
+  greeting: string;
+  headline: string;
+  body: string;
+};
+
 type Props = {
   displayName: string;
   orbState: TwinMeOrbState;
+  greeting: Greeting;
 };
 
-export function TwinMeHero({ displayName, orbState }: Props) {
+export function TwinMeHero({ displayName, orbState, greeting }: Props) {
   return (
     <section className="relative min-h-[680px] overflow-visible px-4 pt-6 pb-8 text-center">
       <div className="relative z-30 mx-auto flex max-w-md items-center justify-between px-2">
@@ -50,11 +57,11 @@ export function TwinMeHero({ displayName, orbState }: Props) {
         </h1>
 
         <p className="mt-3 text-sm font-semibold text-cyan-200">
-          Good evening, {displayName}.
+          {greeting.greeting}
         </p>
 
         <p className="mx-auto mt-3 max-w-[22rem] text-sm leading-7 text-white/65">
-          TwinMe is reading your current state, crew alignment, environment pressure, and learned rhythm.
+           {greeting.body}
         </p>
       </div>
 

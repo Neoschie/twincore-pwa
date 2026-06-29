@@ -10,11 +10,18 @@ type TwinMeOrbState = {
 type Props = {
   displayName: string;
   orbState: TwinMeOrbState;
+  greeting: Greeting;
+};
+
+type Greeting = {
+  greeting: string;
+  headline: string;
+  body: string;
 };
 
 export function TwinMeHeroV2({
-  displayName,
   orbState,
+  greeting,
 }: Props) {
   return (
     <section className="relative min-h-[720px] overflow-hidden">
@@ -58,24 +65,16 @@ export function TwinMeHeroV2({
 
       <div className="relative z-20 -mt-10 text-center">
 
-        <p className="text-cyan-200 font-semibold">
+       <p className="text-cyan-200 font-semibold">
+          {greeting.greeting}
+       </p>
 
-          Good evening, {displayName}.
-
-        </p>
-
-        <h1 className="mt-3 text-5xl font-black text-white">
-
-          I'm here.
-
-        </h1>
+       <h1 className="mt-3 text-5xl font-black text-white">
+          {greeting.headline}
+       </h1>
 
         <p className="mx-auto mt-5 max-w-sm text-white/65 leading-7">
-
-          I've been quietly observing your rhythm,
-          learning your patterns,
-          and waiting until you needed me.
-
+           {greeting.body}
         </p>
 
       </div>
