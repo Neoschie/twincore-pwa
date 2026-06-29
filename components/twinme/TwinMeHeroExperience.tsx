@@ -21,7 +21,7 @@ type Props = {
 
 export function TwinMeHeroExperience({ greeting, presence }: Props) {
   return (
-    <section className="relative min-h-[640px] overflow-visible px-4 pt-8 pb-10 text-center">
+    <section className="relative min-h-[640px] overflow-visible px-6 pt-10 pb-12 text-center">
   <div className="relative z-20 mx-auto flex max-w-md items-center justify-between">
   <PresenceBadge
     label="Identity Core"
@@ -41,21 +41,21 @@ export function TwinMeHeroExperience({ greeting, presence }: Props) {
           Online
         </div>
 
-      <div className="relative z-10 mx-auto mt-8 flex justify-center">
+      <div className="relative z-10 mx-auto mt-12 flex justify-center">
         <PresenceOrb {...presence} size={520} />
       </div>
 
-      <GlassPanel className="relative z-20 mx-auto -mt-10 max-w-md p-6">
+      <GlassPanel className="relative z-20 mx-auto -mt-12 max-w-lg px-8 py-7">
 
   <p className="text-sm font-semibold text-cyan-200">
     {greeting.greeting}
   </p>
 
-  <h1 className="mt-3 text-5xl font-black tracking-tight text-white">
+  <h1 className="mt-2 text-5xl font-black tracking-[-0.03em] text-white">
     {greeting.headline}
   </h1>
 
-  <p className="mt-4 text-sm leading-7 text-white/65">
+  <p className="mt-5 text-[15px] leading-7 text-white/70">
     {greeting.body}
   </p>
 
