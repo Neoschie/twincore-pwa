@@ -2,6 +2,7 @@
 
 import { PresenceOrb } from "@/components/ui/PresenceOrb";
 import { PresenceBadge } from "@/components/ui/PresenceBadge";
+import { GlassPanel } from "@/components/ui/GlassPanel";
 type Greeting = {
   greeting: string;
   headline: string;
@@ -44,19 +45,21 @@ export function TwinMeHeroExperience({ greeting, presence }: Props) {
         <PresenceOrb {...presence} size={520} />
       </div>
 
-      <div className="relative z-20 -mt-10 mx-auto max-w-md">
-        <p className="text-sm font-semibold text-cyan-200">
-          {greeting.greeting}
-        </p>
+      <GlassPanel className="relative z-20 mx-auto -mt-10 max-w-md p-6">
 
-        <h1 className="mt-3 text-5xl font-black tracking-tight text-white">
-          {greeting.headline}
-        </h1>
+  <p className="text-sm font-semibold text-cyan-200">
+    {greeting.greeting}
+  </p>
 
-        <p className="mx-auto mt-4 max-w-sm text-sm leading-7 text-white/65">
-          {greeting.body}
-        </p>
-      </div>
+  <h1 className="mt-3 text-5xl font-black tracking-tight text-white">
+    {greeting.headline}
+  </h1>
+
+  <p className="mt-4 text-sm leading-7 text-white/65">
+    {greeting.body}
+  </p>
+
+</GlassPanel>
     </section>
   );
 }
