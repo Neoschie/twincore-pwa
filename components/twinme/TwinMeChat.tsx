@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { GlassPanel } from "@/components/ui/GlassPanel";
 import { MessageBubble } from "./MessageBubble";
+import { chatScrollArea } from "./styles";
 
 type ChatMessage = {
   id: string;
@@ -37,7 +38,7 @@ export function TwinMeChat({
         </div>
       </div>
 
-      <div className="min-h-[280px] max-h-[380px] overflow-y-auto overscroll-contain scroll-smooth rounded-2xl border border-white/10 bg-black/25 p-3 space-y-3">
+      <div className={chatScrollArea}>
         {messages.length === 0 ? (
           <div className="flex h-[240px] items-center justify-center text-center text-sm leading-6 text-white/50">
             TwinMe is ready for {displayName || "you"}.
