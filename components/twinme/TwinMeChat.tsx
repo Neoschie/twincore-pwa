@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { GlassPanel } from "@/components/ui/GlassPanel";
 
 type ChatMessage = {
   id: string;
@@ -26,7 +27,7 @@ export function TwinMeChat({
   browserName,
 }: Props) {
   return (
-    <div className="rounded-3xl border border-cyan-300/15 bg-white/[0.035] p-5 backdrop-blur-xl">
+    <GlassPanel className="p-5">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-base font-black text-white">Talk to TwinMe</h3>
 
@@ -122,6 +123,6 @@ export function TwinMeChat({
           </p>
         </div>
       ) : null}
-    </div>
+    </GlassPanel>
   );
 }
