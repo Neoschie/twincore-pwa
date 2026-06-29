@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { GlassPanel } from "@/components/ui/GlassPanel";
+import { MessageBubble } from "./MessageBubble";
 
 type ChatMessage = {
   id: string;
@@ -42,78 +43,63 @@ export function TwinMeChat({
             TwinMe is ready for {displayName || "you"}.
           </div>
         ) : (
-          messages.map((m, i) => {
-            const isLatest = i === messages.length - 1;
+          <>
+            {messages.map((m, i) => {
+              const isLatest = i === messages.length - 1;
 
-            return (
-              <div
-                key={m.id}
-                className={`flex ${
-                  m.role === "twin"
-                    ? "animate-[fadeIn_0.45s_ease-out]"
-                    : "animate-[fadeIn_0.25s_ease-out]"
-                } ${m.role === "user" ? "justify-end" : "justify-start"}`}
-              >
+              return (
                 <div
-                  className={`max-w-[78%] rounded-2xl p-3.5 text-sm leading-6 shadow-sm ${
+                  key={m.id}
+                  className={`flex ${
                     m.role === "twin"
-                      ? isLatest && showActionButtons
-                        ? "border border-red-400/30 bg-red-500/15 animate-pulse text-white"
-                        : "border border-blue-400/20 bg-blue-500/10 text-white"
-                      : "bg-white/10 text-white"
-                  }`}
+                      ? "animate-[fadeIn_0.45s_ease-out]"
+                      : "animate-[fadeIn_0.25s_ease-out]"
+                  } ${m.role === "user" ? "justify-end" : "justify-start"}`}
                 >
-                  <p className="whitespace-pre-wrap break-words">{m.text}</p>
+                  <MessageBubble role={m.role}>
+                    <p className="whitespace-pre-wrap break-words">{m.text}</p>
 
-                  {m.role === "twin" && isLatest && showActionButtons ? (
-                    <div className="mt-3 grid grid-cols-2 gap-2">
-                      <Link
-                        href="/spots"
-                        className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-center text-xs text-white/80 transition hover:bg-white/15 active:scale-[0.98]"
-                      >
-                        Open Spots
-                      </Link>
+                    {m.role === "twin" && isLatest && showActionButtons ? (
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <Link href="/spots" className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-center text-xs text-white/80 transition hover:bg-white/15 active:scale-[0.98]">
+                          Open Spots
+                        </Link>
 
-                      <Link
-                        href="/crew"
-                        className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-center text-xs text-white/80 transition hover:bg-white/15 active:scale-[0.98]"
-                      >
-                        Check Crew
-                      </Link>
+                        <Link href="/crew" className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-center text-xs text-white/80 transition hover:bg-white/15 active:scale-[0.98]">
+                          Check Crew
+                        </Link>
 
-                      <Link
-                        href="/exit"
-                        className="rounded-xl border border-red-400/20 bg-red-500/10 px-3 py-2 text-center text-xs text-red-100 transition hover:bg-red-500/15 active:scale-[0.98]"
-                      >
-                        Start Exit
-                      </Link>
+                        <Link href="/exit" className="rounded-xl border border-red-400/20 bg-red-500/10 px-3 py-2 text-center text-xs text-red-100 transition hover:bg-red-500/15 active:scale-[0.98]">
+                          Start Exit
+                        </Link>
 
-                      <button
-                        type="button"
-                        onClick={onStateCheck}
-                        className="rounded-xl border border-blue-400/20 bg-blue-500/10 px-3 py-2 text-xs text-blue-100"
-                      >
-                        State Check
-                      </button>
-                    </div>
-                  ) : null}
+                        <button
+                          type="button"
+                          onClick={onStateCheck}
+                          className="rounded-xl border border-blue-400/20 bg-blue-500/10 px-3 py-2 text-xs text-blue-100"
+                        >
+                          State Check
+                        </button>
+                      </div>
+                    ) : null}
+                  </MessageBubble>
+                </div>
+              );
+            })}
+
+            {isThinking ? (
+              <div className="flex justify-start">
+                <div className="max-w-[75%] rounded-xl border border-blue-400/20 bg-blue-500/10 p-3">
+                  <div className="flex items-center gap-1">
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-white/60" />
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-white/60 [animation-delay:0.15s]" />
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-white/60 [animation-delay:0.3s]" />
+                  </div>
                 </div>
               </div>
-            );
-          })
+            ) : null}
+          </>
         )}
-
-        {isThinking ? (
-          <div className="flex justify-start">
-            <div className="max-w-[75%] rounded-xl border border-blue-400/20 bg-blue-500/10 p-3">
-              <div className="flex items-center gap-1">
-                <span className="h-2 w-2 animate-bounce rounded-full bg-white/60" />
-                <span className="h-2 w-2 animate-bounce rounded-full bg-white/60 [animation-delay:0.15s]" />
-                <span className="h-2 w-2 animate-bounce rounded-full bg-white/60 [animation-delay:0.3s]" />
-              </div>
-            </div>
-          </div>
-        ) : null}
       </div>
 
       {!voiceSupported ? (
