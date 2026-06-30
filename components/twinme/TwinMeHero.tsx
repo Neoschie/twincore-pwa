@@ -24,7 +24,7 @@ type Props = {
   greeting: Greeting;
 };
 
-export function TwinMeHero({ displayName, orbState, greeting }: Props) {
+export function TwinMeHero({ orbState, greeting }: Props) {
   return (
     <section className="relative min-h-[680px] overflow-visible px-4 pt-6 pb-8 text-center">
       <div className="relative z-30 mx-auto flex max-w-md items-center justify-between px-2">
@@ -53,8 +53,8 @@ export function TwinMeHero({ displayName, orbState, greeting }: Props) {
 
       <div className="relative z-30 mx-auto mt-[470px] max-w-md">
         <h1 className="text-5xl font-black tracking-tight text-white">
-          TwinMe
-        </h1>
+          {greeting.headline}
+      </h1>
 
         <p className="mt-3 text-sm font-semibold text-cyan-200">
           {greeting.greeting}
