@@ -10185,6 +10185,16 @@ const greeting = buildGreeting({
                   voiceSupported={voiceSupported}
                   browserName={browserName}
                 />
+
+                <TwinMeInput
+                value={input}
+                onChange={setInput}
+                onSend={handleSend}
+                isListening={isListening}
+                voiceOutputEnabled={voiceOutputEnabled}
+                handsFreeEnabled={handsFreeEnabled}
+                />
+
               </div>
             </div>
 
