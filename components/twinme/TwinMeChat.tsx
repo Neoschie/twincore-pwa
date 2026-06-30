@@ -57,20 +57,32 @@ export function TwinMeChat({
                       : "animate-[fadeIn_0.25s_ease-out]"
                   } ${m.role === "user" ? "justify-end" : "justify-start"}`}
                 >
-                  <MessageBubble role={m.role}>
+                  <MessageBubble
+                    role={m.role}
+                    activeAlert={m.role === "twin" && isLatest && showActionButtons}
+                  >
                     <p className="whitespace-pre-wrap break-words">{m.text}</p>
 
                     {m.role === "twin" && isLatest && showActionButtons ? (
                       <div className="mt-3 grid grid-cols-2 gap-2">
-                        <Link href="/spots" className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-center text-xs text-white/80 transition hover:bg-white/15 active:scale-[0.98]">
+                        <Link
+                          href="/spots"
+                          className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-center text-xs text-white/80 transition hover:bg-white/15 active:scale-[0.98]"
+                        >
                           Open Spots
                         </Link>
 
-                        <Link href="/crew" className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-center text-xs text-white/80 transition hover:bg-white/15 active:scale-[0.98]">
+                        <Link
+                          href="/crew"
+                          className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-center text-xs text-white/80 transition hover:bg-white/15 active:scale-[0.98]"
+                        >
                           Check Crew
                         </Link>
 
-                        <Link href="/exit" className="rounded-xl border border-red-400/20 bg-red-500/10 px-3 py-2 text-center text-xs text-red-100 transition hover:bg-red-500/15 active:scale-[0.98]">
+                        <Link
+                          href="/exit"
+                          className="rounded-xl border border-red-400/20 bg-red-500/10 px-3 py-2 text-center text-xs text-red-100 transition hover:bg-red-500/15 active:scale-[0.98]"
+                        >
                           Start Exit
                         </Link>
 
