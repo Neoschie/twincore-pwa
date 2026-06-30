@@ -2571,16 +2571,19 @@ function isSimpleGreeting(input: string) {
   const clean = input.trim().toLowerCase();
 
   return [
-    "hi",
-    "hello",
-    "hey",
-    "yo",
-    "sup",
-    "what's up",
-    "wyd",
-    "good morning",
-    "goodnight",
-  ].includes(clean);
+  "hi",
+  "hello",
+  "hey",
+  "yo",
+  "sup",
+  "what's up",
+  "wyd",
+  "good morning",
+  "what's good",
+  "gm",
+  "morning",
+  "goodnight",
+].includes(clean);
 }
 
 function getSafeGreetingName(displayName: string): string {
