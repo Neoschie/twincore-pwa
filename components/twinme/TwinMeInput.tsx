@@ -33,8 +33,14 @@ return(
 <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-4 backdrop-blur-xl">
 
 <input
-value={value}
-onChange={(e)=>onChange(e.target.value)}
+  value={value}
+  onChange={(e) => onChange(e.target.value)}
+  onKeyDown={(e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      onSend();
+    }
+  }}
 placeholder="Talk to TwinMe..."
 className="
 w-full
@@ -53,7 +59,8 @@ placeholder:text-white/40
 <div className="mt-3 flex gap-2">
 
 <button
-onClick={onSend}
+  onClick={onSend}
+  disabled={!value.trim()}
 className="
 flex-1
 rounded-2xl
@@ -61,6 +68,8 @@ bg-cyan-500/20
 py-3
 font-semibold
 text-cyan-100
+disabled:cursor-not-allowed
+disabled:opacity-40
 "
 >
 
