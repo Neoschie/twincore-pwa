@@ -9327,6 +9327,19 @@ const greeting = buildGreeting({
         lowerTrimmed.includes("nm") ||
         lowerTrimmed.includes("not much");
 
+function getGreetingReply(displayName: string) {
+  const name = displayName?.trim();
+
+  const replies = [
+    `Hi${name ? `, ${name}` : ""}. It's good to see you. What's on your mind today?`,
+    `Hey${name ? `, ${name}` : ""}. I'm here. What would you like to talk about?`,
+    `Welcome back${name ? `, ${name}` : ""}. How are you feeling today?`,
+    `Hi${name ? `, ${name}` : ""}. I'm listening. What's been on your mind?`,
+  ];
+
+  return replies[Math.floor(Math.random() * replies.length)];
+}
+
       const memoryUpdate = updateTwinMemoryState({
         now: Date.now(),
         userText: trimmed,
@@ -9350,6 +9363,10 @@ const greeting = buildGreeting({
         crewCollapse,
         spots,
       });
+
+      if (isSimpleGreeting(trimmed)) {
+  twinText = getGreetingReply(displayName);
+}
 
       if (
         memoryUpdate.shouldCarryForward &&
