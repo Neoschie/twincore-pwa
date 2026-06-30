@@ -1586,7 +1586,22 @@ function getDisplayNameForUser(userId: string): string {
     null
   );
 
-  return profile?.displayName?.trim() || "Neo";
+  const name = profile?.displayName?.trim();
+
+  if (!name) return "Neo";
+
+  const lower = name.toLowerCase();
+
+  if (
+    lower.includes("account-a") ||
+    lower.includes("account-b") ||
+    lower.includes("final") ||
+    lower.includes("test")
+  ) {
+    return "Neo";
+  }
+
+  return name;
 }
 
 /* -------------------------
@@ -2566,6 +2581,25 @@ function isSimpleGreeting(input: string) {
     "good morning",
     "goodnight",
   ].includes(clean);
+}
+
+function getSafeGreetingName(displayName: string): string {
+  const name = displayName?.trim();
+
+  if (!name) return "Neo";
+
+  const lower = name.toLowerCase();
+
+  if (
+    lower.includes("account-a") ||
+    lower.includes("account-b") ||
+    lower.includes("final") ||
+    lower.includes("test")
+  ) {
+    return "Neo";
+  }
+
+  return name;
 }
 
 function getAdaptiveEnergyReply({
@@ -9327,19 +9361,6 @@ const greeting = buildGreeting({
         lowerTrimmed.includes("nm") ||
         lowerTrimmed.includes("not much");
 
-function getGreetingReply(displayName: string) {
-  const name = displayName?.trim();
-
-  const replies = [
-    `Hi${name ? `, ${name}` : ""}. It's good to see you. What's on your mind today?`,
-    `Hey${name ? `, ${name}` : ""}. I'm here. What would you like to talk about?`,
-    `Welcome back${name ? `, ${name}` : ""}. How are you feeling today?`,
-    `Hi${name ? `, ${name}` : ""}. I'm listening. What's been on your mind?`,
-  ];
-
-  return replies[Math.floor(Math.random() * replies.length)];
-}
-
       const memoryUpdate = updateTwinMemoryState({
         now: Date.now(),
         userText: trimmed,
@@ -9368,14 +9389,44 @@ function getGreetingReply(displayName: string) {
   twinText = getGreetingReply(displayName);
 }
 
+function getSafeGreetingName(displayName: string): string {
+  const name = displayName?.trim();
+
+  if (!name) return "Neo";
+
+  const lower = name.toLowerCase();
+
+  if (
+    lower.includes("account-a") ||
+    lower.includes("account-b") ||
+    lower.includes("final") ||
+    lower.includes("test")
+  ) {
+    return "Neo";
+  }
+
+  return name;
+}
+
+function getGreetingReply(displayName: string) {
+  const name = getSafeGreetingName(displayName);
+
+  const replies = [
+    `Hi, ${name}. It's good to see you. What's on your mind today?`,
+    `Hey, ${name}. I'm here. What would you like to talk about?`,
+    `Welcome back, ${name}. How are you feeling today?`,
+    `Hi, ${name}. I'm listening. What's been on your mind?`,
+  ];
+
+  return replies[Math.floor(Math.random() * replies.length)];
+}
+
       if (
         memoryUpdate.shouldCarryForward &&
         memoryUpdate.carryForwardMessage
       ) {
         twinText = `${memoryUpdate.carryForwardMessage}\n\n${twinText}`;
       }
-
-
 
       const isDecisionLocked = detectDecisionLockIn(lowerTrimmed);
 
