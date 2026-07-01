@@ -6766,6 +6766,17 @@ const desyncLevel: DesyncLevel =
     );
   }
 
+// EMOTIONAL FIRST RESPONSE
+if (
+  latestText.includes("overwhelmed") ||
+  latestText.includes("too much") ||
+  latestText.includes("stressed")
+) {
+  return shapeTone(
+    "That sounds like a lot to carry. I'm here with you. What's feeling the heaviest right now?"
+  );
+}
+
   // MODE RESPONSE LAYER
   if (mode === "casual") {
     const casualReplies = [
