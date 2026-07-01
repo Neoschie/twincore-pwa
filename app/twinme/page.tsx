@@ -9773,6 +9773,26 @@ function getGreetingReply(displayName: string, input: string) {
               ? `You've been uncertain for a few steps now. If you move without a destination, you'll drift fast. Pick something controlled like ${adaptiveMove.safestChoice} before you move.`
               : `If you move without a destination right now, you'll drift. Choose ${adaptiveMove.safestChoice} or something equally controlled before you move.`;
 
+          const lastMessage = messages[messages.length - 1];
+
+const lastWasEmotionalUserMessage =
+  lastMessage?.role === "user" &&
+  detectPrimaryEmotion(lastMessage.text) !== "neutral";
+
+const lastWasEmotionalTwinReply =
+  lastMessage?.role === "twin" &&
+  (
+    lastMessage.text.includes("I'm here with you") ||
+    lastMessage.text.includes("I want to hear") ||
+    lastMessage.text.includes("I'm sorry you're feeling") ||
+    lastMessage.text.includes("What's making you feel anxious")
+  );
+
+if (lastWasEmotionalUserMessage || lastWasEmotionalTwinReply) {
+  lastAutonomousReasonRef.current = null;
+  return;
+}
+          
           const intervention = shapeIntervention({
             reason: "drift",
             baseMessage,
