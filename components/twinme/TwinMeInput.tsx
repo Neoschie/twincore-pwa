@@ -2,7 +2,7 @@ type Props = {
   value: string;
   onChange: (v: string) => void;
 
-  onSend: () => void;
+  onSend: (text?: string) => void;
 
   isListening: boolean;
 
@@ -38,7 +38,7 @@ return(
   onKeyDown={(e) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      onSend();
+      onSend(value);
     }
   }}
 placeholder="Talk to TwinMe..."
@@ -59,7 +59,7 @@ placeholder:text-white/40
 <div className="mt-3 flex gap-2">
 
 <button
-  onClick={onSend}
+  onClick={() => onSend(value)}
   disabled={!value.trim()}
 className="
 flex-1

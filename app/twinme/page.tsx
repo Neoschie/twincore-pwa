@@ -12,6 +12,7 @@ import { TwinMeChat } from "@/components/twinme/TwinMeChat";
 import { TwinMeInput } from "@/components/twinme/TwinMeInput";
 import { supabase } from "@/lib/supabase/client";
 import { buildTwinSignals } from "@/lib/twin/buildSignals";
+import { detectPrimaryEmotion } from "@/components/twinme/emotion";
 import type {
   TwinContextSnapshot,
   PartyLive,
@@ -2669,6 +2670,17 @@ function getConversationIntent(text: string) {
       clean.includes("stressed") ||
       clean.includes("pressure");
 
+    const celebration =
+  clean.includes("good news") ||
+  clean.includes("great news") ||
+  clean.includes("excited") ||
+  clean.includes("happy") ||
+  clean.includes("passed") ||
+  clean.includes("promotion") ||
+  clean.includes("promoted") ||
+  clean.includes("i did it") ||
+  clean.includes("got the job");
+
     const reflective =
       clean.includes("feel") ||
       clean.includes("thinking") ||
@@ -2694,6 +2706,7 @@ function getConversationIntent(text: string) {
     if (lowEnergy) return "drained";
     if (overwhelmed) return "overwhelmed";
     if (uncertain) return "uncertain";
+    if (celebration) return "celebration";
     if (reflective) return "reflective";
     if (social) return "social";
 
@@ -3052,18 +3065,6 @@ function getDecisionPrediction(profile: {
 }) {
   if (profile.resistance >= 3 && profile.riskTolerance >= 3) {
     return "You're likely to reject stable options and move toward something unpredictable.";
-  }
-
-  if (profile.decisiveness <= -2) {
-    return "You're likely to stall here instead of choosing.";
-  }
-
-  if (profile.sensitivity >= 3) {
-    return "You're likely to avoid pressure and look for a low-effort option.";
-  }
-
-  if (profile.consistency <= -2) {
-    return "Your responses are inconsistent right now. You're likely not settled yet.";
   }
 
   return null;
@@ -4841,6 +4842,15 @@ function generateTwinResponse({
 
  const latestText = input.toLowerCase().trim();
 
+ const emotion = detectPrimaryEmotion(input);
+
+ const isEmotionalConversation =
+  emotion === "celebrating" ||
+  emotion === "happy" ||
+  emotion === "lonely" ||
+  emotion === "anxious" ||
+  emotion === "overwhelmed";
+
 updateValueMemory(latestText);
 updateGoalMemory(latestText);
 updateBoundaryMemory(latestText);
@@ -6124,13 +6134,7 @@ return openings.length > 0
 
   const lastTwinLower = lastTwinMessage.toLowerCase();
 
-  const subtleEndings = [
-    "",
-    "",
-    "",
-    " Stay aware.",
-    " Keep it simple.",
-  ];
+  const subtleEndings = [""];
 
   function shapeTone(
     base: string,
@@ -6217,6 +6221,7 @@ return openings.length > 0
   };
 
   let intent = getConversationIntent(input);
+  console.log("Intent:", intent);
 
   for (const [key, keywords] of Object.entries(intentMap)) {
     if (keywords.some((word) => latestText.includes(word))) {
@@ -6777,7 +6782,40 @@ if (
   );
 }
 
+// CELEBRATION RESPONSE
+if (intent === "celebration") {
+  return shapeTone(
+    "That's awesome! 🎉 I want to hear about it. What happened?"
+  );
+}
+
   // MODE RESPONSE LAYER
+
+switch (emotion) {
+  case "celebrating":
+    return shapeTone(
+      "That's fantastic! 🎉 I want to hear all about it. What happened?"
+    );
+
+  case "happy":
+    return shapeTone(
+      "I love hearing that. 😊 What's made today such a good day?"
+    );
+
+  case "lonely":
+    return shapeTone(
+      "I'm sorry you're feeling lonely. I'm here with you. Want to tell me what's been going on?"
+    );
+
+  case "anxious":
+    return shapeTone(
+      "It sounds like there's a lot on your mind. What's making you feel anxious?"
+    );
+
+  default:
+    break;
+}
+  
   if (mode === "casual") {
     const casualReplies = [
       "I'm here. We don't have to solve anything yet—what's on your mind?",
