@@ -2732,9 +2732,10 @@ function getConversationIntent(text: string) {
     clean.includes("club");
 
   const reciprocal =
-    clean.includes("you tell me") ||
-    clean.includes("you first") ||
-    clean.includes("what about you");
+  clean === "wbu" ||
+  clean.includes("you tell me") ||
+  clean.includes("you first") ||
+  clean.includes("what about you");
 
   const lowEnergy =
     clean.includes("tired") ||
@@ -6224,6 +6225,10 @@ return openings.length > 0
     }
   }
 
+if (latestText === "wbu" || latestText === "what about you") {
+  return "I'm doing well, and I'm glad we're talking. What's been happening with you today?";
+}
+
   // HIGH RISK OVERRIDE
   if ((trajectory.riskWindow as TrajectoryRiskWindow) === "approaching") {
     return shapeTone(
@@ -9389,7 +9394,7 @@ const greeting = buildGreeting({
       });
 
       if (isSimpleGreeting(trimmed)) {
-  twinText = getGreetingReply(displayName);
+  twinText = getGreetingReply(displayName, trimmed);
 }
 
 function getSafeGreetingName(displayName: string): string {
@@ -9411,17 +9416,36 @@ function getSafeGreetingName(displayName: string): string {
   return name;
 }
 
-function getGreetingReply(displayName: string) {
+function getGreetingReply(displayName: string, input: string) {
   const name = getSafeGreetingName(displayName);
+  const clean = input.trim().toLowerCase();
 
-  const replies = [
-    `Hi, ${name}. It's good to see you. What's on your mind today?`,
-    `Hey, ${name}. I'm here. What would you like to talk about?`,
-    `Welcome back, ${name}. How are you feeling today?`,
-    `Hi, ${name}. I'm listening. What's been on your mind?`,
-  ];
+  if (clean === "sup" || clean === "yo") {
+    return `Hey, ${name}. What's up?`;
+  }
 
-  return replies[Math.floor(Math.random() * replies.length)];
+  if (clean === "hey") {
+    return `Hey, ${name}. I'm here. What's going on?`;
+  }
+
+  if (clean === "hello") {
+    return `Hello, ${name}. It's good to see you. What's on your mind?`;
+  }
+
+  if (
+    clean === "good morning" ||
+    clean === " what's good" ||
+    clean === "morning" ||
+    clean === "gm"
+  ) {
+    return `Good morning, ${name}. What's on your mind today?`;
+  }
+
+  if (clean === "goodnight") {
+    return `Goodnight, ${name}. I'm here with you. Want to settle your thoughts before sleep?`;
+  }
+
+  return `Hi, ${name}. I'm listening. What's been on your mind?`;
 }
 
       if (
