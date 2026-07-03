@@ -4842,6 +4842,16 @@ function generateTwinResponse({
 
  const latestText = input.toLowerCase().trim();
 
+ if (
+  latestText.includes("should i") &&
+  !latestText.includes("where should i go") &&
+  !latestText.includes("where to go") &&
+  !latestText.includes("spot") &&
+  !latestText.includes("spots")
+) {
+  return "I'd be happy to think it through with you. Tell me a little more about the decision you're facing.";
+}
+
  const emotion = detectPrimaryEmotion(input);
 
  const isEmotionalConversation =
@@ -9411,6 +9421,35 @@ const greeting = buildGreeting({
 
       const lowerTrimmed = trimmed.toLowerCase();
 
+   const isLifeDecision =
+  lowerTrimmed.includes("should i") &&
+  !lowerTrimmed.includes("where should i go") &&
+  !lowerTrimmed.includes("where to go") &&
+  !lowerTrimmed.includes("spot") &&
+  !lowerTrimmed.includes("spots");
+
+if (isLifeDecision) {
+  const reply =
+    "I'd be happy to think it through with you. Tell me a little more about the decision you're facing.";
+
+  const twinMessage: Message = {
+    id: makeMessageId(),
+    role: "twin",
+    text: reply,
+  };
+
+  setMessages((prev) => [...prev, twinMessage].slice(-20));
+
+  lastTwinReplyRef.current = reply;
+  lastTwinMessageTimeRef.current = Date.now();
+  lastAutonomousReasonRef.current = null;
+  lastAutonomousMessageRef.current = null;
+
+  speak(reply);
+  setIsThinking(false);
+  return;
+}
+
       const isLowRiskConversation =
         isSimpleGreeting(trimmed) ||
         lowerTrimmed.includes("nothing") ||
@@ -9441,6 +9480,16 @@ const greeting = buildGreeting({
         crewCollapse,
         spots,
       });
+
+   if (isLifeDecision) {
+  console.log("✅ Life decision detected");
+
+  twinText =
+    "I'd be happy to think it through with you. Tell me a little more about the decision you're facing.";
+
+  lastAutonomousReasonRef.current = null;
+  lastAutonomousMessageRef.current = null;
+}
 
       if (isSimpleGreeting(trimmed)) {
   twinText = getGreetingReply(displayName, trimmed);
@@ -9712,7 +9761,6 @@ function getGreetingReply(displayName: string, input: string) {
       setPersistentProfile(profile);
       window.__twinUserProfile = profile;
       const isSpotFollowUp =
-        isDecisionMode ||
         lowerTrimmed.includes("spot") ||
         lowerTrimmed.includes("spots") ||
         lowerTrimmed.includes("where to go") ||
@@ -9728,6 +9776,13 @@ function getGreetingReply(displayName: string, input: string) {
         lowerTrimmed.includes("somewhere else") ||
         lowerTrimmed.includes("somewhere new") ||
         lowerTrimmed.includes("another place");
+
+      if (
+  lowerTrimmed.includes("should i") &&
+  !isSpotFollowUp
+) {
+return "I'd be happy to think it through with you. Tell me a little more about the decision you're facing.";  
+}
 
       // 🔥 PRE-RISK INTERCEPTION (BEFORE spot logic)
       if (isPreRiskIntent) {
@@ -9787,6 +9842,17 @@ const lastWasEmotionalTwinReply =
     lastMessage.text.includes("I'm sorry you're feeling") ||
     lastMessage.text.includes("What's making you feel anxious")
   );
+
+  const lastWasDecisionConversation =
+  lastMessage?.role === "user" &&
+  (
+    lastMessage.text.toLowerCase().includes("should i") ||
+    lastMessage.text.toLowerCase().includes("can't decide") ||
+    lastMessage.text.toLowerCase().includes("cant decide") ||
+    lastMessage.text.toLowerCase().includes("don't know what to do") ||
+    lastMessage.text.toLowerCase().includes("dont know what to do")
+  );
+
 
 if (lastWasEmotionalUserMessage || lastWasEmotionalTwinReply) {
   lastAutonomousReasonRef.current = null;
