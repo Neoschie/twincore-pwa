@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { useEffect, useRef } from "react";
 import { GlassPanel } from "@/components/ui/GlassPanel";
 import { MessageBubble } from "./MessageBubble";
 import { chatScrollArea } from "./styles";
@@ -111,6 +112,8 @@ export function TwinMeChat({
                 </div>
               </div>
             ) : null}
+
+            <div ref={bottomRef} />
           </>
         )}
       </div>

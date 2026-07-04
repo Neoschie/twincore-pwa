@@ -9853,8 +9853,16 @@ const lastWasEmotionalTwinReply =
     lastMessage.text.toLowerCase().includes("dont know what to do")
   );
 
+  const lastWasDecisionTwinReply =
+  lastMessage?.role === "twin" &&
+  lastMessage.text.includes("decision you're facing");
 
-if (lastWasEmotionalUserMessage || lastWasEmotionalTwinReply) {
+if (
+  lastWasEmotionalUserMessage ||
+  lastWasEmotionalTwinReply ||
+  lastWasDecisionConversation ||
+  lastWasDecisionTwinReply
+) {
   lastAutonomousReasonRef.current = null;
   return;
 }
