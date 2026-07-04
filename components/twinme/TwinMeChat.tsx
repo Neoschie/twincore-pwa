@@ -29,6 +29,16 @@ export function TwinMeChat({
   voiceSupported,
   browserName,
 }: Props) {
+
+    const bottomRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "end",
+    });
+  }, [messages, isThinking]);
+  
   return (
     <GlassPanel className="p-5">
       <div className="mb-3 flex items-center justify-between">
