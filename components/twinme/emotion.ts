@@ -4,6 +4,7 @@ export type TwinEmotion =
   | "lonely"
   | "anxious"
   | "happy"
+  | "grief"
   | "neutral";
 
 export function detectPrimaryEmotion(text: string): TwinEmotion {
@@ -31,6 +32,20 @@ export function detectPrimaryEmotion(text: string): TwinEmotion {
   ) {
     return "overwhelmed";
   }
+
+  if (
+  clean.includes("miss my") ||
+  clean.includes("lost my") ||
+  clean.includes("passed away") ||
+  clean.includes("grandmother") ||
+  clean.includes("grandfather") ||
+  clean.includes("mom died") ||
+  clean.includes("dad died") ||
+  clean.includes("my mother died") ||
+  clean.includes("my father died")
+) {
+  return "grief";
+}
 
   // Lonely
   if (

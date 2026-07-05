@@ -532,15 +532,11 @@ function getIdentityArchetype({
     return { dominantArchetype: "explorer" };
   }
 
-  return { dominantArchetype: null };
-}
-
 function getIdentityArchetypeOpening(
   identityArchetype: IdentityArchetype
 ): string | null {
-  if (!identityArchetype.dominantArchetype) {
-    return null;
-  }
+  return null;
+}
 
   const lines: Record<
     NonNullable<IdentityArchetype["dominantArchetype"]>,
@@ -563,6 +559,12 @@ function getIdentityArchetypeOpening(
   };
 
   return lines[identityArchetype.dominantArchetype];
+}
+
+function getIdentityArchetypeOpening(
+  identityArchetype: IdentityArchetype
+): string | null {
+  return null;
 }
 
 function getPredictiveIdentity({
@@ -1073,7 +1075,7 @@ function getIdentityNarrative({
   }
 
   return {
-    dominantStory: `You keep returning to ${dominantDirection}. That persistence is becoming part of your pattern.`,
+     dominantStory: null,
   };
 }
 
@@ -6811,6 +6813,9 @@ switch (emotion) {
     return shapeTone(
       "I love hearing that. 😊 What's made today such a good day?"
     );
+
+case "grief":
+  return "I'm so sorry. Missing someone you love can leave a space that's hard to fill. If you'd like, I'd love to hear about them.";
 
   case "lonely":
     return shapeTone(
