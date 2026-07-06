@@ -20,6 +20,8 @@ import {
 } from "lucide-react";
 import { DashboardHero } from "@/components/dashboard/DashboardHero";
 import { TwinPulseCard } from "@/components/dashboard/TwinPulseCard";
+import { QuickActions } from "@/components/dashboard/QuickActions";
+
 
 /* =========================
    TYPES
@@ -532,54 +534,13 @@ if (s) setStatus(s);
           </div>
         </section>
 
-        <section className="mb-8">
-          <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-xl font-semibold">Core</h3>
-            <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/75">
-              {spotsStatusText}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            {featureCards.map((card) => (
-              <Link
-                key={card.title}
-                href={card.href}
-                className={`rounded-3xl p-5 transition hover:scale-[1.02] active:scale-[0.98] ${getToneClass(
-                  card.tone
-                )} ${card.title === "Spots" ? "ring-1 ring-cyan-300/20" : ""}`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="text-2xl font-semibold">{card.title}</div>
-                  {card.title === "Spots" ? (
-                    <div className="flex flex-col items-end gap-1">
-                      <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-1 text-[10px] font-medium text-white/85">
-                        <EyeOff className="h-3 w-3" />
-                        {ghostMode ? "Ghost" : "Map"}
-                      </span>
-                      <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-1 text-[10px] font-medium text-white/85">
-                        <Lock className="h-3 w-3" />
-                        {trustedOnly ? "Trusted" : "Open"}
-                      </span>
-                    </div>
-                  ) : null}
-                </div>
-
-                <p className="mt-2 text-sm text-white/65">{card.description}</p>
-
-                {card.title === "Spots" ? (
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-medium text-white/85">
-                      <MapPin className="h-3.5 w-3.5" />
-                      Live spots
-                    </span>
-                  </div>
-                ) : null}
-              </Link>
-            ))}
-          </div>
-        </section>
-
+        <QuickActions
+  features={featureCards}
+  getToneClass={getToneClass}
+  spotsStatusText={spotsStatusText}
+  ghostMode={ghostMode}
+  trustedOnly={trustedOnly}
+/>
         <section>
           <div className="rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-6 shadow-[0_16px_40px_rgba(0,0,0,0.34)]">
             <div className="mb-2 flex items-center gap-2 text-sm text-white/50">
