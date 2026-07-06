@@ -18,6 +18,8 @@ import {
   EyeOff,
   Lock,
 } from "lucide-react";
+import { DashboardHero } from "@/components/dashboard/DashboardHero";
+
 
 /* =========================
    TYPES
@@ -379,11 +381,9 @@ if (s) setStatus(s);
       />
 
       <div className="relative mx-auto max-w-md px-4 py-8">
-        <header className="mb-8">
-          <div className="text-xs tracking-[0.3em] text-white/50">TWINCORE</div>
-          <h1 className="mt-2 text-4xl font-semibold">Dashboard</h1>
-          <p className="mt-2 text-white/60">Your live social awareness system</p>
-        </header>
+        <div className="mb-8">
+  <DashboardHero name={name} status={status} />
+</div>
 
         <section className="mb-8">
           <div className="rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#14141a,#0c0c10)] p-6 shadow-[0_20px_55px_rgba(0,0,0,0.34)]">
