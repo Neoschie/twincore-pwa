@@ -397,6 +397,30 @@ if (s) setStatus(s);
   statusIcon={getStatusIcon(status)}
 />
 
+<InsightCard
+  insight="Your Twin has noticed stable activity patterns today. Systems are synchronized and operating normally."
+  confidence={98}
+/>
+
+<QuickActions
+  features={featureCards}
+  getToneClass={getToneClass}
+  spotsStatusText={spotsStatusText}
+  ghostMode={ghostMode}
+  trustedOnly={trustedOnly}
+/>
+
+<PredictiveAlertsCard
+  predictiveSignals={predictiveSignals}
+/>
+
+<ActivityCard
+  connected={crewStats.connected}
+  location={location}
+  ghostMode={ghostMode}
+  trustedOnly={trustedOnly}
+/>
+
         <section className="mb-8">
           <div className="rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,#101216,#090A0D)] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.42)]">
             <div className="mb-4 flex items-center justify-between">
@@ -499,24 +523,6 @@ if (s) setStatus(s);
           </div>
         </section>
 
-        <PredictiveAlertsCard
-  predictiveSignals={predictiveSignals}
-/>
-
-<ActivityCard
-  connected={crewStats.connected}
-  location={location}
-  ghostMode={ghostMode}
-  trustedOnly={trustedOnly}
-/>
-
-        <QuickActions
-  features={featureCards}
-  getToneClass={getToneClass}
-  spotsStatusText={spotsStatusText}
-  ghostMode={ghostMode}
-  trustedOnly={trustedOnly}
-/>
         <section>
           <div className="rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-6 shadow-[0_16px_40px_rgba(0,0,0,0.34)]">
             <div className="mb-2 flex items-center gap-2 text-sm text-white/50">

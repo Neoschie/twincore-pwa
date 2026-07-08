@@ -1,7 +1,3 @@
-export function InsightCard() {
-  return null;
-}
-
 import { Brain } from "lucide-react";
 
 type Props = {
