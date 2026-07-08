@@ -1,7 +1,3 @@
-export function ActivityCard() {
-  return null;
-}
-
 type Props = {
   connected: number;
   location: boolean;
