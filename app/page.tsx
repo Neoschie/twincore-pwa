@@ -19,6 +19,7 @@ import {
   Lock,
 } from "lucide-react";
 import { DashboardHero } from "@/components/dashboard/DashboardHero";
+import { DashboardOrb } from "@/components/dashboard/DashboardOrb";
 import { TwinPulseCard } from "@/components/dashboard/TwinPulseCard";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { InsightCard } from "@/components/dashboard/InsightCard";
@@ -174,7 +175,19 @@ supabase.auth.getUser().then(({ data }) => {
 const s = localStorage.getItem(`twincore_party_status_${user.id}`);
 const l = localStorage.getItem(`twincore_last_shared_location_${user.id}`);
 
-if (n) setName(n);
+if (n) {
+  const lower = n.toLowerCase();
+
+  const safeName =
+    lower.includes("account-a") ||
+    lower.includes("account-b") ||
+    lower.includes("final") ||
+    lower.includes("test")
+      ? "Neo"
+      : n;
+
+  setName(safeName);
+}
 if (s) setStatus(s);
  if (l) setLocation(true);
 
@@ -388,6 +401,8 @@ if (s) setStatus(s);
         <div className="mb-8">
   <DashboardHero name={name} status={status} />
 </div>
+
+<DashboardOrb />
 
 <TwinPulseCard
   name={name}

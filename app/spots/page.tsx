@@ -370,42 +370,26 @@ export default function SpotsPage() {
       setLocationError("Geolocation is not supported on this device.");
       return;
     }
+navigator.geolocation.getCurrentPosition(
+  (position) => {
+    const nextCoords = {
+      lat: position.coords.latitude,
+      lng: position.coords.longitude,
+    };
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const nextCoords = {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-        };
-
-        setUserCoords(nextCoords);
-        setHasSharedLocation(true);
-        setLocationError(null);
-
-        supabase.auth.getUser().then(({ data }) => {
-  const currentUser = data.user;
-
-  if (!currentUser) return;
-
-  window.localStorage.setItem(
-    getLastSharedLocationKey(currentUser.id),
-    JSON.stringify({
-            latitude: nextCoords.lat,
-            longitude: nextCoords.lng,
-            timestamp: new Date().toISOString(),
-            mapsUrl: `https://maps.google.com/?q=${nextCoords.lat},${nextCoords.lng}`,
-          })
-        );
-      });
-
-        setLocationError("Location access is off. Turn it on for live crew radar.");
-      },
-      {
-        enableHighAccuracy: true,
-        maximumAge: 15000,
-        timeout: 12000,
-      }
-    );
+    setUserCoords(nextCoords);
+    setLocationError(null);
+  },
+  (error) => {
+    console.error("Geolocation error:", error);
+    setLocationError("Unable to get your location.");
+  },
+  {
+    enableHighAccuracy: true,
+    timeout: 10000,
+    maximumAge: 30000,
+  }
+);
   }, [ghostMode]);
 
   useEffect(() => {

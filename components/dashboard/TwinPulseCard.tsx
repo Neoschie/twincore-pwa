@@ -37,8 +37,12 @@ export function TwinPulseCard({
         </div>
 
         <h2 className="relative text-3xl font-black tracking-tight text-white">
-          {name}
-        </h2>
+  Stable
+</h2>
+
+<p className="mt-1 text-sm text-white/50">
+  Twin synchronization looks healthy.
+</p>
 
         <div className="relative mt-5 grid grid-cols-2 gap-3 text-sm">
           <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">

@@ -1,5 +1,25 @@
 import Link from "next/link";
 import { EyeOff, Lock } from "lucide-react";
+import {
+  MapPin,
+  Users,
+  UserPlus,
+  PartyPopper,
+  Brain,
+  User,
+} from "lucide-react";
+
+const iconMap = {
+  Spots: MapPin,
+  Crew: Users,
+  "Invite Crew": UserPlus,
+  "Party Mode": PartyPopper,
+  TwinMe: Brain,
+  Profile: User,
+
+};
+
+const Icon = iconMap[card.title as keyof typeof iconMap];
 
 type FeatureCard = {
   title: string;
@@ -43,7 +63,10 @@ export function QuickActions({
             )} ${card.title === "Spots" ? "ring-1 ring-cyan-300/20" : ""}`}
           >
             <div className="flex items-start justify-between gap-3">
-              <div className="text-2xl font-semibold">{card.title}</div>
+              <div className="flex items-center gap-2 text-2xl font-semibold">
+  {Icon ? <Icon className="h-5 w-5" /> : null}
+  {card.title}
+</div>
 
               {card.title === "Spots" && (
                 <div className="flex flex-col items-end gap-1">

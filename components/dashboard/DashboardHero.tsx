@@ -5,7 +5,7 @@ type Props = {
 
 export function DashboardHero({ name, status }: Props) {
   return (
-    <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 shadow-[0_0_55px_rgba(34,211,238,0.14)] backdrop-blur-xl">
+    <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.04] p-5 shadow-[0_0_55px_rgba(34,211,238,0.14)] backdrop-blur-xl">
       <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-cyan-400/10 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-20 left-8 h-44 w-44 rounded-full bg-fuchsia-400/10 blur-3xl" />
 
@@ -15,7 +15,7 @@ export function DashboardHero({ name, status }: Props) {
           TwinCore Command
         </div>
 
-        <h1 className="mt-5 text-4xl font-black tracking-[-0.03em] text-white">
+        <h1 className="mt-4 text-4xl font-black tracking-[-0.03em] text-white">
           Welcome back, {name}.
         </h1>
 
@@ -23,7 +23,7 @@ export function DashboardHero({ name, status }: Props) {
           Your Twin is connected, learning, and watching your ecosystem.
         </p>
 
-        <div className="mt-5 inline-flex rounded-full border border-emerald-400/20 bg-emerald-500/10 px-4 py-2 text-xs font-bold text-emerald-100">
+        <div className="mt-4 inline-flex rounded-full border border-emerald-400/20 bg-emerald-500/10 px-4 py-2 text-xs font-bold text-emerald-100">
           {status || "Twin Status: Standing by"}
         </div>
       </div>
