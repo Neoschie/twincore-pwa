@@ -10,6 +10,7 @@ type Props = {
   status: string | null;
   location: boolean;
   connected: number;
+  syncScore: number;
   statusIcon: React.ReactNode;
 };
 
@@ -18,6 +19,7 @@ export function TwinPulseCard({
   status,
   location,
   connected,
+  syncScore,
   statusIcon,
 }: Props) {
   return (
@@ -37,12 +39,12 @@ export function TwinPulseCard({
         </div>
 
         <h2 className="relative text-3xl font-black tracking-tight text-white">
-  Stable
-</h2>
+          {syncScore}% Synced
+        </h2>
 
-<p className="mt-1 text-sm text-white/50">
-  Twin synchronization looks healthy.
-</p>
+        <p className="mt-1 text-sm text-white/50">
+          Your ecosystem is stable.
+        </p>
 
         <div className="relative mt-5 grid grid-cols-2 gap-3 text-sm">
           <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
@@ -50,6 +52,7 @@ export function TwinPulseCard({
               {statusIcon}
               Status
             </div>
+
             <div className="font-bold text-white">
               {status || "Not active"}
             </div>
@@ -60,6 +63,7 @@ export function TwinPulseCard({
               <MapPin className="h-4 w-4 text-blue-400" />
               Location
             </div>
+
             <div className="font-bold text-white">
               {location ? "On" : "Off"}
             </div>
@@ -70,6 +74,7 @@ export function TwinPulseCard({
               <Users className="h-4 w-4 text-fuchsia-300" />
               Crew
             </div>
+
             <div className="font-bold text-white">
               {connected} Connected
             </div>
@@ -80,6 +85,7 @@ export function TwinPulseCard({
               <Brain className="h-4 w-4 text-cyan-300" />
               TwinMe
             </div>
+
             <div className="font-bold text-white">
               Active
             </div>
@@ -87,7 +93,7 @@ export function TwinPulseCard({
         </div>
 
         <p className="relative mt-5 text-sm leading-6 text-white/60">
-          TwinCore is monitoring your environment in real time.
+          TwinCore is monitoring {name}&apos;s ecosystem in real time.
         </p>
       </div>
     </section>

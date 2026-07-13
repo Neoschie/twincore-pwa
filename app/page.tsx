@@ -10,7 +10,6 @@ import {
   MapPin,
   Users,
   Shield,
-  Radar,
   Route,
   AlertTriangle,
   Snowflake,
@@ -25,6 +24,7 @@ import { QuickActions } from "@/components/dashboard/QuickActions";
 import { InsightCard } from "@/components/dashboard/InsightCard";
 import { PredictiveAlertsCard } from "@/components/dashboard/PredictiveAlertsCard";
 import { ActivityCard } from "@/components/dashboard/ActivityCard";
+
 
 /* =========================
    TYPES
@@ -116,18 +116,6 @@ function getStatusIcon(status: string | null) {
   return <Music4 className="h-4 w-4 text-fuchsia-300" />;
 }
 
-function getRadarPosition(index: number) {
-  const presets = [
-    { x: 50, y: 50 },
-    { x: 30, y: 38 },
-    { x: 70, y: 34 },
-    { x: 26, y: 70 },
-    { x: 76, y: 66 },
-  ];
-
-  return presets[index] || { x: 50, y: 50 };
-}
-
 function timeAgo(input?: string | null) {
   if (!input) return "No update";
   const then = new Date(input).getTime();
@@ -165,11 +153,12 @@ export default function HomePage() {
   const [ghostMode, setGhostMode] = useState(false);
   const [trustedOnly, setTrustedOnly] = useState(false);
 
+ 
   useEffect(() => {
-supabase.auth.getUser().then(({ data }) => {
-  const user = data.user;
+    supabase.auth.getUser().then(({ data }) => {
+      const user = data.user;
 
-  if (!user) return;
+      if (!user) return;
 
  const n = localStorage.getItem(`twincore_display_name_${user.id}`);
 const s = localStorage.getItem(`twincore_party_status_${user.id}`);
@@ -188,7 +177,18 @@ if (n) {
 
   setName(safeName);
 }
-if (s) setStatus(s);
+if (s) {
+  if (s.toLowerCase() === "at club") {
+    setStatus("At Club");
+  } else {
+    setStatus(s);
+  }
+}
+if (s === "At club" || s === "at club") {
+  setStatus("At Club");
+} else {
+  setStatus(s);
+}
  if (l) setLocation(true);
 
 });
@@ -328,6 +328,38 @@ if (s) setStatus(s);
     return signals.slice(0, 3);
   }, [crewStats, systemState, location]);
 
+const dashboardInsight = useMemo(() => {
+  const highest = predictiveSignals[0];
+
+  if (highest?.level === "red") {
+    return "One or more crew signals require attention.";
+  }
+
+  if (highest?.level === "orange") {
+    return "Your environment is changing quickly.";
+  }
+
+  if (highest?.level === "blue") {
+    return "Crew awareness is partially degraded.";
+  }
+
+  return "Crew synchronization appears healthy.";
+}, [predictiveSignals]);
+
+const orbState = useMemo<
+  "stable" | "learning" | "elevated"
+>(() => {
+  if (predictiveSignals[0]?.level === "red") {
+    return "elevated";
+  }
+
+  if (systemState === "active") {
+    return "learning";
+  }
+
+  return "stable";
+}, [predictiveSignals, systemState]);
+
   const ambient = useMemo(() => {
     const highest = predictiveSignals[0]?.level;
 
@@ -384,6 +416,13 @@ if (s) setStatus(s);
     return "Ready";
   }, [ghostMode, trustedOnly, crewStats.alerts, systemState]);
 
+ const syncScore = useMemo(() => {
+  const base = 85;
+  const bonus = Math.min(crewStats.connected * 3, 13);
+
+  return base + bonus;
+}, [crewStats.connected]);
+
   return (
     <main className="min-h-screen overflow-hidden bg-[#0A0A0B] text-white">
       <div className={`fixed inset-0 pointer-events-none ${ambient}`} />
@@ -402,19 +441,20 @@ if (s) setStatus(s);
   <DashboardHero name={name} status={status} />
 </div>
 
-<DashboardOrb />
+<DashboardOrb state={orbState} />
 
 <TwinPulseCard
   name={name}
   status={status}
   location={location}
   connected={crewStats.connected}
+  syncScore={syncScore}
   statusIcon={getStatusIcon(status)}
 />
 
 <InsightCard
-  insight="Your Twin has noticed stable activity patterns today. Systems are synchronized and operating normally."
-  confidence={98}
+  insight={dashboardInsight}
+  confidence={syncScore}
 />
 
 <QuickActions
@@ -428,161 +468,6 @@ if (s) setStatus(s);
 <PredictiveAlertsCard
   predictiveSignals={predictiveSignals}
 />
-
-<ActivityCard
-  connected={crewStats.connected}
-  location={location}
-  ghostMode={ghostMode}
-  trustedOnly={trustedOnly}
-/>
-
-        <section className="mb-8">
-          <div className="rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,#101216,#090A0D)] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.42)]">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <div className="inline-flex items-center gap-2 text-sm font-medium text-blue-100">
-                  <Radar className="h-4 w-4" />
-                  Live Core Radar
-                </div>
-                <p className="mt-1 text-sm text-white/55">
-                  Your crew layer at a glance
-                </p>
-              </div>
-
-              <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/80">
-                {crewStats.connected} visible
-              </span>
-            </div>
-
-            <div className="relative aspect-square overflow-hidden rounded-[1.6rem] border border-white/10 bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.10),rgba(0,0,0,0.45)_52%,rgba(0,0,0,0.9)_100%)]">
-              <div className="absolute inset-6 rounded-full border border-white/10" />
-              <div className="absolute inset-12 rounded-full border border-white/10" />
-              <div className="absolute inset-20 rounded-full border border-white/10" />
-              <div className="absolute inset-28 rounded-full border border-white/10" />
-
-              <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-white/10" />
-              <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-white/10" />
-
-              <div className="pointer-events-none absolute inset-0">
-                <div className="absolute left-1/2 top-1/2 h-[48%] w-[48%] -translate-x-1/2 -translate-y-1/2 origin-bottom-right rounded-tl-full bg-[conic-gradient(from_0deg,rgba(96,165,250,0.0)_0deg,rgba(96,165,250,0.0)_280deg,rgba(96,165,250,0.25)_340deg,rgba(96,165,250,0.0)_360deg)] animate-[spin_4s_linear_infinite]" />
-              </div>
-
-              <div className="absolute left-1/2 top-1/2 z-20 flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-white/15 backdrop-blur">
-                <div className="h-2.5 w-2.5 rounded-full bg-white shadow-[0_0_14px_rgba(255,255,255,0.8)]" />
-              </div>
-
-              {crewRows.slice(0, 5).map((row, index) => {
-                const pos = getRadarPosition(index);
-                const current = (row.status || "").toLowerCase();
-
-                const dotClass = current.includes("home")
-                  ? "bg-cyan-300 shadow-[0_0_18px_rgba(103,232,249,0.8)]"
-                  : current.includes("alert") ||
-                    current.includes("danger") ||
-                    current.includes("help")
-                  ? "bg-red-400 shadow-[0_0_18px_rgba(248,113,113,0.85)]"
-                  : "bg-orange-400 shadow-[0_0_18px_rgba(251,146,60,0.8)]";
-
-                return (
-                  <div
-                    key={row.id || `${row.name || "crew"}-${index}`}
-                    className="absolute z-20 -translate-x-1/2 -translate-y-1/2"
-                    style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
-                  >
-                    <span className={`absolute inset-0 rounded-full ${dotClass} opacity-50 blur-md animate-pulse`} />
-                    <span className="relative flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/50 backdrop-blur">
-                      <span className={`h-3.5 w-3.5 rounded-full ${dotClass}`} />
-                    </span>
-                  </div>
-                );
-              })}
-
-              <div className="absolute left-4 top-4 rounded-full bg-white/10 px-3 py-1 text-[11px] font-medium text-white/75">
-                HOME CORE
-              </div>
-
-              <div className="absolute bottom-4 right-4 rounded-full bg-white/10 px-3 py-1 text-[11px] font-medium text-white/75">
-                LIVE
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="mb-8">
-          <div className="rounded-3xl border border-blue-500/20 bg-[linear-gradient(180deg,#1a1f2e,#0c0f1a)] p-5 shadow-[0_18px_45px_rgba(59,130,246,0.14)]">
-            <div className="mb-3 flex items-center gap-2 text-sm text-blue-100">
-              <Brain className="h-4 w-4" />
-              TWINME SNAPSHOT
-            </div>
-
-            <p className="text-sm leading-6 text-white/80">{twinInsight}</p>
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
-                {systemState.toUpperCase()}
-              </span>
-              <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
-                {crewStats.connected} CONNECTED
-              </span>
-              {crewStats.headingHome > 0 ? (
-                <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
-                  {crewStats.headingHome} HOME
-                </span>
-              ) : null}
-              {crewStats.alerts > 0 ? (
-                <span className="rounded-full bg-red-500/15 px-3 py-1 text-xs font-medium text-red-100">
-                  {crewStats.alerts} ALERT
-                </span>
-              ) : null}
-            </div>
-          </div>
-        </section>
-
-        <section>
-          <div className="rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-6 shadow-[0_16px_40px_rgba(0,0,0,0.34)]">
-            <div className="mb-2 flex items-center gap-2 text-sm text-white/50">
-              <Shield className="h-4 w-4" />
-              SAFETY STATE
-            </div>
-
-            <div className="text-3xl font-semibold capitalize">{systemState}</div>
-
-            <p className="mt-3 text-sm text-white/65">
-              {systemState === "alert"
-                ? "Immediate attention recommended."
-                : systemState === "active"
-                ? "Stay aware and connected."
-                : systemState === "safe"
-                ? "System stable."
-                : "Activate Party Mode to begin."}
-            </p>
-
-            {crewRows.length > 0 ? (
-              <div className="mt-5 space-y-2">
-                {crewRows.slice(0, 3).map((row, index) => (
-                  <div
-                    key={row.id || `${row.name || "crew-row"}-${index}`}
-                    className="flex items-center justify-between rounded-2xl bg-white/5 px-4 py-3"
-                  >
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-medium text-white">
-                        {row.name || `Crew ${index + 1}`}
-                      </div>
-                      <div className="truncate text-xs text-white/50">
-                        {row.status || "active"}
-                      </div>
-                    </div>
-
-                    <div className="inline-flex items-center gap-2 text-xs text-white/50">
-                      <Route className="h-3.5 w-3.5" />
-                      {timeAgo(row.updated_at)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        </section>
       </div>
     </main>
   );

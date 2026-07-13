@@ -15,7 +15,7 @@ import {
 import posthog from "posthog-js";
 
 import { supabase } from "@/lib/supabase/client";
-
+import { ActivityCard } from "@/components/dashboard/ActivityCard";
 const getProfileStorageKey = (userId: string) =>
   `twincore_profile_${userId}`;
 
@@ -176,6 +176,13 @@ console.log("SAVE PROFILE DATA:", profile);
 </Link>
         }
       />
+
+<ActivityCard
+  connected={crewStats.connected}
+  location={location}
+  ghostMode={ghostMode}
+  trustedOnly={trustedOnly}
+/>
 
       {/* BASIC */}
       <section style={cardStyle}>

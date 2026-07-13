@@ -20,7 +20,7 @@ export function DashboardHero({ name, status }: Props) {
         </h1>
 
         <p className="mt-3 max-w-sm text-sm leading-6 text-white/65">
-          Your Twin is connected, learning, and watching your ecosystem.
+          Your Twin is connected and adapting alongside you.
         </p>
 
         <div className="mt-4 inline-flex rounded-full border border-emerald-400/20 bg-emerald-500/10 px-4 py-2 text-xs font-bold text-emerald-100">
