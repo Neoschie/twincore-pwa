@@ -311,18 +311,20 @@ function getVibeLabelForStatus(status: PartyStatus | null) {
 function getFriendlyLocationName(coords: Coordinates) {
   return `${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`;
 }
-function getCrewStatusId() {
-  user
-  ? window.localStorage.getItem(getCrewStatusIdKey(user.id))
-  : null
+function getCrewStatusId(userId: string) {
+  const existing = window.localStorage.getItem(
+    getCrewStatusIdKey(userId)
+  );
+
   if (existing) return existing;
-  const created =
-    typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID()
-      : `crew-${Date.now()}`;
-  if (user) {
-  window.localStorage.setItem(getCrewStatusIdKey(user.id), created);
-}
+
+  const created = crypto.randomUUID();
+
+  window.localStorage.setItem(
+    getCrewStatusIdKey(userId),
+    created
+  );
+
   return created;
 }
 function normalizeErrorMessage(error: unknown) {
@@ -346,11 +348,11 @@ function roundCoordinate(value: number, decimals: number) {
   const factor = 10 ** decimals;
   return Math.round(value * factor) / factor;
 }
-function getJoinedCrew(): JoinedCrewStorage {
+function getJoinedCrew(userId?: string): JoinedCrewStorage {
   try {
-  const raw = user
-  ? window.localStorage.getItem(getJoinedCrewKey(user.id))
-  : null;
+    const raw = userId
+      ? window.localStorage.getItem(getJoinedCrewKey(userId))
+      : null;
     if (!raw) return {};
     return JSON.parse(raw) as JoinedCrewStorage;
   } catch {
@@ -358,15 +360,15 @@ function getJoinedCrew(): JoinedCrewStorage {
   }
 }
 
-async function getPrivacySettings(): PrivacySettings {
+async function getPrivacySettings(): Promise<PrivacySettings> {
   try {
     const {
-  data: { user },
-} = await supabase.auth.getUser();
+      data: { user },
+    } = await supabase.auth.getUser();
 
-const raw = user
-  ? window.localStorage.getItem(getProfileStorageKey(user.id))
-  : null;
+    const raw = user
+      ? window.localStorage.getItem(getProfileStorageKey(user.id))
+      : null;
     if (!raw) return defaultPrivacy;
     const parsed = JSON.parse(raw) as Partial<PrivacySettings>;
     return {
@@ -374,7 +376,9 @@ const raw = user
       ghostLabel: parsed.ghostLabel || "Low Visibility",
       blurPresence: parsed.blurPresence ?? true,
       trustedOnly: parsed.trustedOnly ?? false,
-      trustedList: Array.isArray(parsed.trustedList) ? parsed.trustedList : [],
+      trustedList: Array.isArray(parsed.trustedList)
+        ? parsed.trustedList
+        : [],
     };
   } catch {
     return defaultPrivacy;
@@ -614,11 +618,7 @@ export default function PartyPage() {
   });
  
   useEffect(() => {
-    async function loadPartyPage() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
+  
       const savedName = user
         ? window.localStorage.getItem(`twincore_display_name_${user.id}`)
         : null;
@@ -675,8 +675,15 @@ export default function PartyPage() {
       setPartyActive(true);
     }
 
-    if (user) {
-  setPrivacy(getPrivacySettings(user.id));
+ async function loadPrivacy() {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return;
+
+  const privacySettings = await getPrivacySettings(user.id);
+  setPrivacy(privacySettings);
 }
    
     const onStorage = () => {
@@ -834,31 +841,38 @@ function writePartyLiveState(
       
       const exactMapsUrl = `https://maps.google.com/?q=${coords.latitude},${coords.longitude}`;
       const exactLocationName = getFriendlyLocationName(coords);
-    window.localStorage.setItem(
-  getLastSharedLocationKey(user.id),
-  JSON.stringify({
-    latitude: coords.latitude,
-    longitude: coords.longitude,
-    timestamp: new Date().toISOString(),
-    mapsUrl: exactMapsUrl,
-  })
-);
 
-    writePartyLiveState(user.id, status, coords, trigger, active);  
       if (!supabase) {
         throw new Error("Supabase is not configured.");
       }
-      const rowIdFromStorage = getCrewStatusId();
-      if (!user) {
-  throw new Error("User is not signed in.");
-}
 
-const { data: existingByName, error: lookupError } = await supabase
-  .from("crew_status")
-  .select("id,name")
-  .eq("user_id", user.id)
-  .eq("name", displayName)
-  .maybeSingle();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        throw new Error("User is not signed in.");
+      }
+
+      window.localStorage.setItem(
+        getLastSharedLocationKey(user.id),
+        JSON.stringify({
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          timestamp: new Date().toISOString(),
+          mapsUrl: exactMapsUrl,
+        })
+      );
+
+      writePartyLiveState(user.id, status, coords, trigger, active);
+      const rowIdFromStorage = getCrewStatusId(user.id);
+
+      const { data: existingByName, error: lookupError } = await supabase
+        .from("crew_status")
+        .select("id,name")
+        .eq("user_id", user.id)
+        .eq("name", displayName)
+        .maybeSingle();
       if (lookupError) {
         throw new Error(lookupError.message || "Could not look up crew row.");
       }

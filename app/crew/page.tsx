@@ -20,6 +20,7 @@ import {
   HomeIcon,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
+import { calculateDistanceKm } from "@/lib/distance";
 import StatusChip from "../_components/status-chip";
 import PageHeader from "../_components/page-header";
 import GlobalStatusBar from "../_components/global-status-bar";
@@ -234,7 +235,8 @@ export default function CrewPage() {
   const [privacy, setPrivacy] = useState<PrivacySettings>(defaultPrivacy);
   const inviteCode = "TWIN-" + (privacy.displayName || "CREW").slice(0, 4).toUpperCase();
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-async function loadCrewSignals() {
+  const [expandedMemberId, setExpandedMemberId] = useState<string | null>(null);
+  async function loadCrewSignals() {
   if (!supabase) {
     setCrewRows([]);
     setCrewMessage("Crew connection unavailable");
@@ -423,6 +425,38 @@ setPrivacy(getPrivacySettings(user.id));
     [crewRows, privacy]
   );
 
+const homeCore = useMemo(() => {
+ 
+  const selfWithCoordinates = displayRows.find(
+    (row) =>
+      row.id === currentUserId &&
+      typeof row.latitude === "number" &&
+      typeof row.longitude === "number"
+  );
+
+  const firstAvailableLocation = displayRows.find(
+    (row) =>
+      typeof row.latitude === "number" &&
+      typeof row.longitude === "number"
+  );
+
+  const anchor =
+    selfWithCoordinates || firstAvailableLocation;
+
+  if (
+    !anchor ||
+    typeof anchor.latitude !== "number" ||
+    typeof anchor.longitude !== "number"
+  ) {
+    return null;
+  }
+
+  return {
+    latitude: anchor.latitude,
+    longitude: anchor.longitude,
+  };
+}, [displayRows, currentUserId]);
+
   const crewStats = useMemo(() => {
     const headingHome = displayRows.filter(
       (r) => (r.status || "").toLowerCase() === "heading home"
@@ -437,27 +471,126 @@ setPrivacy(getPrivacySettings(user.id));
     };
   }, [displayRows]);
 
-  const cohesionScore = useMemo(() => {
-  if (displayRows.length === 0) return 0;
+const crewMembersWithRisk = useMemo(() => {
+  return displayRows.map((row) => {
+    let risk = 0;
 
-  const base = 92;
-  const alertPenalty = crewStats.flagged * 18;
+    const status = (row.status || "").toLowerCase();
+
+    if (
+      status.includes("help") ||
+      status.includes("danger") ||
+      status.includes("alert")
+    ) {
+      risk += 75;
+    }
+
+    if (status.includes("heading home")) {
+      risk += 20;
+    }
+
+    if (!row.updated_at) {
+      risk += 10;
+    } else {
+      const minutes =
+        (Date.now() -
+          new Date(row.updated_at).getTime()) /
+        1000 /
+        60;
+
+      if (minutes > 30) risk += 10;
+      if (minutes > 60) risk += 20;
+    }
+
+    const hasCoordinates =
+  typeof row.latitude === "number" &&
+  typeof row.longitude === "number";
+
+const distanceKm =
+  homeCore && hasCoordinates
+    ? calculateDistanceKm(
+        homeCore.latitude,
+        homeCore.longitude,
+        row.latitude as number,
+        row.longitude as number
+      )
+    : null;
+
+if (distanceKm !== null && distanceKm > 5) {
+  risk += 15;
+}
+
+if (distanceKm !== null && distanceKm > 15) {
+  risk += 20;
+}
+
+return {
+  ...row,
+  risk: Math.min(100, risk),
+  distanceKm,
+};
+  });
+}, [displayRows, homeCore]);
+
+const highestRisk = useMemo(() => {
+  return Math.max(
+    ...crewMembersWithRisk.map((m) => m.risk),
+    0
+  );
+}, [crewMembersWithRisk]);
+
+const geographicDrift = useMemo(() => {
+  return crewMembersWithRisk.some(
+    (member) =>
+      member.distanceKm !== null &&
+      member.distanceKm > 10
+  );
+}, [crewMembersWithRisk]);
+
+const cohesionScore = useMemo(() => {
+  if (displayRows.length === 0) {
+    return 0;
+  }
+
+  const riskPenalty = highestRisk * 0.4;
   const homePenalty = crewStats.headingHome * 6;
+  const alertPenalty = crewStats.flagged * 8;
 
-  return Math.max(35, Math.min(100, base - alertPenalty - homePenalty));
-}, [displayRows.length, crewStats.flagged, crewStats.headingHome]);
+  const score =
+    100 -
+    riskPenalty -
+    homePenalty -
+    alertPenalty;
+
+  return Math.round(
+    Math.max(35, Math.min(100, score))
+  );
+}, [
+  displayRows.length,
+  highestRisk,
+  crewStats.headingHome,
+  crewStats.flagged,
+]);
 
 const twinMeRecommendation = useMemo(() => {
-  if (crewStats.flagged > 0) {
-    return "TwinMe recommends immediate check-in. One or more crew signals may need attention.";
+  if (highestRisk >= 75) {
+    return "TwinMe recommends an immediate check-in. One or more crew signals indicate elevated risk.";
+  }
+
+if (geographicDrift) {
+  return "TwinMe detects increasing crew separation. Cohesion may be weakening because of geographic drift.";
+}
+
+  if (highestRisk >= 40) {
+    return "TwinMe is monitoring changes in crew movement, location coverage, and signal freshness.";
   }
 
   if (crewStats.headingHome > 0) {
-    return "TwinMe detects weakening crew proximity patterns as part of your crew begins to drift home.";
+    return "TwinMe detects weakening crew proximity as part of your crew begins heading home.";
   }
 
   if (crewStats.total > 3) {
-    return "TwinMe predicts strong social cohesion over the next 4 hours.";
+    return "TwinMe predicts strong social cohesion based on current crew signals.";
   }
 
   if (crewStats.total > 0) {
@@ -465,23 +598,32 @@ const twinMeRecommendation = useMemo(() => {
   }
 
   return "TwinMe is awaiting new crew signals.";
-}, [crewStats.flagged, crewStats.headingHome, crewStats.total]);
+}, [
+  highestRisk,
+  geographicDrift,
+  crewStats.headingHome,
+  crewStats.total,
+]);
 
   const filteredRows = useMemo(() => {
-    if (filter === "heading-home") {
-      return displayRows.filter(
-        (r) => (r.status || "").toLowerCase() === "heading home"
-      );
-    }
+  if (filter === "heading-home") {
+    return crewMembersWithRisk.filter(
+      (row) =>
+        (row.status || "").toLowerCase() ===
+        "heading home"
+    );
+  }
 
-    if (filter === "active") {
-      return displayRows.filter(
-        (r) => (r.status || "").toLowerCase() !== "heading home"
-      );
-    }
+  if (filter === "active") {
+    return crewMembersWithRisk.filter(
+      (row) =>
+        (row.status || "").toLowerCase() !==
+        "heading home"
+    );
+  }
 
-    return displayRows;
-  }, [displayRows, filter]);
+  return crewMembersWithRisk;
+}, [crewMembersWithRisk, filter]);
 
   const radarRows = filteredRows.slice(0, 6);
 
@@ -770,39 +912,6 @@ to-emerald-400/10
   <div className="h-2 w-2 rounded-full bg-cyan-300 animate-pulse"/>
 </div>
 
-<div className="mt-5 rounded-3xl border border-cyan-300/20 bg-white/[0.04] p-4 backdrop-blur-xl shadow-[0_0_40px_rgba(34,211,238,0.08)]">
-  <div className="flex items-center justify-between gap-4">
-    <div>
-      <h3 className="text-lg font-black text-white">Build Your Circle</h3>
-      <p className="mt-1 max-w-md text-sm leading-6 text-white/65">
-        TwinCore becomes more intelligent as trusted people join your ecosystem.
-      </p>
-
-      <div className="mt-3 flex -space-x-2">
-        {[1, 2, 3].map((item) => (
-          <div
-            key={item}
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-gradient-to-br from-fuchsia-400/40 to-cyan-300/30 text-xs font-bold text-white"
-          >
-            {item}
-          </div>
-        ))}
-      </div>
-    </div>
-
-    <Link
-      href="/join"
-      className="shrink-0 rounded-2xl bg-gradient-to-r from-fuchsia-500 via-cyan-400 to-emerald-400 px-5 py-3 text-sm font-black text-black shadow-[0_0_30px_rgba(34,211,238,0.35)] transition hover:scale-[1.03] active:scale-[0.98] animate-[pulse_3s_ease-in-out_infinite]"
-    >
-      + Invite Someone
-    </Link>
-  </div>
-
-  <div className="mt-3 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200/80">
-    {crewStats.total} connected · Crew intelligence growing
-  </div>
-</div>
-
 <p className="relative mx-auto mt-4 max-w-xl text-center text-sm leading-6 text-white/70">
 
   {crewStats.total > 0
@@ -812,29 +921,42 @@ to-emerald-400/10
     : "TwinCore works best when trusted people are connected. Invite people you care about to share movement, check-ins, Party Mode, Spots and TwinMe insights together."}
 
 </p>
-            </div>
-
-            <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-
-<div className="mb-4 flex items-center justify-center">
-
-<div className="h-px flex-1 max-w-[120px] bg-gradient-to-r from-transparent via-fuchsia-400 to-transparent"/>
-
-<div className="mx-4 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-semibold tracking-[0.2em] text-cyan-100">
-
-CREW PULSE
-
 </div>
 
-<div className="h-px-4 py-2 flex-1 max-w-[120px] bg-gradient-to-r from-transparent via-cyan-300 to-transparent"/>
+<div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+  <StatPill
+    icon={Radio}
+    value={radarRows.length}
+    label="Pulse"
+  />
 
+  <StatPill
+    icon={Users}
+    value={crewStats.total}
+    label="Connected"
+  />
+
+  <StatPill
+    icon={Route}
+    value={crewStats.headingHome}
+    label="Home"
+  />
+
+  <StatPill
+    icon={Siren}
+    value={crewStats.flagged}
+    label="Alerts"
+  />
 </div>
 
-              <StatPill icon={Radio} value={radarRows.length} label="Pulse" />
-<StatPill icon={Users} value={crewStats.total} label="Connected" />
-<StatPill icon={Route} value={crewStats.headingHome} label="Home" />
-<StatPill icon={Siren} value={crewStats.flagged} label="Alerts" />
-            </div>
+<div className="mt-4 flex justify-center">
+  <Link
+    href="/crew/invite"
+    className="inline-flex items-center justify-center rounded-2xl border border-cyan-300/25 bg-cyan-300/10 px-5 py-3 text-sm font-black text-cyan-100 transition hover:bg-cyan-300/15 active:scale-[0.98]"
+  >
+    + Invite Crew
+  </Link>
+</div>           
           </AnimatedCard>
 
           <AnimatedCard className="mx-auto max-w-6xl rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,#101216,#090A0D)] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.42)]">
@@ -1086,27 +1208,6 @@ border-cyan-300/40
   </div>
 </div>
 
-            <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:grid-cols-3 sm:gap-3">
-            {radarRows.map((row, index) => {
-                const tone = getRadarPointClass(row);
-                const trusted = canSeeFull(filteredRows[index] || row, privacy);
-
-                return (
-                  <div
-                    key={row.id || `legend-${index}`}
-                    className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2 sm:py-3"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className={`h-2.5 w-2.5 rounded-full ${tone.dot}`} />
-                      <span className={`truncate text-sm font-medium ${tone.label}`}>
-                        {row.name || `Crew ${index + 1}`}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
   <div className="mt-4 flex gap-2">
     <button
       type="button"
@@ -1175,79 +1276,12 @@ border-cyan-300/40
                     </div>
                   </div>
                 );
-              })}
+             })}
             </div>
+
           </AnimatedCard>
 
-<AnimatedCard className="rounded-3xl border border-fuchsia-300/20 bg-white/[0.04] p-5 backdrop-blur-xl shadow-[0_0_55px_rgba(217,70,239,0.12)]">
-  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-    <div>
-      <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-cyan-100">
-        <Sparkles className="h-3.5 w-3.5" />
-        Viral Crew Link
-      </div>
-
-      <h3 className="mt-3 text-2xl font-black text-white">
-        Bring Your People Into TwinCore
-      </h3>
-
-      <p className="mt-2 max-w-xl text-sm leading-6 text-white/65">
-        Your twin becomes more powerful when your trusted people connect. Share your invite and start building your live crew layer.
-      </p>
-    </div>
-
-    <div className="rounded-2xl border border-white/10 bg-black/35 p-4 text-center">
-      <div className="text-xs font-bold uppercase tracking-[0.2em] text-white/45">
-        Invite Code
-      </div>
-
-      <div className="mt-2 text-2xl font-black text-cyan-100">
-        {inviteCode}
-      </div>
-
-      <Link
-        href="/join"
-        className="mt-3 inline-flex rounded-2xl bg-gradient-to-r from-fuchsia-500 via-cyan-400 to-emerald-400 px-5 py-3 text-sm font-black text-black shadow-[0_0_30px_rgba(34,211,238,0.35)] transition hover:scale-[1.03] active:scale-[0.98]"
-      >
-        Share Invite
-      </Link>
-    </div>
-  </div>
-
-  <div className="mt-5">
-    <div className="mb-2 flex items-center justify-between text-xs font-bold uppercase tracking-[0.16em] text-white/45">
-      <span>Crew Intelligence</span>
-      <span>{Math.min(100, crewStats.total * 20)}%</span>
-    </div>
-
-    <div className="h-3 overflow-hidden rounded-full bg-white/10">
-      <div
-        className="h-full rounded-full bg-gradient-to-r from-fuchsia-400 via-cyan-300 to-emerald-300 transition-all duration-1000"
-        style={{ width: `${Math.min(100, crewStats.total * 20)}%` }}
-      />
-    </div>
-
-    <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-      <div className="flex min-h-[90px] flex-col justify-center rounded-2xl bg-white/5 p-4">
-        <div className="text-xs text-white/45">Unlocked</div>
-        <div className="mt-1 font-bold text-emerald-300">Realtime Sync</div>
-      </div>
-
-      <div className="flex min-h-[90px] flex-col justify-center rounded-2xl bg-white/5 p-4">
-        <div className="text-xs text-white/45">Next</div>
-        <div className="mt-1 font-bold text-cyan-300">Group Arrival</div>
-      </div>
-
-      <div className="flex min-h-[90px] flex-col justify-center rounded-2xl bg-white/5 p-4">
-        <div className="text-xs text-white/45">Goal</div>
-        <div className="mt-1 font-bold text-fuchsia-300">5 Members</div>
-      </div>
-    </div>
-  </div>
-</AnimatedCard>
-
-<AnimatedCard className="rounded-3xl bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-4 shadow-[0_16px_45px_rgba(0,0,0,0.42)]" children={undefined} ></AnimatedCard>
-  <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
 
               {(["all", "active", "heading-home"] as FilterMode[]).map((mode) => (
                 <button
@@ -1315,8 +1349,12 @@ border-cyan-300/40
     <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
       <div className="text-white/45">Drift Risk</div>
       <div className="mt-1 font-bold text-emerald-100">
-        {crewStats.flagged > 0 ? "High" : crewStats.headingHome > 0 ? "Medium" : "Low"}
-      </div>
+     {highestRisk >= 75
+  ? "High"
+  : highestRisk >= 40
+  ? "Medium"
+  : "Low"}
+     </div>
     </div>
 
     <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
@@ -1327,51 +1365,26 @@ border-cyan-300/40
     </div>
   </div>
 </AnimatedCard>
-                    <AnimatedCard className="animate-glow rounded-3xl border border-cyan-300/20 bg-white/[0.04] p-5 backdrop-blur-xl shadow-[0_0_50px_rgba(34,211,238,0.12)]">
-            <div className="mb-3 inline-flex items-center gap-2 text-sm font-medium text-blue-100">
-              <Brain className="h-4 w-4" />
-              TwinMe Live Insight
-            </div>
-            <div className="text-base leading-7 text-white">
-              {privacy.trustedOnly
-                ? "TwinMe: trusted-only visibility is active. Non-trusted crew members are masked on this device."
-                : crewStats.flagged > 0
-                ? "TwinMe: one or more crew signals need attention. Reduce drift and check in now."
-                : crewStats.headingHome > 0
-                ? "TwinMe: your crew is starting to split. Keep tabs on who is heading home."
-                : crewStats.total > 0
-                ? "TwinMe: your crew is building. Stay connected and keep the energy aligned."
-                : "TwinMe: your crew looks stable right now. Stay connected and enjoy the moment."}
-            </div>
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              <StatusChip
-                label={crewStats.flagged > 0 ? "HIGH ATTENTION" : "LIVE CREW STREAM"}
-                tone={crewStats.flagged > 0 ? "red" : "blue"}
-              />
-              {privacy.trustedOnly ? (
-                <StatusChip label="TRUSTED ONLY" tone="orange" />
-              ) : null}
-              {privacy.ghostMode ? <StatusChip label="GHOST MODE" tone="blue" /> : null}
-            </div>
-          </AnimatedCard>
-
+                  
           <div className="space-y-4">
-            {filteredRows.map((row, i) => {
-              const isSelf =
-row.id === currentUserId;
+{filteredRows.map((row, i) => {
+const isSelf = row.id === currentUserId;
 
 const name = isSelf
 ? "Neo"
 : row.name || `Crew ${i+1}`;
-              const status = row.status || "active";
-              const location = row.location_name || "Unknown";
-              const tone = getRowTone(row);
-              const trusted = canSeeFull(row, privacy);
+
+const memberId = row.id || `${name}-${i}`;
+const isExpanded = expandedMemberId === memberId;
+
+const status = row.status || "active";
+const location = row.location_name || "Unknown";
+const tone = getRowTone(row);
+const trusted = canSeeFull(row, privacy);
 
               return (
                 <AnimatedCard
-                  key={row.id || `${name}-${i}`}
+                  key={memberId}
                   className={`rounded-3xl border p-5 backdrop-blur-xl transition-all duration-300 hover:scale-[1.02] hover:border-cyan-400/30 active:scale-[0.98] shadow-[0_0_40px_rgba(34,211,238,.08)] ${
   tone === "red"
     ? "border-red-400/30 bg-red-950/20"
@@ -1382,109 +1395,136 @@ const name = isSelf
     : "border-white/10 bg-white/[0.03]"
 }`}
                 >
-                  <div className="flex items-start justify-between gap-3 mb-2">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 text-lg font-semibold text-white">
-                        {tone === "red" ? (
-                          <AlertTriangle className="h-4 w-4 shrink-0 text-red-400" />
-                        ) : null}
-                        {!trusted && privacy.trustedOnly ? (
-                          <Ghost className="h-4 w-4 shrink-0 text-white/60" />
-                        ) : null}
-                        <span className="truncate">{name}</span>
-                        {isSelf && (
 
-<div className="mt-1">
+<div className="flex items-start justify-between gap-3">
+    <div className="min-w-0">
+      <div className="flex items-center gap-2">
+        {tone === "red" ? (
+          <AlertTriangle className="h-4 w-4 shrink-0 text-red-400" />
+        ) : null}
 
-<span className="
-inline-flex
-items-center
-gap-1
+        {!trusted && privacy.trustedOnly ? (
+          <Ghost className="h-4 w-4 shrink-0 text-white/60" />
+        ) : null}
 
-rounded-full
+        <span className="truncate text-base font-semibold text-white">
+          {name}
+        </span>
 
-bg-cyan-400/10
+        {isSelf ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-cyan-400/10 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-cyan-200">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-cyan-300" />
+            You
+          </span>
+        ) : null}
+      </div>
 
-px-2
+      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-white/55">
+        <span>{row.vibe_label || status}</span>
+        <span className="text-white/25">•</span>
+        <span>{timeAgo(row.updated_at)}</span>
+      </div>
+    </div>
 
-py-1
+    <div className="flex shrink-0 flex-col items-end gap-2">
+      <StatusChip
+        label={status}
+        tone={
+          tone === "red"
+            ? "red"
+            : tone === "cyan"
+            ? "cyan"
+            : tone === "orange"
+            ? "orange"
+            : "neutral"
+        }
+      />
 
-text-[10px]
+      <span
+        className={`rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.12em] ${
+          row.risk >= 75
+            ? "border-red-400/30 bg-red-500/10 text-red-200"
+            : row.risk >= 40
+            ? "border-orange-300/30 bg-orange-400/10 text-orange-100"
+            : "border-emerald-300/25 bg-emerald-400/10 text-emerald-100"
+        }`}
+      >
+        Risk {row.risk}%
+      </span>
+    </div>
+  </div>
 
-font-bold
+  <button
+    type="button"
+    onClick={() =>
+      setExpandedMemberId(isExpanded ? null : memberId)
+    }
+    className="mt-4 flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-left text-xs font-semibold text-white/70 transition hover:bg-white/[0.07]"
+    aria-expanded={isExpanded}
+  >
+    <span>{isExpanded ? "Hide details" : "View details"}</span>
 
-uppercase
+    <span
+      className={`transition-transform duration-200 ${
+        isExpanded ? "rotate-180" : ""
+      }`}
+    >
+      ▾
+    </span>
+  </button>
 
-tracking-[0.18em]
+  {isExpanded ? (
+    <div className="mt-3 space-y-3">
+      <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-sm text-white/65">
+        <MapPin className="h-4 w-4 shrink-0 text-cyan-300" />
+        <span className="truncate">{location}</span>
+      </div>
 
-text-cyan-200
-">
+<div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
+  <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/40">
+    Distance From Crew Core
+  </div>
 
-<div className="
-h-2
-w-2
-rounded-full
-bg-cyan-300
-animate-pulse
-"/>
-
-YOU
-
-</span>
-
+  <div className="mt-1 text-sm font-semibold text-white/80">
+    {row.distanceKm !== null
+      ? row.distanceKm < 0.1
+        ? "At crew core"
+        : `${row.distanceKm.toFixed(1)} km away`
+      : "Location unavailable"}
+  </div>
 </div>
 
-)}
-                      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <MiniInfo
+          icon={Activity}
+          label="Heartbeat"
+          value={
+            trusted || !privacy.trustedOnly
+              ? row.heartbeat_bpm
+                ? `${row.heartbeat_bpm} BPM`
+                : "Linked"
+              : "Masked"
+          }
+        />
 
-                      <div className="mt-2 inline-flex items-center gap-2 text-sm text-white/60">
-                        <MapPin className="h-4 w-4" />
-                        <span className="truncate">{location}</span>
-                      </div>
-                    </div>
+        <MiniInfo
+          icon={Users}
+          label="Vibe"
+          value={row.vibe_label || "No vibe"}
+        />
+      </div>
 
-                    <StatusChip
-                      label={status}
-                      tone={
-                        tone === "red"
-                          ? "red"
-                          : tone === "cyan"
-                          ? "cyan"
-                          : tone === "orange"
-                          ? "orange"
-                          : "neutral"
-                      }
-                    />
-                  </div>
-
-                  <div className="mt-3 grid grid-cols-2 gap-3">
-                    <MiniInfo
-                      icon={Activity}
-                      label="Heartbeat"
-                      value={
-                        trusted || !privacy.trustedOnly
-                          ? row.heartbeat_bpm
-                            ? `${row.heartbeat_bpm} BPM`
-                            : "Linked"
-                          : "Masked"
-                      }
-                    />
-                    <MiniInfo
-                      icon={Users}
-                      label="Vibe"
-                      value={row.vibe_label || "No vibe"}
-                    />
-                  </div>
-
-                  <div className="mt-4 text-xs text-white/50">
-                    {timeAgo(row.updated_at)}
-                  </div>
-                </AnimatedCard>
+      <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-xs text-white/50">
+        Last updated {timeAgo(row.updated_at)}
+      </div>
+    </div>
+  ) : null}
+</AnimatedCard>
               );
             })}
-          </div>
         </div>
-      </div>
+        </div>
+        </div>
     </main>
      </AuthGuard>
   );

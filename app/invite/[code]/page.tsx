@@ -535,31 +535,6 @@ function formatCreatedTime(dateString: string) {
 
   if (diff < 60) return "just now";
 
-  if (diff < 3600)
-    return `${Math.floor(diff / 60)} minute${Math.floor(diff / 60) > 1 ? "s" : ""} ago`;
-
-  if (diff < 86400)
-    return `${Math.floor(diff / 3600)} hour${Math.floor(diff / 3600) > 1 ? "s" : ""} ago`;
-
-  if (diff < 172800)
-    return "yesterday";
-
-  if (diff < 604800)
-    return `${Math.floor(diff / 86400)} days ago`;
-
-  return created.toLocaleDateString();
-}
-
-function formatCreatedTime(dateString: string) {
-  const created = new Date(dateString);
-  const now = new Date();
-
-  const diff = Math.floor(
-    (now.getTime() - created.getTime()) / 1000
-  );
-
-  if (diff < 60) return "just now";
-
   if (diff < 3600) {
     const mins = Math.floor(diff / 60);
     return `${mins} minute${mins !== 1 ? "s" : ""} ago`;
@@ -572,30 +547,6 @@ function formatCreatedTime(dateString: string) {
 
   if (diff < 172800) return "yesterday";
 
-  if (diff < 604800) {
-    const days = Math.floor(diff / 86400);
-    return `${days} days ago`;
-  }
-
-  return created.toLocaleDateString();
-}
-
-function formatCreatedTime(dateString: string) {
-  const created = new Date(dateString);
-  const now = new Date();
-
-  const diff = Math.floor((now.getTime() - created.getTime()) / 1000);
-
-  if (diff < 60) return "just now";
-  if (diff < 3600) {
-    const mins = Math.floor(diff / 60);
-    return `${mins} minute${mins > 1 ? "s" : ""} ago`;
-  }
-  if (diff < 86400) {
-    const hours = Math.floor(diff / 3600);
-    return `${hours} hour${hours > 1 ? "s" : ""} ago`;
-  }
-  if (diff < 172800) return "yesterday";
   if (diff < 604800) {
     const days = Math.floor(diff / 86400);
     return `${days} days ago`;

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { supabase } from "@/lib/supabase/client";
 import { useEffect, useMemo, useState } from "react";
 import { QRCodeCanvas } from "qrcode.react";
 import {
