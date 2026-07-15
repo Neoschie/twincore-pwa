@@ -96,6 +96,7 @@ type EmotionalState =
   | "social"
   | "drained"
   | "uncertain"
+  | "celebration"
   | "overwhelmed"
   | "reflective"
   | "guarded"
@@ -532,12 +533,12 @@ function getIdentityArchetype({
     return { dominantArchetype: "explorer" };
   }
 
+  return { dominantArchetype: "builder" };
+}
+
 function getIdentityArchetypeOpening(
   identityArchetype: IdentityArchetype
 ): string | null {
-  return null;
-}
-
   const lines: Record<
     NonNullable<IdentityArchetype["dominantArchetype"]>,
     string
@@ -558,13 +559,10 @@ function getIdentityArchetypeOpening(
       "The Explorer pattern is showing up. You keep moving toward change, possibility, and new direction.",
   };
 
-  return lines[identityArchetype.dominantArchetype];
-}
+  const archetype =
+    identityArchetype.dominantArchetype as keyof typeof lines;
 
-function getIdentityArchetypeOpening(
-  identityArchetype: IdentityArchetype
-): string | null {
-  return null;
+  return lines[archetype];
 }
 
 function getPredictiveIdentity({

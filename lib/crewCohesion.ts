@@ -1,5 +1,4 @@
-import { CrewMember } from "@/types/crew";
-
+import type { CrewMember } from "@/app/types/crew";
 export function calculateCrewCohesion(
   crew: CrewMember[]
 ): number {

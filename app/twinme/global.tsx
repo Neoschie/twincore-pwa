@@ -29,51 +29,27 @@ type LocalSignals = {
   hour: number;
 };
 
-async function readLocalSignals(): Promise<LocalSignals> {
+function readLocalSignals(): LocalSignals {
   if (typeof window === "undefined") {
     return {
       partyStatus: null,
       exitStatus: null,
       hasSharedLocation: false,
-      hour: 12,
+      hour: new Date().getHours(),
     };
   }
 
-  const { supabase } = await import("@/lib/supabase/client");
+  const partyStatus = window.localStorage.getItem(
+    "twincore_party_status"
+  );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const exitStatus = window.localStorage.getItem(
+    "twincore_exit_crew_status"
+  );
 
-  const partyStatus = user
-    ? window.localStorage.getItem(`twincore_party_status_${user.id}`)
-    : null;
-
-  const sharedLocation = user
-    ? window.localStorage.getItem(`twincore_last_shared_location_${user.id}`)
-    : null;
-
-  const exitStatus = window.localStorage.getItem("twincore_exit_crew_status");
-
-  return {
-    partyStatus,
-    exitStatus,
-    hasSharedLocation: Boolean(sharedLocation),
-    hour: new Date().getHours(),
-  };
-}
-  if (typeof window === "undefined") {
-    return {
-      partyStatus: null,
-      exitStatus: null,
-      hasSharedLocation: false,
-      hour: 12,
-    };
-  }
-
-  
-  const exitStatus = window.localStorage.getItem("twincore_exit_crew_status");
-  
+  const sharedLocation = window.localStorage.getItem(
+    "twincore_last_shared_location"
+  );
 
   return {
     partyStatus,
@@ -368,8 +344,8 @@ if (hideDashboard) return null;
     setMounted(true);
 
     const refreshSignals = () => {
-      readLocalSignals().then(setSignals);
-    };
+  setSignals(readLocalSignals());
+};
 
     refreshSignals();
 

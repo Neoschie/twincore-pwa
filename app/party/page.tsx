@@ -9,6 +9,8 @@ import {
   Play,
   Send,
   Users,
+  Shield,
+  Activity,
   LocateFixed,
   CheckCircle2,
   AlertTriangle,
@@ -23,6 +25,7 @@ import {
 import { supabase } from "@/lib/supabase/client";
 import AuthGuard from "@/components/auth/AuthGuard";
 import posthog from "posthog-js";
+import AnimatedCard from "../_components/animated-card";
 const getProfileStorageKey = (userId: string) =>
   `twincore_profile_${userId}`;
 const PARTY_AUDIO_SRC = "/party-mode.mp3";
@@ -88,6 +91,13 @@ type CrewStatusRow = {
   name: string;
   status: string | null;
   updated_at?: string | null;
+
+  latitude?: number | null;
+  longitude?: number | null;
+
+  location_name?: string | null;
+  heartbeat_bpm?: number | null;
+  vibe_label?: string | null;
 };
 
 type CrewMemberRow = {
@@ -616,45 +626,69 @@ export default function PartyPage() {
     actions: [],
     level: "none",
   });
- 
-  useEffect(() => {
-  
-      const savedName = user
-        ? window.localStorage.getItem(`twincore_display_name_${user.id}`)
-        : null;
+ useEffect(() => {
+  async function loadPartyPage() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-      const savedStatus = window.localStorage.getItem(getPartyStatusKey(user.id));
+    if (!user) return;
+
+    const savedName = window.localStorage.getItem(
+      `twincore_display_name_${user.id}`
+    );
+
+    const savedStatus = window.localStorage.getItem(
+      getPartyStatusKey(user.id)
+    );
 
     const savedLocation = window.localStorage.getItem(
       getLastSharedLocationKey(user.id)
     );
+
     const savedAutoTracking =
-      window.localStorage.getItem(getPartyLiveKey(user.id)) === "true";
-    
-      const savedPartyActive =
-      window.localStorage.getItem(getPartyStatusKey(user.id)) === "true";
+      window.localStorage.getItem(
+        getPartyAutoTrackingKey(user.id)
+      ) === "true";
+
+    const savedPartyActive =
+      window.localStorage.getItem(
+        getPartyActiveKey(user.id)
+      ) === "true";
+
     if (savedName) {
       setDisplayName(savedName);
     }
 
-    const joinedCrew = user ? getJoinedCrew(user.id) : {};
+    const joinedCrew = getJoinedCrew(user.id);
+
     if (joinedCrew.crewOwner?.trim()) {
       setCrewOwner(joinedCrew.crewOwner.trim());
     } else if (savedName) {
       setCrewOwner(savedName);
     }
-    if (savedStatus && PARTY_STATUSES.includes(savedStatus as PartyStatus)) {
+
+    if (
+      savedStatus &&
+      PARTY_STATUSES.includes(savedStatus as PartyStatus)
+    ) {
       setSelectedStatus(savedStatus as PartyStatus);
     } else {
       setSelectedStatus("Listening to music");
-      window.localStorage.setItem(getPartyStatusKey(user.id), "Listening to music");
+
+      window.localStorage.setItem(
+        getPartyStatusKey(user.id),
+        "Listening to music"
+      );
     }
+
     if (savedLocation) {
       try {
         const parsed = JSON.parse(savedLocation) as {
           latitude?: number;
           longitude?: number;
         };
+
         if (
           typeof parsed.latitude === "number" &&
           typeof parsed.longitude === "number"
@@ -665,54 +699,66 @@ export default function PartyPage() {
           });
         }
       } catch {
-        // ignore bad cache
+        // Ignore invalid cached location data.
       }
     }
-    if (savedAutoTracking) {
-      setAutoTracking(true);
-    }
-    if (savedPartyActive) {
-      setPartyActive(true);
-    }
 
- async function loadPrivacy() {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    setAutoTracking(savedAutoTracking);
+    setPartyActive(savedPartyActive);
 
-  if (!user) return;
+    const privacySettings = await getPrivacySettings();
+    setPrivacy(privacySettings);
+  }
 
-  const privacySettings = await getPrivacySettings(user.id);
-  setPrivacy(privacySettings);
-}
-   
-    const onStorage = () => {
-    
-      const nextName = user
-  ? window.localStorage.getItem(`twincore_display_name_${user.id}`)
-  : null;
-      if (nextName) setDisplayName(nextName);
+  void loadPartyPage();
 
-      const nextJoinedCrew = user ? getJoinedCrew(user.id) : {};
+  function onStorage() {
+    void supabase.auth.getUser().then(({ data }) => {
+      const user = data.user;
+
+      if (!user) return;
+
+      const nextName = window.localStorage.getItem(
+        `twincore_display_name_${user.id}`
+      );
+
+      if (nextName) {
+        setDisplayName(nextName);
+      }
+
+      const nextJoinedCrew = getJoinedCrew(user.id);
+
       if (nextJoinedCrew.crewOwner?.trim()) {
         setCrewOwner(nextJoinedCrew.crewOwner.trim());
       } else if (nextName) {
         setCrewOwner(nextName);
       }
-      const nextStatus = window.localStorage.getItem(getPartyStatusKey(user.id));
-      if (nextStatus && PARTY_STATUSES.includes(nextStatus as PartyStatus)) {
+
+      const nextStatus = window.localStorage.getItem(
+        getPartyStatusKey(user.id)
+      );
+
+      if (
+        nextStatus &&
+        PARTY_STATUSES.includes(nextStatus as PartyStatus)
+      ) {
         setSelectedStatus(nextStatus as PartyStatus);
       }
+
       const nextPartyActive =
-        window.localStorage.getItem(getPartyStatusKey(user.id)) === "true";
+        window.localStorage.getItem(
+          getPartyActiveKey(user.id)
+        ) === "true";
+
       setPartyActive(nextPartyActive);
-    };
-  
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    });
   }
 
-  loadPartyPage();
+  window.addEventListener("storage", onStorage);
+
+  return () => {
+    window.removeEventListener("storage", onStorage);
+  };
 }, []);
 
   useEffect(() => {
@@ -869,7 +915,17 @@ function writePartyLiveState(
 
       const { data: existingByName, error: lookupError } = await supabase
         .from("crew_status")
-        .select("id,name")
+        .select(`
+  id,
+  name,
+  status,
+  updated_at,
+  latitude,
+  longitude,
+  location_name,
+  heartbeat_bpm,
+  vibe_label
+`)
         .eq("user_id", user.id)
         .eq("name", displayName)
         .maybeSingle();
@@ -954,11 +1010,19 @@ function writePartyLiveState(
     }
   }
   async function loadCrewRowsForAwareness() {
-    if (!supabase || !displayName) return [] as CrewStatusRow[];
+  if (!supabase || !displayName) {
+    return [] as CrewStatusRow[];
+  }
 
-    if (!user) return [];
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-const joined = getJoinedCrew(user.id);
+  if (!user) {
+    return [] as CrewStatusRow[];
+  }
+
+  const joined = getJoinedCrew(user.id);
     const owner = joined.crewOwner?.trim() || crewOwner || displayName;
 
     const memberNames = new Set<string>();
@@ -988,7 +1052,17 @@ const joined = getJoinedCrew(user.id);
 
     const { data: statusRows, error: statusError } = await supabase
   .from("crew_status")
-  .select("id,name,status,updated_at")
+  .select(`
+  id,
+  name,
+  status,
+  updated_at,
+  latitude,
+  longitude,
+  location_name,
+  heartbeat_bpm,
+  vibe_label
+`)
   .eq("user_id", user.id)
   .in("name", namesToLoad);
 
@@ -1151,10 +1225,20 @@ useEffect(() => {
     if (typeof window === "undefined") return;
     if (!("speechSynthesis" in window)) return;
     if (!autoVoiceEnabled) return;
+   
     const interval = setInterval(async () => {
-      try {
-        const raw = window.localStorage.getItem(getPartyLiveKey(user.id));
-        if (!raw) return;
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) return;
+
+    const raw = window.localStorage.getItem(
+      getPartyLiveKey(user.id)
+    );
+
+    if (!raw) return;
         const live = JSON.parse(raw) as {
           active?: boolean;
           heartbeatBpm?: number;
@@ -1226,6 +1310,7 @@ useEffect(() => {
           return;
         }
         const now = Date.now();
+        
         const cooldown =
           label === "critical" ||
           label === "crew_separated" ||
@@ -1234,11 +1319,14 @@ useEffect(() => {
           label === "risk_high"
             ? 12000
             : 20000;
-        const labelChanged = label !== autoVoiceLastLabelRef.current;
+        
+            const labelChanged = label !== autoVoiceLastLabelRef.current;
+        
         const cooldownPassed =
           now - autoVoiceLastSpokenAtRef.current > cooldown;
         if (!labelChanged && !cooldownPassed) return;
         window.speechSynthesis.cancel();
+       
         const utterance = new SpeechSynthesisUtterance(message);
         utterance.rate = 1;
         utterance.pitch = 0.95;
@@ -1251,8 +1339,10 @@ useEffect(() => {
     }, 4000);
     return () => clearInterval(interval);
   }, [autoVoiceEnabled, crewRows, displayName, crewOwner]);
+ 
   const visual = useMemo(() => getStatusVisual(selectedStatus), [selectedStatus]);
   async function handleToggleAudio() {
+   
     const audio = audioRef.current;
     if (!audio) return;
     try {
@@ -1355,8 +1445,7 @@ writePartyLiveState(user.id, selectedStatus, lastCoords, "toggle", nextActive);
     return getFriendlyLocationName(lastCoords);
   }, [lastCoords]);
   return (
-    
-      <main className="min-h-screen overflow-hidden bg-[#0A0A0B] text-white">
+    <main className="min-h-screen overflow-hidden bg-[#0A0A0B] text-white">
       <div className="relative z-20 px-5 pt-5">
   <Link
     href="/"
@@ -1482,300 +1571,111 @@ writePartyLiveState(user.id, selectedStatus, lastCoords, "toggle", nextActive);
             </div>
           </div>
         </section>
+
         <section className="mb-6 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-2xl font-semibold text-white">Party Engine</h2>
+              <h2 className="text-2xl font-semibold text-white">Status Layer</h2>
               <p className="mt-1 text-sm text-white/60">
-                This is the switch that feeds your live awareness system.
+                Choose the state that best matches your current phase.
               </p>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={handleTogglePartyMode}
-              className={`rounded-2xl px-4 py-5 text-center text-lg font-semibold transition duration-200 active:scale-[0.97] ${
-                partyActive
-                  ? "border border-white/80 bg-[linear-gradient(180deg,#24242b,#17171d)] text-white shadow-[0_12px_28px_rgba(255,255,255,0.06)]"
-                  : "bg-[linear-gradient(180deg,#17171d,#121218)] text-white/92 shadow-[0_8px_24px_rgba(0,0,0,0.32)] hover:scale-[1.02]"
-              }`}
-            >
-              {partyActive ? "Party On" : "Party Off"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (autoTracking) {
-                  stopAutoTracking();
-                } else {
-                  startAutoTracking();
-                }
-              }}
-              disabled={!partyActive}
-              className={`rounded-2xl px-4 py-5 text-center text-lg font-semibold transition duration-200 active:scale-[0.97] ${
-                !partyActive
-                  ? "cursor-not-allowed bg-white/5 text-white/35"
-                  : "bg-[linear-gradient(180deg,#17171d,#121218)] text-white/92 shadow-[0_8px_24px_rgba(0,0,0,0.32)] hover:scale-[1.02]"
-              }`}
-            >
-              {autoTracking ? "Stop Tracking" : "Start Tracking"}
-            </button>
+            {PARTY_STATUSES.map((status) => {
+              const active = selectedStatus === status;
+              return (
+                <button
+                  key={status}
+                  type="button"
+                  onClick={() => handleStatusClick(status)}
+                  className={`rounded-2xl px-4 py-4 text-left text-sm font-semibold transition duration-200 active:scale-[0.97] ${
+                    active
+                      ? "border border-white/80 bg-[linear-gradient(180deg,#24242b,#17171d)] text-white shadow-[0_12px_28px_rgba(255,255,255,0.06)]"
+                      : "bg-[linear-gradient(180deg,#17171d,#121218)] text-white/80 shadow-[0_8px_24px_rgba(0,0,0,0.32)] hover:scale-[1.02]"
+                  }`}
+                >
+                  {status}
+                </button>
+              );
+            })}
           </div>
-          <div className="mt-3 grid grid-cols-3 gap-3">
-            <button
-              type="button"
-              onClick={() => setAutoVoiceEnabled((prev) => !prev)}
-              className="rounded-2xl bg-[linear-gradient(180deg,#17171d,#121218)] px-4 py-4 text-sm font-semibold text-white shadow-[0_8px_24px_rgba(0,0,0,0.32)] transition duration-200 hover:scale-[1.02] active:scale-[0.97]"
-            >
-              {autoVoiceEnabled ? "Auto Voice On" : "Auto Voice Off"}
-            </button>
-            <button
-              type="button"
-              onClick={handleSendCheckIn}
-              className="rounded-2xl bg-white/10 px-4 py-4 text-sm font-semibold text-white transition duration-200 hover:bg-white/15 active:scale-[0.97]"
-            >
-              {checkInSent ? "Check-in Sent" : "Send Check-in"}
-            </button>
+        </section>
+        
+   <section className="mb-6 rounded-[2rem] border border-cyan-400/20 bg-[linear-gradient(135deg,rgba(15,23,42,0.95),rgba(10,15,25,0.92))] p-5 shadow-[0_0_50px_rgba(34,211,238,0.10)]">
+  <div className="flex items-start justify-between gap-4">
+    <div>
+      <p className="text-xs font-black uppercase tracking-[0.22em] text-cyan-200">
+        TwinMe Intelligence
+      </p>
 
-          <Link
-  href="/join"
-  className="rounded-2xl bg-fuchsia-500 px-4 py-4 text-center text-sm font-semibold text-white transition duration-200 hover:bg-fuchsia-600 active:scale-[0.97]"
->
-  🎉 Invite Tonight&apos;s Crew
-</Link>
+      <p className="mt-2 text-sm leading-6 text-white/60">
+        Adaptive awareness based on crew alignment, signal freshness,
+        isolation, and predictive risk.
+      </p>
+    </div>
 
-          </div>
-          <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-            <div className="mb-2 flex items-center gap-2 text-sm font-medium text-white/85">
-              <MapPin className="h-4 w-4" />
-              Spots + TwinMe bridge
-            </div>
-            <p className="text-sm leading-6 text-white/70">{spotsBridgeText}</p>
-          </div>
-        </section>
-        <section className="mb-6 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
-          <div className="mb-4 flex items-start justify-between gap-3">
-            <div>
-              <h2 className="text-2xl font-semibold text-white">Crew Desync</h2>
-              <p className="mt-1 text-sm text-white/60">
-                TwinMe now reads your state against your crew’s state.
-              </p>
-            </div>
-          </div>
-          <div
-            className={`rounded-2xl border p-4 ${
-              crewDesync.level === "separated"
-                ? "border-red-400/20 bg-red-500/10"
-                : crewDesync.level === "watch"
-                  ? "border-orange-400/20 bg-orange-500/10"
-                  : "border-white/10 bg-white/5"
-            }`}
-          >
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <div className="text-sm font-medium text-white/90">
-                Crew state read
-              </div>
-              <span
-                className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${
-                  crewDesync.level === "separated"
-                    ? "bg-red-500/15 text-red-100"
-                    : crewDesync.level === "watch"
-                      ? "bg-orange-500/15 text-orange-100"
-                      : "bg-white/10 text-white/80"
-                }`}
-              >
-                {crewDesync.level}
-              </span>
-            </div>
-            <p className="text-sm leading-6 text-white/80">
-              {crewDesync.message}
-            </p>
-            <div className="mt-3 text-xs text-white/55">
-              Crew rows read: {crewRows.length} · active mismatch signals:{" "}
-              {crewDesync.differentCount}
-            </div>
-          </div>
-        </section>
-        <section className="mb-6 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
-          <div className="mb-4">
-            <h2 className="text-2xl font-semibold text-white">Isolation</h2>
-            <p className="text-sm text-white/60">
-              TwinMe monitors if you are operating without crew presence.
-            </p>
-          </div>
-          <div
-            className={`rounded-2xl border p-4 ${
-              isolation.level === "isolated"
-                ? "border-red-400/20 bg-red-500/10"
-                : "border-white/10 bg-white/5"
-            }`}
-          >
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <span className="text-sm text-white">Isolation state</span>
-              <span
-                className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${
-                  isolation.level === "isolated"
-                    ? "bg-red-500/15 text-red-100"
-                    : "bg-white/10 text-white/80"
-                }`}
-              >
-                {isolation.level}
-              </span>
-            </div>
-            <p className="text-sm text-white/80">{isolation.message}</p>
-          </div>
-        </section>
-        <section className="mb-6 rounded-3xl border border-white/10 bg-[#0c0c0f] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
-          <h2 className="mb-2 text-xl font-semibold text-white">
-            Signal Freshness
-          </h2>
-          <div
-            className={`rounded-xl border p-4 ${
-              stale.level === "stale"
-                ? "border-yellow-400/20 bg-yellow-500/10"
-                : "border-white/10 bg-white/5"
-            }`}
-          >
-            <div className="mb-1 flex justify-between">
-              <span className="text-sm text-white">Crew signal state</span>
-              <span
-                className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${
-                  stale.level === "stale"
-                    ? "bg-yellow-500/15 text-yellow-100"
-                    : "bg-white/10 text-white/80"
-                }`}
-              >
-                {stale.level}
-              </span>
-            </div>
-            <p className="text-sm text-white/80">{stale.message}</p>
-          </div>
-        </section>
-        <section className="mb-6 rounded-3xl border border-white/10 bg-[#0c0c0f] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
-          <h2 className="mb-2 text-xl font-semibold text-white">
-            Predictive Risk
-          </h2>
-          <div
-            className={`rounded-xl border p-4 ${
-              risk.level === "high"
-                ? "border-red-400/20 bg-red-500/10"
-                : risk.level === "rising"
-                  ? "border-orange-400/20 bg-orange-500/10"
-                  : "border-white/10 bg-white/5"
-            }`}
-          >
-            <div className="mb-1 flex justify-between">
-              <span className="text-sm text-white">Risk trajectory</span>
-              <span
-                className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${
-                  risk.level === "high"
-                    ? "bg-red-500/15 text-red-100"
-                    : risk.level === "rising"
-                      ? "bg-orange-500/15 text-orange-100"
-                      : "bg-white/10 text-white/80"
-                }`}
-              >
-                {risk.level}
-              </span>
-            </div>
-            <p className="text-sm text-white/80">{risk.message}</p>
-          </div>
-        </section>
-        <section className="mb-6 rounded-3xl border border-white/10 bg-[#0c0c0f] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
-          <h2 className="mb-2 text-xl font-semibold text-white">
-            Intervention Mode
-          </h2>
-          <div
-            className={`rounded-xl border p-4 ${
-              intervention.level === "urgent"
-                ? "border-red-400/20 bg-red-500/10"
-                : intervention.level === "suggest"
-                  ? "border-orange-400/20 bg-orange-500/10"
-                  : "border-white/10 bg-white/5"
-            }`}
-          >
-            <div className="mb-2 flex justify-between">
-              <span className="text-sm text-white">Action guidance</span>
-              <span
-                className={`text-xs uppercase ${
-                  intervention.level === "urgent"
-                    ? "text-red-300"
-                    : intervention.level === "suggest"
-                      ? "text-orange-300"
-                      : "text-white/60"
-                }`}
-              >
-                {intervention.level}
-              </span>
-            </div>
-            {intervention.actions.length === 0 ? (
-              <p className="text-sm text-white/60">No intervention needed.</p>
-            ) : (
-              <div className="space-y-2">
-                {intervention.actions.map((action, i) => (
-                  <button
-                    key={i}
-                    onClick={() => handleInterventionAction(action)}
-                    className="w-full rounded-xl bg-white/5 px-4 py-3 text-left text-sm text-white/85 transition hover:bg-white/10"
-                  >
-                    • {action}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </section>
-        <section className="mb-6 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
-          <div className="mb-4 flex items-start justify-between gap-3">
-            <div>
-              <h2 className="text-2xl font-semibold text-white">Audio + Vibe</h2>
-              <p className="mt-1 text-sm text-white/60">
-                Keep the room alive, but keep awareness higher than the vibe.
-              </p>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={handleToggleAudio}
-              className="rounded-2xl bg-[linear-gradient(180deg,#17171d,#121218)] px-4 py-4 text-sm font-semibold text-white shadow-[0_8px_24px_rgba(0,0,0,0.32)] transition duration-200 hover:scale-[1.02] active:scale-[0.97]"
-            >
-              <span className="inline-flex items-center gap-2">
-                {isPlaying ? (
-                  <Pause className="h-4 w-4" />
-                ) : (
-                  <Play className="h-4 w-4" />
-                )}
-                {isPlaying ? "Pause Sound" : "Play Sound"}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={handleSendCheckIn}
-              className="rounded-2xl bg-[linear-gradient(180deg,#17171d,#121218)] px-4 py-4 text-sm font-semibold text-white shadow-[0_8px_24px_rgba(0,0,0,0.32)] transition duration-200 hover:scale-[1.02] active:scale-[0.97]"
-            >
-              <span className="inline-flex items-center gap-2">
-                <Send className="h-4 w-4" />
-                Crew Ping
-              </span>
-            </button>
-          </div>
-          {!audioReady ? (
-            <div className="mt-3 rounded-2xl border border-orange-500/20 bg-orange-500/10 px-4 py-3 text-sm text-orange-100">
-              Party audio could not load. Check that{" "}
-              <span className="font-semibold">{PARTY_AUDIO_SRC}</span> exists in{" "}
-              <span className="font-semibold">public/</span>.
-            </div>
-          ) : null}
-          <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-white/55">
-              Twin Tip
-            </div>
-            <p className="text-sm leading-6 text-white/80">{visual.twinTip}</p>
-          </div>
-        </section>
-        <section className="mb-6 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
+    <span className="rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-cyan-200">
+      Active
+    </span>
+  </div>
+
+  <div className="mt-5 grid grid-cols-2 gap-3">
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+      <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/45">
+        Crew
+      </div>
+
+      <div className="mt-1 text-sm font-semibold text-white">
+        {crewDesync.level}
+      </div>
+    </div>
+
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+      <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/45">
+        Isolation
+      </div>
+
+      <div className="mt-1 text-sm font-semibold text-white">
+        {isolation.level}
+      </div>
+    </div>
+
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+      <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/45">
+        Freshness
+      </div>
+
+      <div className="mt-1 text-sm font-semibold text-white">
+        {stale.level}
+      </div>
+    </div>
+
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+      <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/45">
+        Risk
+      </div>
+
+      <div className="mt-1 text-sm font-semibold text-white">
+        {risk.level}
+      </div>
+    </div>
+  </div>
+
+  <div className="mt-5 rounded-2xl border border-cyan-400/15 bg-cyan-400/[0.06] p-4">
+    <div className="text-xs font-black uppercase tracking-[0.18em] text-cyan-200">
+      Recommendation
+    </div>
+
+    <p className="mt-2 text-sm leading-6 text-white/80">
+      {intervention.actions.length > 0
+        ? intervention.actions[0]
+        : risk.message}
+    </p>
+  </div>
+</section>        
+          
+<section className="mb-6 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
               <h2 className="text-2xl font-semibold text-white">Live Crew Sync</h2>
@@ -1845,35 +1745,7 @@ writePartyLiveState(user.id, selectedStatus, lastCoords, "toggle", nextActive);
             </div>
           </div>
         </section>
-        <section className="mb-6 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
-          <div className="mb-4 flex items-start justify-between gap-3">
-            <div>
-              <h2 className="text-2xl font-semibold text-white">Status Layer</h2>
-              <p className="mt-1 text-sm text-white/60">
-                Choose the state that best matches your current phase.
-              </p>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            {PARTY_STATUSES.map((status) => {
-              const active = selectedStatus === status;
-              return (
-                <button
-                  key={status}
-                  type="button"
-                  onClick={() => handleStatusClick(status)}
-                  className={`rounded-2xl px-4 py-4 text-left text-sm font-semibold transition duration-200 active:scale-[0.97] ${
-                    active
-                      ? "border border-white/80 bg-[linear-gradient(180deg,#24242b,#17171d)] text-white shadow-[0_12px_28px_rgba(255,255,255,0.06)]"
-                      : "bg-[linear-gradient(180deg,#17171d,#121218)] text-white/80 shadow-[0_8px_24px_rgba(0,0,0,0.32)] hover:scale-[1.02]"
-                  }`}
-                >
-                  {status}
-                </button>
-              );
-            })}
-          </div>
-        </section>
+        
         <div className="mt-6 flex items-center justify-between text-xs text-white/45">
           <Link href="/" className="transition hover:text-white/75">
             Dashboard
@@ -1888,7 +1760,7 @@ writePartyLiveState(user.id, selectedStatus, lastCoords, "toggle", nextActive);
             TwinMe
           </Link>
         </div>
-         </div>
+      </div>
     </main>
-  );
-}
+    );
+  }

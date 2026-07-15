@@ -178,10 +178,10 @@ console.log("SAVE PROFILE DATA:", profile);
       />
 
 <ActivityCard
-  connected={crewStats.connected}
-  location={location}
-  ghostMode={ghostMode}
-  trustedOnly={trustedOnly}
+  connected={0}
+  location={false}
+  ghostMode={profile.ghostMode}
+  trustedOnly={profile.trustedOnly}
 />
 
       {/* BASIC */}
