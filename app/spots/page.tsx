@@ -23,6 +23,150 @@ import AuthGuard from "@/components/auth/AuthGuard";
 
 type SpotTone = "lit" | "safe" | "risk" | "chill";
 
+type SpotsView = "crew" | "nearby" | "live";
+
+type NearbySpot = {
+  id: string;
+  name: string;
+  category: "Food" | "Nightlife" | "Events" | "Sports" | "Outdoor" | "Stay In";
+  distanceKm: number;
+  vibe: string;
+  status: string;
+  note: string;
+};
+
+type LiveActivity = {
+  id: string;
+  title: string;
+  area: string;
+  activityType: "Nightlife" | "Food" | "Event" | "Sports" | "Outdoor";
+  vibe: string;
+  crowdLevel: "Low" | "Moderate" | "Busy" | "Packed";
+  minutesAgo: number;
+  trusted: boolean;
+  note: string;
+  latitude?: number | null;
+longitude?: number | null;
+};
+
+type LivePostRow = {
+  id: string;
+  user_id: string;
+  display_name: string;
+  title: string;
+  area: string;
+  activity_type: string;
+  vibe: string;
+  crowd_level: string;
+  note: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  trusted: boolean;
+  created_at: string;
+};
+
+type LivePostType =
+  | "Great vibe"
+  | "Busy here"
+  | "Getting packed"
+  | "Calm spot"
+  | "Avoid area";
+
+const nearbySpots: NearbySpot[] = [
+  {
+    id: "spot-1",
+    name: "Harbour Social",
+    category: "Nightlife",
+    distanceKm: 1.2,
+    vibe: "High energy",
+    status: "Open",
+    note: "Busy social atmosphere with strong late-night activity.",
+  },
+  {
+    id: "spot-2",
+    name: "North Shore Kitchen",
+    category: "Food",
+    distanceKm: 0.8,
+    vibe: "Relaxed",
+    status: "Open",
+    note: "Good option for food and a lower-energy reset.",
+  },
+  {
+    id: "spot-3",
+    name: "Community Arena",
+    category: "Sports",
+    distanceKm: 2.4,
+    vibe: "Active",
+    status: "Event tonight",
+    note: "Local sports activity with moderate crowd energy.",
+  },
+  {
+    id: "spot-4",
+    name: "Waterfront Walk",
+    category: "Outdoor",
+    distanceKm: 1.6,
+    vibe: "Calm",
+    status: "Open",
+    note: "Lower-energy outdoor option for a quieter evening.",
+  },
+  {
+    id: "spot-5",
+    name: "Stay In",
+    category: "Stay In",
+    distanceKm: 0,
+    vibe: "Private",
+    status: "Always available",
+    note: "Best fallback when weather, fatigue, or safety makes staying in the better move.",
+  },
+];
+
+const liveActivities: LiveActivity[] = [
+  {
+    id: "live-1",
+    title: "Crowd building at Harbour Social",
+    area: "Downtown",
+    activityType: "Nightlife",
+    vibe: "High energy",
+    crowdLevel: "Busy",
+    minutesAgo: 3,
+    trusted: true,
+    note: "Music is picking up and the crowd is growing quickly.",
+  },
+  {
+    id: "live-2",
+    title: "Late-night food rush",
+    area: "North Shore Kitchen",
+    activityType: "Food",
+    vibe: "Relaxed",
+    crowdLevel: "Moderate",
+    minutesAgo: 8,
+    trusted: true,
+    note: "Good food option with a calmer atmosphere than nearby nightlife.",
+  },
+  {
+    id: "live-3",
+    title: "Local game ending soon",
+    area: "Community Arena",
+    activityType: "Sports",
+    vibe: "Active",
+    crowdLevel: "Busy",
+    minutesAgo: 12,
+    trusted: false,
+    note: "Expect heavier movement and traffic as people begin leaving.",
+  },
+  {
+    id: "live-4",
+    title: "Waterfront is quiet",
+    area: "Waterfront Walk",
+    activityType: "Outdoor",
+    vibe: "Calm",
+    crowdLevel: "Low",
+    minutesAgo: 5,
+    trusted: true,
+    note: "Low crowd activity and a quieter environment right now.",
+  },
+];
+
 type CrewStatusRow = {
   id?: string;
   name?: string | null;
@@ -70,6 +214,26 @@ function getDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number) {
 
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return earthRadiusKm * c;
+}
+
+function getLiveActivityDistance(
+  activity: LiveActivity,
+  userCoords: { lat: number; lng: number } | null
+) {
+  if (
+    !userCoords ||
+    typeof activity.latitude !== "number" ||
+    typeof activity.longitude !== "number"
+  ) {
+    return null;
+  }
+
+  return getDistanceKm(
+    userCoords.lat,
+    userCoords.lng,
+    activity.latitude,
+    activity.longitude
+  );
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -174,6 +338,63 @@ function getToneIcon(tone: SpotTone) {
   if (tone === "safe") return <Shield className="h-4 w-4" />;
   if (tone === "risk") return <AlertTriangle className="h-4 w-4" />;
   return <MapPin className="h-4 w-4" />;
+}
+
+function convertLivePostRow(
+  row: LivePostRow
+): LiveActivity {
+  const createdTime = new Date(row.created_at).getTime();
+  const now = Date.now();
+
+  const minutesAgo = Math.max(
+    0,
+    Math.floor((now - createdTime) / 60000)
+  );
+
+  const validActivityTypes: LiveActivity["activityType"][] = [
+    "Nightlife",
+    "Food",
+    "Event",
+    "Sports",
+    "Outdoor",
+  ];
+
+  const activityType =
+    validActivityTypes.includes(
+      row.activity_type as LiveActivity["activityType"]
+    )
+      ? (row.activity_type as LiveActivity["activityType"])
+      : "Event";
+
+  const validCrowdLevels: LiveActivity["crowdLevel"][] = [
+    "Low",
+    "Moderate",
+    "Busy",
+    "Packed",
+  ];
+
+  const crowdLevel =
+    validCrowdLevels.includes(
+      row.crowd_level as LiveActivity["crowdLevel"]
+    )
+      ? (row.crowd_level as LiveActivity["crowdLevel"])
+      : "Moderate";
+
+  return {
+    id: row.id,
+    title: row.title,
+    area: row.area,
+    activityType,
+    vibe: row.vibe,
+    crowdLevel,
+    minutesAgo,
+    trusted: row.trusted,
+    note:
+      row.note ||
+      "Live update shared from the area.",
+      latitude: row.latitude,
+longitude: row.longitude,
+  };
 }
 
 function getPointTone(row: CrewStatusRow, distanceKm: number): SpotTone {
@@ -291,7 +512,27 @@ const getPartyStatusKey = (userId: string) =>
 const getLastSharedLocationKey = (userId: string) =>
   `twincore_last_shared_location_${userId}`;
 
+const LIVE_POST_EXPIRY_MINUTES = 180;
+
 export default function SpotsPage() {
+  const [activeView, setActiveView] = useState<SpotsView>("crew");
+  const [nearbyCategory, setNearbyCategory] =
+  useState<NearbySpot["category"] | "All">("All");
+  const [liveFilter, setLiveFilter] =
+  useState<LiveActivity["activityType"] | "All">("All");
+  const [postComposerOpen, setPostComposerOpen] = useState(false);
+const [databaseLivePosts, setDatabaseLivePosts] =
+  useState<LiveActivity[]>([]);
+const [livePostType, setLivePostType] =
+  useState<LivePostType>("Great vibe");
+
+const [livePostNote, setLivePostNote] = useState("");
+
+const [livePostLocation, setLivePostLocation] =
+  useState("Current Location");
+
+const [localLivePosts, setLocalLivePosts] =
+  useState<LiveActivity[]>([]);
   const [displayName, setDisplayName] = useState("Neo");
   const [partyStatus, setPartyStatus] = useState<string | null>(null);
   const [hasSharedLocation, setHasSharedLocation] = useState(false);
@@ -788,6 +1029,151 @@ navigator.geolocation.getCurrentPosition(
   selectedSpot,
 ]);
 
+const filteredNearbySpots = useMemo(() => {
+  if (nearbyCategory === "All") {
+    return nearbySpots;
+  }
+
+  return nearbySpots.filter(
+    (spot) => spot.category === nearbyCategory
+  );
+}, [nearbyCategory]);
+
+const filteredLiveActivities = useMemo(() => {
+  const allLiveActivities = [
+    ...databaseLivePosts,
+    ...localLivePosts,
+    ...liveActivities,
+  ];
+
+  const uniqueActivities = allLiveActivities.filter(
+    (activity, index, array) =>
+      array.findIndex(
+        (item) => item.id === activity.id
+      ) === index
+  );
+
+  const freshActivities = uniqueActivities.filter(
+    (activity) =>
+      activity.minutesAgo <= LIVE_POST_EXPIRY_MINUTES
+  );
+
+
+  const nearbyActivities = freshActivities.filter(
+  (activity) => {
+    const distance = getLiveActivityDistance(
+      activity,
+      userCoords
+    );
+
+    if (distance === null) {
+      return true;
+    }
+
+    return distance <= 25;
+  }
+);
+
+  if (liveFilter === "All") {
+    return nearbyActivities;
+  }
+
+  return nearbyActivities.filter(
+    (activity) =>
+      activity.activityType === liveFilter
+  );
+}, [
+  liveFilter,
+  databaseLivePosts,
+  localLivePosts,
+   userCoords,
+]);
+
+async function handlePostLiveUpdate() {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    alert("You must be signed in to post a live update.");
+    return;
+  }
+
+
+console.log("Posting live update as user:", user.id);
+
+  const activityType: LiveActivity["activityType"] =
+    livePostType === "Calm spot"
+      ? "Outdoor"
+      : livePostType === "Avoid area"
+      ? "Event"
+      : "Nightlife";
+
+  const crowdLevel: LiveActivity["crowdLevel"] =
+    livePostType === "Getting packed"
+      ? "Packed"
+      : livePostType === "Busy here"
+      ? "Busy"
+      : livePostType === "Calm spot"
+      ? "Low"
+      : "Moderate";
+
+  const payload = {
+    user_id: user.id,
+    display_name: displayName,
+    title: livePostType,
+   
+    area:
+  livePostLocation === "Current Location"
+    ? "Current location"
+    : livePostLocation,
+    activity_type: activityType,
+    vibe: livePostType,
+    crowd_level: crowdLevel,
+    note:
+      livePostNote.trim() ||
+      "Live update shared from the area.",
+    latitude: userCoords?.lat ?? null,
+    longitude: userCoords?.lng ?? null,
+    trusted: false,
+  };
+
+  const { data, error } = await supabase
+    .from("spots_live_posts")
+    .insert(payload)
+    .select()
+    .single();
+
+  if (error) {
+  console.error("Live post failed");
+  console.error("message:", error.message);
+  console.error("details:", error.details);
+  console.error("hint:", error.hint);
+  console.error("code:", error.code);
+
+  alert(
+    `Your live update could not be posted.\n\n${error.message}`
+  );
+
+  return;
+}
+
+  if (data) {
+    const newPost = convertLivePostRow(
+      data as LivePostRow
+    );
+
+    setDatabaseLivePosts((current) => [
+      newPost,
+      ...current.filter(
+        (post) => post.id !== newPost.id
+      ),
+    ]);
+  }
+
+  setLivePostNote("");
+  setPostComposerOpen(false);
+}
   return (
     <AuthGuard>
     <main className="min-h-screen overflow-hidden bg-[#0A0A0B] text-white">
@@ -808,37 +1194,420 @@ navigator.geolocation.getCurrentPosition(
         <div className="absolute inset-0 opacity-[0.08] [background-image:linear-gradient(rgba(255,255,255,0.55)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.55)_1px,transparent_1px)] [background-size:26px_26px]" />
       </div>
 
-      <div className="relative mx-auto w-full max-w-md px-4 py-8">
+       <div className="relative mx-auto w-full max-w-2xl px-4 py-8 sm:px-6 lg:px-8">
         <header className="mb-8">
           <div className="mb-2 text-xs tracking-[0.3em] text-white/50">TWINCORE</div>
 
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h1 className="text-4xl font-semibold tracking-tight">Map Mode</h1>
-              <p className="mt-2 text-sm text-white/60">
-                Live situational awareness around you
-              </p>
+              <h1 className="text-4xl font-semibold tracking-tight">
+  Spots
+</h1>
+             <p className="mt-2 text-sm text-white/60">
+  Crew awareness, nearby places, and live activity
+</p>
             </div>
 
             <button
               type="button"
               onClick={() => setSweepOn((prev) => !prev)}
-              className="twincore-press rounded-2xl bg-[linear-gradient(180deg,#1A1A1F,#141419)] px-4 py-3 text-sm font-medium text-white shadow-[0_8px_24px_rgba(0,0,0,0.35)]"
+              className={`twincore-press rounded-2xl bg-[linear-gradient(180deg,#1A1A1F,#141419)] px-4 py-3 text-sm font-medium text-white shadow-[0_8px_24px_rgba(0,0,0,0.35)] ${
+  activeView === "crew" ? "inline-flex" : "hidden"
+}`}
             >
               {sweepOn ? "Radar On" : "Radar Off"}
             </button>
           </div>
-        </header>
+           </header>
 
-        <section className="mb-6 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#14141a,#0c0c10)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
-          <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold tracking-[0.22em] text-white/80">
-            <Radar className="h-3.5 w-3.5" />
-            LIVE RADAR
+           {/* SPOTS VIEW SWITCHER */}
+<section className="mb-6 rounded-3xl border border-white/10 bg-white/[0.035] p-2 backdrop-blur-xl">
+  <div className="grid grid-cols-3 gap-2">
+    {(
+      [
+        {
+          id: "crew",
+          label: "Crew",
+          description: "Private radar",
+        },
+        {
+          id: "nearby",
+          label: "Nearby",
+          description: "Places & events",
+        },
+        {
+          id: "live",
+          label: "Live",
+          description: "Happening now",
+        },
+      ] as const
+    ).map((view) => {
+      const active = activeView === view.id;
+
+      return (
+        <button
+          key={view.id}
+          type="button"
+          onClick={() => setActiveView(view.id)}
+          className={`rounded-2xl px-3 py-3 text-center transition active:scale-[0.98] ${
+            active
+              ? "border border-cyan-300/25 bg-cyan-300/10 text-cyan-100 shadow-[0_0_25px_rgba(34,211,238,0.12)]"
+              : "border border-transparent text-white/55 hover:bg-white/[0.05] hover:text-white/80"
+          }`}
+        >
+          <div className="text-sm font-black">
+            {view.label}
           </div>
 
-          <h2 className="text-2xl font-semibold text-white">
-            {displayName}'s Awareness Grid
-          </h2>
+          <div className="mt-1 hidden text-[10px] font-medium text-white/40 sm:block">
+            {view.description}
+          </div>
+        </button>
+      );
+    })}
+  </div>
+</section>
+
+{/* NEARBY VIEW */}
+{activeView === "nearby" ? (
+  <div className="space-y-5">
+    <section className="rounded-3xl border border-fuchsia-300/20 bg-[radial-gradient(circle_at_top,rgba(217,70,239,0.14),transparent_45%),linear-gradient(180deg,#15111d,#0b0b0f)] p-5 shadow-[0_0_45px_rgba(217,70,239,0.10)]">
+      <div className="inline-flex items-center gap-2 rounded-full border border-fuchsia-300/20 bg-fuchsia-300/10 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-fuchsia-100">
+        <MapPin className="h-3.5 w-3.5" />
+        Nearby Discovery
+      </div>
+
+      <h2 className="mt-4 text-2xl font-black text-white">
+        Find What Fits Right Now
+      </h2>
+
+      <p className="mt-2 text-sm leading-6 text-white/65">
+        Discover nearby places based on distance, energy,
+        activity, and what fits your current night.
+      </p>
+    </section>
+
+  <div className="flex items-center gap-2 overflow-x-auto py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+  {(
+    [
+      "All",
+      "Food",
+      "Nightlife",
+      "Events",
+      "Sports",
+      "Outdoor",
+      "Stay In",
+    ] as const
+  ).map((category) => {
+    const active = nearbyCategory === category;
+
+    return (
+      <button
+        key={category}
+        type="button"
+        onClick={() => setNearbyCategory(category)}
+        className={`shrink-0 rounded-full border px-3 py-2 text-xs font-semibold transition ${
+          active
+            ? "border-cyan-300/30 bg-cyan-300/10 text-cyan-100"
+            : "border-white/10 bg-white/[0.04] text-white/55"
+        }`}
+      >
+        {category}
+      </button>
+    );
+  })}
+</div>
+
+    <section className="space-y-3">
+      {filteredNearbySpots.map((spot) => (
+        <div
+          key={spot.id}
+          className="rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#14141a,#0c0c10)] p-4"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-lg font-semibold text-white">
+                {spot.name}
+              </div>
+
+              <div className="mt-1 text-xs text-white/45">
+                {spot.category}
+              </div>
+            </div>
+
+            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-white/70">
+              {spot.distanceKm === 0
+                ? "Home"
+                : `${spot.distanceKm.toFixed(1)} km`}
+            </span>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-white/70">
+              {spot.vibe}
+            </span>
+
+            <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-white/70">
+              {spot.status}
+            </span>
+          </div>
+
+          <p className="mt-3 text-sm leading-6 text-white/60">
+            {spot.note}
+          </p>
+        </div>
+      ))}
+    </section>
+
+    <section className="rounded-3xl border border-blue-500/20 bg-[linear-gradient(180deg,#1a1f2e,#0c0f1a)] p-5">
+      <div className="mb-2 inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-blue-100">
+        <Sparkles className="h-3.5 w-3.5" />
+        TwinMe Suggests
+      </div>
+
+      <p className="text-sm leading-6 text-white/75">
+        Your strongest nearby option right now is the one that matches
+        your energy, keeps travel simple, and gives your crew an easy
+        exit if plans change.
+      </p>
+    </section>
+  </div>
+) : null}
+
+{/* LIVE VIEW */}
+{activeView === "live" ? (
+  <div className="space-y-5">
+    <section className="rounded-3xl border border-orange-300/20 bg-[radial-gradient(circle_at_top,rgba(251,146,60,0.14),transparent_45%),linear-gradient(180deg,#1c130e,#0b0b0f)] p-5 shadow-[0_0_45px_rgba(251,146,60,0.10)]">
+      <div className="inline-flex items-center gap-2 rounded-full border border-orange-300/20 bg-orange-300/10 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-orange-100">
+        <Flame className="h-3.5 w-3.5" />
+        Happening Now
+      </div>
+
+      <h2 className="mt-4 text-2xl font-black text-white">
+        Live From the Area
+      </h2>
+
+      <p className="mt-2 text-sm leading-6 text-white/65">
+        Real-time crowd movement, atmosphere checks, event activity,
+        and trusted reports from nearby.
+      </p>
+
+<button
+  type="button"
+  onClick={() =>
+    setPostComposerOpen((current) => !current)
+  }
+  className="mt-4 w-full rounded-2xl border border-orange-300/25 bg-orange-300/10 px-4 py-3 text-sm font-bold text-orange-100 transition hover:bg-orange-300/15 active:scale-[0.98]"
+>
+  {postComposerOpen
+    ? "Close Update"
+    : "+ Post Live Update"}
+</button>
+
+
+{postComposerOpen ? (
+  <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4">
+    <div className="text-xs font-black uppercase tracking-[0.18em] text-white/50">
+      What&apos;s happening?
+    </div>
+
+    <div className="mt-3 flex flex-wrap gap-2">
+      {(
+        [
+          "Great vibe",
+          "Busy here",
+          "Getting packed",
+          "Calm spot",
+          "Avoid area",
+        ] as const
+      ).map((type) => {
+        const active = livePostType === type;
+
+        return (
+          <button
+            key={type}
+            type="button"
+            onClick={() => setLivePostType(type)}
+            className={`rounded-full border px-3 py-2 text-xs font-semibold transition ${
+              active
+                ? "border-orange-300/30 bg-orange-300/10 text-orange-100"
+                : "border-white/10 bg-white/[0.04] text-white/55"
+            }`}
+          >
+            {type}
+          </button>
+        );
+      })}
+    </div>
+
+<div className="mt-4">
+  <label
+    htmlFor="live-post-location"
+    className="text-xs font-black uppercase tracking-[0.18em] text-white/50"
+  >
+    Where is this happening?
+  </label>
+
+  <input
+    id="live-post-location"
+    type="text"
+    value={livePostLocation}
+    onChange={(event) =>
+      setLivePostLocation(event.target.value)
+    }
+    placeholder="Current Location or venue name"
+    className="mt-3 w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-orange-300/30"
+  />
+
+  <p className="mt-2 text-xs text-white/40">
+    Examples: Harbour Social, Community Arena, Waterfront Walk
+  </p>
+</div>
+
+    <textarea
+      value={livePostNote}
+      onChange={(event) =>
+        setLivePostNote(event.target.value)
+      }
+      placeholder="Add a quick note..."
+      className="mt-4 min-h-[90px] w-full resize-none rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-orange-300/30"
+    />
+
+    <button
+      type="button"
+      onClick={handlePostLiveUpdate}
+      className="mt-3 w-full rounded-2xl bg-orange-500 px-4 py-3 text-sm font-black text-white transition hover:bg-orange-600 active:scale-[0.98]"
+    >
+      Post Update
+    </button>
+  </div>
+) : null}
+
+    </section>
+
+    <div className="flex items-center gap-2 overflow-x-auto py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {(
+        [
+          "All",
+          "Nightlife",
+          "Food",
+          "Event",
+          "Sports",
+          "Outdoor",
+        ] as const
+      ).map((filter) => {
+        const active = liveFilter === filter;
+
+        return (
+          <button
+            key={filter}
+            type="button"
+            onClick={() => setLiveFilter(filter)}
+            className={`shrink-0 rounded-full border px-3 py-2 text-xs font-semibold transition ${
+              active
+                ? "border-orange-300/30 bg-orange-300/10 text-orange-100"
+                : "border-white/10 bg-white/[0.04] text-white/55"
+            }`}
+          >
+            {filter}
+          </button>
+        );
+      })}
+    </div>
+
+    <section className="space-y-3">
+      {filteredLiveActivities.map((activity) => {
+  const distance = getLiveActivityDistance(
+    activity,
+    userCoords
+  );
+
+  return (
+        <div
+          key={activity.id}
+          className="rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#14141a,#0c0c10)] p-4"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-lg font-semibold text-white">
+                {activity.title}
+              </div>
+
+              <div className="mt-1 text-xs text-white/45">
+                {activity.area}
+              </div>
+            </div>
+
+            <div className="shrink-0">
+              <div className="flex shrink-0 flex-col items-end gap-2">
+                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-white/70">
+                  {activity.minutesAgo} min ago
+                </span>
+
+                {distance !== null ? (
+                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-white/70">
+                    {distance.toFixed(1)} km
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-white/70">
+              {activity.activityType}
+            </span>
+
+            <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-white/70">
+              {activity.vibe}
+            </span>
+
+            <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-white/70">
+              Crowd: {activity.crowdLevel}
+            </span>
+
+            {activity.trusted ? (
+              <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-semibold text-emerald-100">
+                Trusted report
+              </span>
+            ) : null}
+          </div>
+
+          <p className="mt-3 text-sm leading-6 text-white/60">
+            {activity.note}
+          </p>
+        </div>
+        );
+})}
+    </section>
+
+    <section className="rounded-3xl border border-blue-500/20 bg-[linear-gradient(180deg,#1a1f2e,#0c0f1a)] p-5">
+      <div className="mb-2 inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-blue-100">
+        <Sparkles className="h-3.5 w-3.5" />
+        TwinMe Live Read
+      </div>
+
+      <p className="text-sm leading-6 text-white/75">
+        Activity is changing in real time. Use trusted reports, crowd
+        levels, distance, and your crew state together before deciding
+        where to move next.
+      </p>
+    </section>
+  </div>
+) : null}
+
+{/* CREW VIEW */}
+{activeView === "crew" ? (
+  <div>
+    <section className="mb-6 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#14141a,#0c0c10)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
+      <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold tracking-[0.22em] text-white/80">
+        <Radar className="h-3.5 w-3.5" />
+        LIVE RADAR
+      </div>
+
+      <h2 className="text-2xl font-semibold text-white">
+        {displayName}&apos;s Awareness Grid
+      </h2>
 
           <p className="mt-3 text-sm leading-6 text-white/70">
             This layer compares live crew distance, signal intensity, and safer movement options before you move.
@@ -872,8 +1641,6 @@ navigator.geolocation.getCurrentPosition(
               {trustedOnly ? "TRUSTED ONLY" : `${trustedVisibleCount} TRUSTED`}
             </span>
           </div>
-
-
 
           {locationError ? (
             <div className="mt-4 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-100">
@@ -1235,9 +2002,13 @@ navigator.geolocation.getCurrentPosition(
           >
             Crew
           </Link>
-        </nav>
+                     </nav>
+
       </div>
-        </main>
-  </AuthGuard>
-  );
+    ) : null}
+
+  </div>
+</main>
+</AuthGuard>
+);
 }
