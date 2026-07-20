@@ -527,6 +527,10 @@ function getLiveReportWeight(minutesAgo: number) {
 
 const LIVE_REPORT_COOLDOWN_MINUTES = 30;
 
+const isLiveReportFresh = (activity: LiveActivity) =>
+  activity.minutesAgo <= LIVE_POST_EXPIRY_MINUTES;
+
+
 // PASTE ABOVE THE COMPONENT
 export default function SpotsPage() {
 
@@ -1072,9 +1076,8 @@ const filteredLiveActivities = useMemo(() => {
   );
 
   const freshActivities = uniqueActivities.filter(
-    (activity) =>
-      activity.minutesAgo <= LIVE_POST_EXPIRY_MINUTES
-  );
+  isLiveReportFresh
+);
 
 
   const nearbyActivities = freshActivities.filter(
@@ -1104,26 +1107,27 @@ const filteredLiveActivities = useMemo(() => {
   liveFilter,
   databaseLivePosts,
   localLivePosts,
-   userCoords,
+  userCoords,
 ]);
 
 const nearbySpotsWithLiveActivity = useMemo(() => {
   return filteredNearbySpots.map((spot) => {
     const matchingLiveReports = filteredLiveActivities.filter(
       (activity) =>
+        isLiveReportFresh(activity) &&
         activity.area.trim().toLowerCase() ===
-        spot.name.trim().toLowerCase()
+          spot.name.trim().toLowerCase()
     );
 
     const latestReport = matchingLiveReports[0] ?? null;
 
     const uniqueReporterIds = new Set(
-  matchingLiveReports
-    .map((report) => report.userId)
-    .filter((userId): userId is string => Boolean(userId))
-);
+      matchingLiveReports
+        .map((report) => report.userId)
+        .filter((userId): userId is string => Boolean(userId))
+    );
 
-const uniqueReporterCount = uniqueReporterIds.size;
+    const uniqueReporterCount = uniqueReporterIds.size;
 
     const liveSignalStrength = matchingLiveReports.reduce(
       (total, report) =>
@@ -1132,13 +1136,13 @@ const uniqueReporterCount = uniqueReporterIds.size;
     );
 
     const corroborationLevel =
-  uniqueReporterCount >= 3
-    ? "strong"
-    : uniqueReporterCount >= 2
-    ? "moderate"
-    : matchingLiveReports.length >= 1
-    ? "single"
-    : "none";
+      uniqueReporterCount >= 3
+        ? "strong"
+        : uniqueReporterCount >= 2
+        ? "moderate"
+        : matchingLiveReports.length >= 1
+        ? "single"
+        : "none";
 
     return {
       ...spot,
@@ -1149,10 +1153,7 @@ const uniqueReporterCount = uniqueReporterIds.size;
       corroborationLevel,
     };
   });
-}, [
-  filteredNearbySpots,
-  filteredLiveActivities,
-]);
+}, [filteredNearbySpots, filteredLiveActivities]);
 
 const twinMeNearbySuggestion = useMemo(() => {
  if (nearbySpotsWithLiveActivity.length === 0) {
