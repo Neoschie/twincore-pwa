@@ -531,6 +531,9 @@ const [livePostNote, setLivePostNote] = useState("");
 const [livePostLocation, setLivePostLocation] =
   useState("Current Location");
 
+const [liveLocationMode, setLiveLocationMode] =
+  useState<"current" | "venue">("current");
+
 const [localLivePosts, setLocalLivePosts] =
   useState<LiveActivity[]>([]);
   const [displayName, setDisplayName] = useState("Neo");
@@ -1089,6 +1092,24 @@ const filteredLiveActivities = useMemo(() => {
    userCoords,
 ]);
 
+const nearbySpotsWithLiveActivity = useMemo(() => {
+  return filteredNearbySpots.map((spot) => {
+    const matchingLiveReports = filteredLiveActivities.filter(
+      (activity) =>
+        activity.area.trim().toLowerCase() ===
+        spot.name.trim().toLowerCase()
+    );
+
+    const latestReport = matchingLiveReports[0] ?? null;
+
+    return {
+      ...spot,
+      liveReportCount: matchingLiveReports.length,
+      latestLiveReport: latestReport,
+    };
+  });
+}, [filteredNearbySpots, filteredLiveActivities]);
+
 async function handlePostLiveUpdate() {
   const {
     data: { user },
@@ -1118,15 +1139,23 @@ console.log("Posting live update as user:", user.id);
       ? "Low"
       : "Moderate";
 
+if (
+  liveLocationMode === "venue" &&
+  !livePostLocation.trim()
+) {
+  alert("Please enter a venue or location name.");
+  return;
+}
+
   const payload = {
     user_id: user.id,
     display_name: displayName,
     title: livePostType,
    
-    area:
-  livePostLocation === "Current Location"
+   area:
+  liveLocationMode === "current"
     ? "Current location"
-    : livePostLocation,
+    : livePostLocation.trim() || "Unnamed location",
     activity_type: activityType,
     vibe: livePostType,
     crowd_level: crowdLevel,
@@ -1172,7 +1201,9 @@ console.log("Posting live update as user:", user.id);
   }
 
   setLivePostNote("");
-  setPostComposerOpen(false);
+setLivePostLocation("Current Location");
+setLiveLocationMode("current");
+setPostComposerOpen(false);
 }
   return (
     <AuthGuard>
@@ -1319,7 +1350,7 @@ console.log("Posting live update as user:", user.id);
 </div>
 
     <section className="space-y-3">
-      {filteredNearbySpots.map((spot) => (
+      {nearbySpotsWithLiveActivity.map((spot) => (
         <div
           key={spot.id}
           className="rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#14141a,#0c0c10)] p-4"
@@ -1350,11 +1381,34 @@ console.log("Posting live update as user:", user.id);
             <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-white/70">
               {spot.status}
             </span>
+           {spot.liveReportCount > 0 ? (
+          <span className="rounded-full border border-orange-300/20 bg-orange-300/10 px-3 py-1 text-xs font-semibold text-orange-100">
+           🔥 {spot.liveReportCount} live report
+           {spot.liveReportCount === 1 ? "" : "s"}
+          </span>
+          ) : null}
+
           </div>
 
           <p className="mt-3 text-sm leading-6 text-white/60">
             {spot.note}
           </p>
+        {spot.latestLiveReport ? (
+  <div className="mt-3 rounded-2xl border border-orange-300/15 bg-orange-300/[0.06] p-3">
+    <div className="text-xs font-black uppercase tracking-[0.16em] text-orange-100">
+      Live now
+    </div>
+
+    <p className="mt-1 text-sm font-semibold text-white/85">
+      {spot.latestLiveReport.title}
+    </p>
+
+    <p className="mt-1 text-xs text-white/50">
+      {spot.latestLiveReport.minutesAgo} min ago
+    </p>
+  </div>
+) : null}
+
         </div>
       ))}
     </section>
@@ -1441,27 +1495,67 @@ console.log("Posting live update as user:", user.id);
     </div>
 
 <div className="mt-4">
-  <label
-    htmlFor="live-post-location"
-    className="text-xs font-black uppercase tracking-[0.18em] text-white/50"
-  >
+  <div className="text-xs font-black uppercase tracking-[0.18em] text-white/50">
     Where is this happening?
-  </label>
+  </div>
 
-  <input
-    id="live-post-location"
-    type="text"
-    value={livePostLocation}
-    onChange={(event) =>
-      setLivePostLocation(event.target.value)
-    }
-    placeholder="Current Location or venue name"
-    className="mt-3 w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-orange-300/30"
-  />
+  <div className="mt-3 grid grid-cols-2 gap-2">
+    <button
+      type="button"
+      onClick={() => {
+        setLiveLocationMode("current");
+        setLivePostLocation("Current Location");
+      }}
+      className={`rounded-2xl border px-3 py-3 text-xs font-semibold transition ${
+        liveLocationMode === "current"
+          ? "border-orange-300/30 bg-orange-300/10 text-orange-100"
+          : "border-white/10 bg-white/[0.04] text-white/55"
+      }`}
+    >
+      Use Current Location
+    </button>
 
-  <p className="mt-2 text-xs text-white/40">
-    Examples: Harbour Social, Community Arena, Waterfront Walk
-  </p>
+    <button
+      type="button"
+      onClick={() => {
+        setLiveLocationMode("venue");
+
+        if (livePostLocation === "Current Location") {
+          setLivePostLocation("");
+        }
+      }}
+      className={`rounded-2xl border px-3 py-3 text-xs font-semibold transition ${
+        liveLocationMode === "venue"
+          ? "border-orange-300/30 bg-orange-300/10 text-orange-100"
+          : "border-white/10 bg-white/[0.04] text-white/55"
+      }`}
+    >
+      Enter Venue
+    </button>
+  </div>
+
+  {liveLocationMode === "current" ? (
+    <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+      <p className="text-sm font-semibold text-white/80">
+        Current Location
+      </p>
+
+      <p className="mt-1 text-xs text-white/45">
+        Your current coordinates will be attached to this live update.
+      </p>
+    </div>
+  ) : (
+    <input
+      id="live-post-location"
+      type="text"
+      value={livePostLocation}
+      onChange={(event) =>
+        setLivePostLocation(event.target.value)
+      }
+      placeholder="Enter venue or location name"
+      className="mt-3 w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-orange-300/30"
+    />
+  )}
 </div>
 
     <textarea
