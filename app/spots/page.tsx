@@ -43,6 +43,7 @@ type LiveActivity = {
   vibe: string;
   crowdLevel: "Low" | "Moderate" | "Busy" | "Packed";
   minutesAgo: number;
+  userId?: string;
   trusted: boolean;
   note: string;
   latitude?: number | null;
@@ -382,6 +383,7 @@ function convertLivePostRow(
 
   return {
     id: row.id,
+    userId: row.user_id,
     title: row.title,
     area: row.area,
     activityType,
@@ -1113,6 +1115,14 @@ const nearbySpotsWithLiveActivity = useMemo(() => {
 
     const latestReport = matchingLiveReports[0] ?? null;
 
+    const uniqueReporterIds = new Set(
+  matchingLiveReports
+    .map((report) => report.userId)
+    .filter((userId): userId is string => Boolean(userId))
+);
+
+const uniqueReporterCount = uniqueReporterIds.size;
+
     const liveSignalStrength = matchingLiveReports.reduce(
       (total, report) =>
         total + getLiveReportWeight(report.minutesAgo),
@@ -1120,17 +1130,18 @@ const nearbySpotsWithLiveActivity = useMemo(() => {
     );
 
     const corroborationLevel =
-      matchingLiveReports.length >= 3
-        ? "strong"
-        : matchingLiveReports.length >= 2
-        ? "moderate"
-        : matchingLiveReports.length === 1
-        ? "single"
-        : "none";
+  uniqueReporterCount >= 3
+    ? "strong"
+    : uniqueReporterCount >= 2
+    ? "moderate"
+    : matchingLiveReports.length >= 1
+    ? "single"
+    : "none";
 
     return {
       ...spot,
       liveReportCount: matchingLiveReports.length,
+      uniqueReporterCount,
       latestLiveReport: latestReport,
       liveSignalStrength,
       corroborationLevel,
@@ -1292,11 +1303,18 @@ const matchConfidence = Math.min(
 
 if (bestSpot.corroborationLevel === "strong") {
   reasons.push(
-    "Multiple live reports strongly support the current activity signal."
+    `${bestSpot.uniqueReporterCount} different people support the current activity signal.`
   );
 } else if (bestSpot.corroborationLevel === "moderate") {
   reasons.push(
-    "More than one live report supports the current activity signal."
+    `${bestSpot.uniqueReporterCount} different people reported activity here.`
+  );
+} else if (
+  bestSpot.liveReportCount > 1 &&
+  bestSpot.uniqueReporterCount === 1
+) {
+  reasons.push(
+    "Multiple updates were posted, but they came from the same reporter."
   );
 }
 
