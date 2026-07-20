@@ -1110,6 +1110,171 @@ const nearbySpotsWithLiveActivity = useMemo(() => {
   });
 }, [filteredNearbySpots, filteredLiveActivities]);
 
+const twinMeNearbySuggestion = useMemo(() => {
+ if (nearbySpotsWithLiveActivity.length === 0) {
+  return {
+    spotName: "No recommendation yet",
+    message:
+      "TwinMe is waiting for nearby places and live activity before making a recommendation.",
+    reasons: [],
+    matchConfidence: 0,
+  };
+}
+
+  const normalizedPartyStatus =
+    (partyStatus || "").trim().toLowerCase();
+
+  const crewNeedsStability =
+    riskCount > 0 ||
+    normalizedPartyStatus.includes("heading home") ||
+    normalizedPartyStatus.includes("safe");
+
+  const crewIsHighEnergy =
+    normalizedPartyStatus.includes("club") ||
+    normalizedPartyStatus.includes("drinking") ||
+    normalizedPartyStatus.includes("music");
+
+  const rankedSpots = [...nearbySpotsWithLiveActivity]
+    .map((spot) => {
+      let score = 0;
+
+      const vibe = spot.vibe.toLowerCase();
+      const crowdLevel =
+        spot.latestLiveReport?.crowdLevel?.toLowerCase() ?? "";
+
+      score += Math.max(0, 25 - spot.distanceKm * 5);
+
+      if (spot.liveReportCount > 0) {
+        score += 15;
+      }
+
+      if (
+        spot.latestLiveReport &&
+        spot.latestLiveReport.minutesAgo <= 10
+      ) {
+        score += 10;
+      }
+
+      if (crewIsHighEnergy) {
+        if (vibe.includes("high energy")) {
+          score += 45;
+        }
+
+        if (vibe.includes("active")) {
+          score += 20;
+        }
+
+        if (
+          vibe.includes("relaxed") ||
+          vibe.includes("calm")
+        ) {
+          score -= 10;
+        }
+      }
+
+      if (crewNeedsStability) {
+        if (
+          vibe.includes("relaxed") ||
+          vibe.includes("calm")
+        ) {
+          score += 45;
+        }
+
+        if (vibe.includes("high energy")) {
+          score -= 25;
+        }
+      }
+
+      if (crowdLevel === "packed") {
+        score -= crewNeedsStability ? 35 : 10;
+      }
+
+      if (crowdLevel === "busy") {
+        score -= crewNeedsStability ? 20 : 0;
+      }
+
+      if (
+        crowdLevel === "low" &&
+        crewNeedsStability
+      ) {
+        score += 15;
+      }
+
+      return {
+        ...spot,
+        twinScore: score,
+      };
+    })
+    .sort((a, b) => b.twinScore - a.twinScore);
+
+ const bestSpot = rankedSpots[0];
+
+if (!bestSpot) {
+  return {
+    spotName: "No recommendation yet",
+    message:
+      "TwinMe does not have enough information to recommend a nearby option yet.",
+    reasons: [],
+    matchConfidence: 0,
+  };
+}
+
+const secondBestSpot = rankedSpots[1];
+
+const scoreGap = secondBestSpot
+  ? bestSpot.twinScore - secondBestSpot.twinScore
+  : bestSpot.twinScore;
+
+const matchConfidence = Math.min(
+  95,
+  Math.max(55, Math.round(65 + scoreGap))
+);
+
+  const reasons: string[] = [];
+
+  if (crewIsHighEnergy) {
+    reasons.push(
+      "Matches your current higher-energy Party Mode."
+    );
+  }
+
+  if (crewNeedsStability) {
+    reasons.push(
+      "Crew safety and stability signals were prioritized."
+    );
+  }
+
+  reasons.push(
+    `${bestSpot.distanceKm.toFixed(1)} km away.`
+  );
+
+  if (bestSpot.liveReportCount > 0) {
+    reasons.push(
+      `${bestSpot.liveReportCount} recent live report${
+        bestSpot.liveReportCount === 1 ? "" : "s"
+      } considered.`
+    );
+  }
+
+  if (bestSpot.latestLiveReport) {
+    reasons.push(
+      `Latest update: "${bestSpot.latestLiveReport.title}".`
+    );
+  }
+
+  return {
+  spotName: bestSpot.name,
+  message: `${bestSpot.name} looks like the strongest match right now.`,
+  reasons,
+  matchConfidence,
+};
+
+}, [
+  nearbySpotsWithLiveActivity,
+  partyStatus,
+  riskCount,
+]);
+
 async function handlePostLiveUpdate() {
   const {
     data: { user },
@@ -1419,11 +1584,49 @@ setPostComposerOpen(false);
         TwinMe Suggests
       </div>
 
-      <p className="text-sm leading-6 text-white/75">
-        Your strongest nearby option right now is the one that matches
-        your energy, keeps travel simple, and gives your crew an easy
-        exit if plans change.
-      </p>
+     <div>
+  <div className="flex items-center justify-between gap-3">
+  <p className="text-lg font-semibold text-white">
+    {twinMeNearbySuggestion.spotName}
+  </p>
+
+  {twinMeNearbySuggestion.matchConfidence > 0 ? (
+    <span className="shrink-0 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-bold text-cyan-100">
+      {twinMeNearbySuggestion.matchConfidence}% Match
+    </span>
+  ) : null}
+</div>
+
+  <p className="mt-2 text-sm leading-6 text-white/75">
+    {twinMeNearbySuggestion.message}
+  </p>
+
+  {twinMeNearbySuggestion.reasons.length > 0 ? (
+    <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+      <div className="text-xs font-black uppercase tracking-[0.18em] text-white/45">
+        Why this?
+      </div>
+
+      <div className="mt-3 space-y-2">
+        {twinMeNearbySuggestion.reasons.map(
+          (reason, index) => (
+            <div
+              key={`${reason}-${index}`}
+              className="flex items-start gap-2 text-sm text-white/65"
+            >
+              <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-300" />
+
+              <span>
+                {reason}
+              </span>
+            </div>
+          )
+        )}
+      </div>
+    </div>
+  ) : null}
+</div>
+
     </section>
   </div>
 ) : null}
