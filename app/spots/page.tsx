@@ -525,6 +525,8 @@ function getLiveReportWeight(minutesAgo: number) {
   return 0;
 }
 
+const LIVE_REPORT_COOLDOWN_MINUTES = 30;
+
 // PASTE ABOVE THE COMPONENT
 export default function SpotsPage() {
 
@@ -1374,15 +1376,37 @@ if (
   return;
 }
 
+const normalizedArea =
+  liveLocationMode === "current"
+    ? "Current location"
+    : livePostLocation.trim() || "Unnamed location";
+
+const cooldownCutoff = new Date(
+  Date.now() - LIVE_REPORT_COOLDOWN_MINUTES * 60 * 1000
+).toISOString();
+
+const { data: recentExistingPosts, error: recentPostsError } =
+  await supabase
+    .from("spots_live_posts")
+    .select("id, created_at")
+    .eq("user_id", user.id)
+    .eq("area", normalizedArea)
+    .gte("created_at", cooldownCutoff)
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+if (recentPostsError) {
+  console.error(
+    "Unable to check for recent live report:",
+    recentPostsError
+  );
+}
+
   const payload = {
     user_id: user.id,
     display_name: displayName,
     title: livePostType,
-   
-   area:
-  liveLocationMode === "current"
-    ? "Current location"
-    : livePostLocation.trim() || "Unnamed location",
+    area: normalizedArea,
     activity_type: activityType,
     vibe: livePostType,
     crowd_level: crowdLevel,
@@ -1394,11 +1418,41 @@ if (
     trusted: false,
   };
 
-  const { data, error } = await supabase
+  let data;
+let error;
+
+const existingPost = recentExistingPosts?.[0];
+
+if (existingPost) {
+  const result = await supabase
+    .from("spots_live_posts")
+    .update({
+      title: payload.title,
+      activity_type: payload.activity_type,
+      vibe: payload.vibe,
+      crowd_level: payload.crowd_level,
+      note: payload.note,
+      latitude: payload.latitude,
+      longitude: payload.longitude,
+      created_at: new Date().toISOString(),
+    })
+    .eq("id", existingPost.id)
+    .eq("user_id", user.id)
+    .select()
+    .single();
+
+  data = result.data;
+  error = result.error;
+} else {
+  const result = await supabase
     .from("spots_live_posts")
     .insert(payload)
     .select()
     .single();
+
+  data = result.data;
+  error = result.error;
+}
 
   if (error) {
   console.error("Live post failed");
