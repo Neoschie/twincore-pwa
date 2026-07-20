@@ -514,7 +514,18 @@ const getLastSharedLocationKey = (userId: string) =>
 
 const LIVE_POST_EXPIRY_MINUTES = 180;
 
+function getLiveReportWeight(minutesAgo: number) {
+  if (minutesAgo <= 10) return 1;
+  if (minutesAgo <= 30) return 0.75;
+  if (minutesAgo <= 60) return 0.5;
+  if (minutesAgo <= 120) return 0.25;
+
+  return 0;
+}
+
+// PASTE ABOVE THE COMPONENT
 export default function SpotsPage() {
+
   const [activeView, setActiveView] = useState<SpotsView>("crew");
   const [nearbyCategory, setNearbyCategory] =
   useState<NearbySpot["category"] | "All">("All");
@@ -1102,13 +1113,33 @@ const nearbySpotsWithLiveActivity = useMemo(() => {
 
     const latestReport = matchingLiveReports[0] ?? null;
 
+    const liveSignalStrength = matchingLiveReports.reduce(
+      (total, report) =>
+        total + getLiveReportWeight(report.minutesAgo),
+      0
+    );
+
+    const corroborationLevel =
+      matchingLiveReports.length >= 3
+        ? "strong"
+        : matchingLiveReports.length >= 2
+        ? "moderate"
+        : matchingLiveReports.length === 1
+        ? "single"
+        : "none";
+
     return {
       ...spot,
       liveReportCount: matchingLiveReports.length,
       latestLiveReport: latestReport,
+      liveSignalStrength,
+      corroborationLevel,
     };
   });
-}, [filteredNearbySpots, filteredLiveActivities]);
+}, [
+  filteredNearbySpots,
+  filteredLiveActivities,
+]);
 
 const twinMeNearbySuggestion = useMemo(() => {
  if (nearbySpotsWithLiveActivity.length === 0) {
@@ -1144,16 +1175,19 @@ const twinMeNearbySuggestion = useMemo(() => {
 
       score += Math.max(0, 25 - spot.distanceKm * 5);
 
-      if (spot.liveReportCount > 0) {
-        score += 15;
-      }
+      // LIVE SIGNAL STRENGTH
+// Fresh and corroborated reports influence recommendations more.
+score += Math.min(
+  30,
+  spot.liveSignalStrength * 12
+);
 
-      if (
-        spot.latestLiveReport &&
-        spot.latestLiveReport.minutesAgo <= 10
-      ) {
-        score += 10;
-      }
+// MULTIPLE REPORTS
+if (spot.corroborationLevel === "strong") {
+  score += 20;
+} else if (spot.corroborationLevel === "moderate") {
+  score += 10;
+}
 
       if (crewIsHighEnergy) {
         if (vibe.includes("high energy")) {
@@ -1249,12 +1283,22 @@ const matchConfidence = Math.min(
   );
 
   if (bestSpot.liveReportCount > 0) {
-    reasons.push(
-      `${bestSpot.liveReportCount} recent live report${
-        bestSpot.liveReportCount === 1 ? "" : "s"
-      } considered.`
-    );
-  }
+  reasons.push(
+    `${bestSpot.liveReportCount} recent live report${
+      bestSpot.liveReportCount === 1 ? "" : "s"
+    } considered.`
+  );
+}
+
+if (bestSpot.corroborationLevel === "strong") {
+  reasons.push(
+    "Multiple live reports strongly support the current activity signal."
+  );
+} else if (bestSpot.corroborationLevel === "moderate") {
+  reasons.push(
+    "More than one live report supports the current activity signal."
+  );
+}
 
   if (bestSpot.latestLiveReport) {
     reasons.push(
@@ -1549,6 +1593,17 @@ setPostComposerOpen(false);
            {spot.liveReportCount > 0 ? (
           <span className="rounded-full border border-orange-300/20 bg-orange-300/10 px-3 py-1 text-xs font-semibold text-orange-100">
            🔥 {spot.liveReportCount} live report
+
+          {spot.corroborationLevel === "strong" ? (
+  <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-semibold text-emerald-100">
+    Strong signal
+  </span>
+) : spot.corroborationLevel === "moderate" ? (
+  <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-semibold text-cyan-100">
+    Confirmed activity
+  </span>
+) : null}
+
            {spot.liveReportCount === 1 ? "" : "s"}
           </span>
           ) : null}
