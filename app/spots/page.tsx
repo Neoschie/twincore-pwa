@@ -28,50 +28,36 @@ type SpotsView = "crew" | "nearby" | "live";
 type NearbySpot = {
   id: string;
   name: string;
-  category: "Food" | "Nightlife" | "Events" | "Sports" | "Outdoor" | "Stay In";
+  category:
+    | "Food"
+    | "Nightlife"
+    | "Events"
+    | "Sports"
+    | "Outdoor"
+    | "Stay In";
   distanceKm: number;
   vibe: string;
   status: string;
   note: string;
+  address?: string | null;
+  rating?: number | null;
+  reviewCount?: number | null;
+  isOpen?: boolean | null;
+  photoUrl?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 type LiveActivity = {
   id: string;
   title: string;
   area: string;
-  activityType: "Nightlife" | "Food" | "Event" | "Sports" | "Outdoor";
   vibe: string;
-  crowdLevel: "Low" | "Moderate" | "Busy" | "Packed";
+  crowd: string;
   minutesAgo: number;
+  createdAt?: string;
   userId?: string;
-  trusted: boolean;
-  note: string;
-  latitude?: number | null;
-longitude?: number | null;
 };
-
-type LivePostRow = {
-  id: string;
-  user_id: string;
-  display_name: string;
-  title: string;
-  area: string;
-  activity_type: string;
-  vibe: string;
-  crowd_level: string;
-  note: string | null;
-  latitude: number | null;
-  longitude: number | null;
-  trusted: boolean;
-  created_at: string;
-};
-
-type LivePostType =
-  | "Great vibe"
-  | "Busy here"
-  | "Getting packed"
-  | "Calm spot"
-  | "Avoid area";
 
 const nearbySpots: NearbySpot[] = [
   {
@@ -126,45 +112,33 @@ const liveActivities: LiveActivity[] = [
     id: "live-1",
     title: "Crowd building at Harbour Social",
     area: "Downtown",
-    activityType: "Nightlife",
     vibe: "High energy",
-    crowdLevel: "Busy",
+    crowd: "Busy",
     minutesAgo: 3,
-    trusted: true,
-    note: "Music is picking up and the crowd is growing quickly.",
   },
   {
     id: "live-2",
     title: "Late-night food rush",
     area: "North Shore Kitchen",
-    activityType: "Food",
     vibe: "Relaxed",
-    crowdLevel: "Moderate",
+    crowd: "Moderate",
     minutesAgo: 8,
-    trusted: true,
-    note: "Good food option with a calmer atmosphere than nearby nightlife.",
   },
   {
     id: "live-3",
     title: "Local game ending soon",
     area: "Community Arena",
-    activityType: "Sports",
     vibe: "Active",
-    crowdLevel: "Busy",
+    crowd: "Busy",
     minutesAgo: 12,
-    trusted: false,
-    note: "Expect heavier movement and traffic as people begin leaving.",
   },
   {
     id: "live-4",
     title: "Waterfront is quiet",
     area: "Waterfront Walk",
-    activityType: "Outdoor",
     vibe: "Calm",
-    crowdLevel: "Low",
+    crowd: "Low",
     minutesAgo: 5,
-    trusted: true,
-    note: "Low crowd activity and a quieter environment right now.",
   },
 ];
 
@@ -1729,15 +1703,21 @@ setPostComposerOpen(false);
           className="rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#14141a,#0c0c10)] p-4"
         >
           <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="text-lg font-semibold text-white">
-                {spot.name}
-              </div>
+     <div>
+  <div className="text-lg font-semibold text-white">
+    {spot.name}
+  </div>
 
-              <div className="mt-1 text-xs text-white/45">
-                {spot.category}
-              </div>
-            </div>
+  {spot.address ? (
+    <div className="mt-1 text-xs text-white/45">
+      📍 {spot.address}
+    </div>
+  ) : null}
+
+  <div className="mt-1 text-xs text-white/45">
+    {spot.category}
+  </div>
+</div>
 
             <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-white/70">
               {spot.distanceKm === 0
@@ -1754,23 +1734,44 @@ setPostComposerOpen(false);
             <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-white/70">
               {spot.status}
             </span>
-           {spot.liveReportCount > 0 ? (
-          <span className="rounded-full border border-orange-300/20 bg-orange-300/10 px-3 py-1 text-xs font-semibold text-orange-100">
-           🔥 {spot.liveReportCount} live report
 
-          {spot.corroborationLevel === "strong" ? (
-  <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-semibold text-emerald-100">
-    Strong signal
-  </span>
-) : spot.corroborationLevel === "moderate" ? (
-  <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-semibold text-cyan-100">
-    Confirmed activity
+           {typeof spot.rating === "number" ? (
+  <span className="rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1 text-xs font-semibold text-amber-100">
+    ★ {spot.rating.toFixed(1)}
+    {typeof spot.reviewCount === "number"
+      ? ` (${spot.reviewCount})`
+      : ""}
   </span>
 ) : null}
 
-           {spot.liveReportCount === 1 ? "" : "s"}
-          </span>
-          ) : null}
+{spot.isOpen === true ? (
+  <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-semibold text-emerald-100">
+    Open now
+  </span>
+) : spot.isOpen === false ? (
+  <span className="rounded-full border border-red-300/20 bg-red-300/10 px-3 py-1 text-xs font-semibold text-red-100">
+    Closed
+  </span>
+) : null}
+
+           {spot.liveReportCount > 0 ? (
+  <>
+    <span className="rounded-full border border-orange-300/20 bg-orange-300/10 px-3 py-1 text-xs font-semibold text-orange-100">
+      🔥 {spot.liveReportCount} live report
+      {spot.liveReportCount === 1 ? "" : "s"}
+    </span>
+
+    {spot.corroborationLevel === "strong" ? (
+      <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-semibold text-emerald-100">
+        Strong signal
+      </span>
+    ) : spot.corroborationLevel === "moderate" ? (
+      <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-semibold text-cyan-100">
+        Confirmed activity
+      </span>
+    ) : null}
+  </>
+) : null}
 
           </div>
 
