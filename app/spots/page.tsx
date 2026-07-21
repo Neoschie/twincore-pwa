@@ -48,16 +48,12 @@ type NearbySpot = {
   longitude?: number | null;
 };
 
-type LiveActivity = {
-  id: string;
-  title: string;
-  area: string;
-  vibe: string;
-  crowd: string;
-  minutesAgo: number;
-  createdAt?: string;
-  userId?: string;
-};
+type LivePostType =
+  | "Great vibe"
+  | "Busy here"
+  | "Getting packed"
+  | "Calm spot"
+  | "Avoid area";
 
 const nearbySpots: NearbySpot[] = [
   {
@@ -315,6 +311,48 @@ function getToneIcon(tone: SpotTone) {
   return <MapPin className="h-4 w-4" />;
 }
 
+type LiveActivity = {
+  id: string;
+  title: string;
+  area: string;
+  vibe: string;
+  crowd: string;
+  minutesAgo: number;
+  createdAt?: string;
+  userId?: string;
+  latitude?: number | null;
+  longitude?: number | null;
+
+  activityType?:
+    | "Nightlife"
+    | "Food"
+    | "Event"
+    | "Sports"
+    | "Outdoor"
+    | "Stay In";
+
+  crowdLevel?:
+    | "Low"
+    | "Moderate"
+    | "Busy"
+    | "Packed";
+
+  trusted?: boolean;
+  note?: string;
+};
+
+type LivePostRow = {
+  id: string;
+  user_id: string | null;
+  title: string;
+  area: string;
+  vibe: string;
+  crowd: string;
+  created_at: string;
+  latitude: number | null;
+  longitude: number | null;
+};
+
 function convertLivePostRow(
   row: LivePostRow
 ): LiveActivity {
@@ -326,6 +364,8 @@ function convertLivePostRow(
     Math.floor((now - createdTime) / 60000)
   );
 
+  // activity_type and crowd_level are not present on the DB row shape
+  // map from available fields when possible
   const validActivityTypes: LiveActivity["activityType"][] = [
     "Nightlife",
     "Food",
@@ -334,12 +374,8 @@ function convertLivePostRow(
     "Outdoor",
   ];
 
-  const activityType =
-    validActivityTypes.includes(
-      row.activity_type as LiveActivity["activityType"]
-    )
-      ? (row.activity_type as LiveActivity["activityType"])
-      : "Event";
+  // No activity_type on LivePostRow; default to Event
+  const activityType: LiveActivity["activityType"] = "Event";
 
   const validCrowdLevels: LiveActivity["crowdLevel"][] = [
     "Low",
@@ -348,28 +384,26 @@ function convertLivePostRow(
     "Packed",
   ];
 
-  const crowdLevel =
-    validCrowdLevels.includes(
-      row.crowd_level as LiveActivity["crowdLevel"]
-    )
-      ? (row.crowd_level as LiveActivity["crowdLevel"])
-      : "Moderate";
+  const crowdLevel: LiveActivity["crowdLevel"] = validCrowdLevels.includes(
+    row.crowd as LiveActivity["crowdLevel"]
+  )
+    ? (row.crowd as LiveActivity["crowdLevel"])
+    : "Moderate";
 
   return {
     id: row.id,
-    userId: row.user_id,
+    userId: row.user_id ?? undefined,
     title: row.title,
     area: row.area,
     activityType,
     vibe: row.vibe,
+    crowd: row.crowd,
     crowdLevel,
     minutesAgo,
-    trusted: row.trusted,
-    note:
-      row.note ||
-      "Live update shared from the area.",
-      latitude: row.latitude,
-longitude: row.longitude,
+    trusted: false,
+    note: row.title || "Live update shared from the area.",
+    latitude: row.latitude,
+    longitude: row.longitude,
   };
 }
 
