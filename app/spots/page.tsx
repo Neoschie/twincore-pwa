@@ -1207,9 +1207,72 @@ const twinMeNearbySuggestion = useMemo(() => {
     normalizedPartyStatus.includes("drinking") ||
     normalizedPartyStatus.includes("music");
 
-  const rankedSpots = [...nearbySpotsWithLiveActivity]
-    .map((spot) => {
-      let score = 0;
+  const rankedSpots = [...nearbySpotsWithLiveActivity].map((spot) => {
+      let score = 50;
+      const reasons: string[] = [];
+
+      // Distance
+if (spot.distanceKm <= 0.5) {
+  score += 18;
+  reasons.push("Very close to you");
+} else if (spot.distanceKm <= 1) {
+  score += 14;
+  reasons.push("Less than 1 km away");
+} else if (spot.distanceKm <= 2) {
+  score += 9;
+  reasons.push("Nearby");
+} else if (spot.distanceKm <= 5) {
+  score += 4;
+}
+
+// Google rating
+if (
+  typeof spot.rating === "number" &&
+  spot.rating >= 4.7
+) {
+  score += 14;
+  reasons.push(
+    `Highly rated at ${spot.rating.toFixed(1)}★`
+  );
+} else if (
+  typeof spot.rating === "number" &&
+  spot.rating >= 4.3
+) {
+  score += 10;
+  reasons.push(
+    `Strong ${spot.rating.toFixed(1)}★ rating`
+  );
+} else if (
+  typeof spot.rating === "number" &&
+  spot.rating >= 4
+) {
+  score += 6;
+}
+
+// Review confidence
+if (
+  typeof spot.reviewCount === "number" &&
+  spot.reviewCount >= 100
+) {
+  score += 6;
+  reasons.push(
+    `${spot.reviewCount} Google reviews`
+  );
+} else if (
+  typeof spot.reviewCount === "number" &&
+  spot.reviewCount >= 25
+) {
+  score += 3;
+}
+
+// Opening status
+if (spot.isOpen === true) {
+  score += 8;
+  reasons.push("Open right now");
+} else if (spot.isOpen === false) {
+  score -= 35;
+  reasons.push("Currently closed");
+}
 
       const vibe = spot.vibe.toLowerCase();
       const crowdLevel =
@@ -1226,70 +1289,60 @@ score += Math.min(
 
 // MULTIPLE REPORTS
 if (spot.corroborationLevel === "strong") {
-  score += 20;
-} else if (spot.corroborationLevel === "moderate") {
-  score += 10;
-}
+      score += 20;
+      reasons.push(
+        "Multiple independent live reports confirm activity"
+      );
+    } else if (
+      spot.corroborationLevel === "moderate"
+    ) {
+      score += 12;
+      reasons.push(
+        "Live activity has been independently confirmed"
+      );
+    } else if (spot.liveReportCount > 0) {
+      score += 5;
+      reasons.push(
+        "Recent live activity reported here"
+      );
+    }
 
-      if (crewIsHighEnergy) {
-        if (vibe.includes("high energy")) {
-          score += 45;
-        }
+    if (crewIsHighEnergy) {
+      // existing logic
+    }
 
-        if (vibe.includes("active")) {
-          score += 20;
-        }
+    if (crewNeedsStability) {
+      // existing logic
+    }
 
-        if (
-          vibe.includes("relaxed") ||
-          vibe.includes("calm")
-        ) {
-          score -= 10;
-        }
-      }
+    if (
+      crowdLevel === "low" &&
+      crewNeedsStability
+    ) {
+      score += 15;
+    }
 
-      if (crewNeedsStability) {
-        if (
-          vibe.includes("relaxed") ||
-          vibe.includes("calm")
-        ) {
-          score += 45;
-        }
+    const matchConfidence = Math.max(
+      1,
+      Math.min(99, Math.round(score))
+    );
 
-        if (vibe.includes("high energy")) {
-          score -= 25;
-        }
-      }
+    return {
+      ...spot,
+      twinScore: score,
+      matchConfidence,
+      reasons,
+    };
+  })
+  .sort((a, b) => b.twinScore - a.twinScore);
 
-      if (crowdLevel === "packed") {
-        score -= crewNeedsStability ? 35 : 10;
-      }
-
-      if (crowdLevel === "busy") {
-        score -= crewNeedsStability ? 20 : 0;
-      }
-
-      if (
-        crowdLevel === "low" &&
-        crewNeedsStability
-      ) {
-        score += 15;
-      }
-
-      return {
-        ...spot,
-        twinScore: score,
-      };
-    })
-    .sort((a, b) => b.twinScore - a.twinScore);
-
- const bestSpot = rankedSpots[0];
+const bestSpot = rankedSpots[0];
 
 if (!bestSpot) {
   return {
     spotName: "No recommendation yet",
     message:
-      "TwinMe does not have enough information to recommend a nearby option yet.",
+      "TwinMe is waiting for enough nearby context.",
     reasons: [],
     matchConfidence: 0,
   };
@@ -1402,15 +1455,23 @@ async function loadRealNearbySpots() {
       data.spots as NearbySpot[]
     );
   } catch (error) {
-    console.error(
-      "Nearby discovery failed:",
-      error
-    );
+  if (
+    error instanceof DOMException &&
+    error.name === "AbortError"
+  ) {
+    return;
+  }
 
-    setNearbyError(
-      "Live nearby discovery is unavailable right now. Showing fallback places."
-    );
-  } finally {
+  console.error(
+    "Nearby discovery failed:",
+    error
+  );
+
+  setNearbyError(
+    "Live nearby discovery is unavailable right now. Showing fallback places."
+  );
+}
+  finally {
     setNearbyLoading(false);
   }
 }
