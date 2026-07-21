@@ -26,6 +26,32 @@ type NearbySpot = {
   longitude: number | null;
 };
 
+type GooglePlace = {
+  id?: string;
+  displayName?: {
+    text?: string;
+  };
+  formattedAddress?: string;
+  location?: {
+    latitude?: number;
+    longitude?: number;
+  };
+  rating?: number;
+  userRatingCount?: number;
+  currentOpeningHours?: {
+    openNow?: boolean;
+  };
+  primaryType?: string;
+  types?: string[];
+  photos?: Array<{
+    name?: string;
+  }>;
+};
+
+type GooglePlacesResponse = {
+  places?: GooglePlace[];
+};
+
 type ProviderPlace = Partial<NearbySpot> & {
   place_id?: string;
   type?: string;
@@ -92,6 +118,84 @@ function normalizeSpot(
 };
 }
 
+function calculateDistanceKm(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number
+) {
+  const earthRadiusKm = 6371;
+
+  const toRadians = (value: number) =>
+    (value * Math.PI) / 180;
+
+  const latDifference = toRadians(lat2 - lat1);
+  const lngDifference = toRadians(lng2 - lng1);
+
+  const a =
+    Math.sin(latDifference / 2) ** 2 +
+    Math.cos(toRadians(lat1)) *
+      Math.cos(toRadians(lat2)) *
+      Math.sin(lngDifference / 2) ** 2;
+
+  const c =
+    2 *
+    Math.atan2(
+      Math.sqrt(a),
+      Math.sqrt(1 - a)
+    );
+
+  return earthRadiusKm * c;
+}
+
+function mapGoogleCategory(
+  primaryType?: string,
+  types: string[] = []
+): NearbyCategory {
+  const categoryText = [
+    primaryType ?? "",
+    ...types,
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  if (
+    categoryText.includes("restaurant") ||
+    categoryText.includes("cafe") ||
+    categoryText.includes("bakery") ||
+    categoryText.includes("food")
+  ) {
+    return "Food";
+  }
+
+  if (
+    categoryText.includes("bar") ||
+    categoryText.includes("night_club") ||
+    categoryText.includes("pub")
+  ) {
+    return "Nightlife";
+  }
+
+  if (
+    categoryText.includes("stadium") ||
+    categoryText.includes("gym") ||
+    categoryText.includes("sports")
+  ) {
+    return "Sports";
+  }
+
+  if (
+    categoryText.includes("park") ||
+    categoryText.includes("beach") ||
+    categoryText.includes("hiking") ||
+    categoryText.includes("tourist_attraction")
+  ) {
+    return "Outdoor";
+  }
+
+  return "Events";
+}
+
 export async function GET(request: Request) {
   console.log(
     "Places key loaded:",
@@ -141,59 +245,182 @@ if (!apiKey) {
   );
 }
 
-const providerResults: NearbySpot[] = [
+const googleResponse = await fetch(
+  "https://places.googleapis.com/v1/places:searchNearby",
   {
-    id: "harbour-social",
-    name: "Harbour Social",
-    category: "Nightlife",
-    distanceKm: 0.6,
-    vibe: "High Energy",
-    crowdLevel: "Busy",
-    status: "Open",
-    note: "Busy social atmosphere with strong late-night activity.",
-    address: "Waterfront District",
-    rating: 4.5,
-    reviewCount: 218,
-    isOpen: true,
-    photoUrl: null,
-    latitude,
-    longitude,
-  },
-  {
-    id: "north-shore-kitchen",
-    name: "North Shore Kitchen",
-    category: "Food",
-    distanceKm: 1.2,
-    vibe: "Relaxed",
-    crowdLevel: "Moderate",
-    status: "Open",
-    note: "Relaxed dining option nearby.",
-    address: "North Shore",
-    rating: 4.7,
-    reviewCount: 164,
-    isOpen: true,
-    photoUrl: null,
-    latitude,
-    longitude,
-  },
-  {
-    id: "waterfront-walk",
-    name: "Waterfront Walk",
-    category: "Outdoor",
-    distanceKm: 0.9,
-    vibe: "Calm",
-    crowdLevel: "Light",
-    status: "Open",
-    note: "Calm outdoor option near the waterfront.",
-    address: "Waterfront Trail",
-    rating: 4.8,
-    reviewCount: 92,
-    isOpen: null,
-    photoUrl: null,
-    latitude,
-    longitude,
-  },
-];
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Goog-Api-Key": apiKey,
+      "X-Goog-FieldMask": [
+        "places.id",
+        "places.displayName",
+        "places.formattedAddress",
+        "places.location",
+        "places.rating",
+        "places.userRatingCount",
+        "places.currentOpeningHours",
+        "places.primaryType",
+        "places.types",
+      ].join(","),
+    },
+
+    body: JSON.stringify({
+      includedTypes: [
+        "restaurant",
+        "cafe",
+        "bar",
+        "night_club",
+        "park",
+        "tourist_attraction",
+        "movie_theater",
+        "gym",
+      ],
+
+      maxResultCount: 20,
+
+      locationRestriction: {
+        circle: {
+          center: {
+            latitude,
+            longitude,
+          },
+          radius: 5000,
+        },
+      },
+    }),
+
+    cache: "no-store",
+  }
+);
+
+if (!googleResponse.ok) {
+  const googleError =
+    await googleResponse.text();
+
+  console.error(
+    "Google Places request failed:",
+    googleResponse.status,
+    googleError
+  );
+
+  return NextResponse.json(
+    {
+      error:
+        "Unable to retrieve nearby places.",
+    },
+    {
+      status: 502,
+    }
+  );
+}
+
+const googleData =
+  (await googleResponse.json()) as GooglePlacesResponse;
+
+const googlePlaces =
+  Array.isArray(googleData.places)
+    ? googleData.places
+    : [];
+
+const providerResults: NearbySpot[] =
+  googlePlaces
+    .map((place): NearbySpot | null => {
+      const placeLatitude =
+        place.location?.latitude;
+
+      const placeLongitude =
+        place.location?.longitude;
+
+      if (
+        typeof placeLatitude !== "number" ||
+        typeof placeLongitude !== "number"
+      ) {
+        return null;
+      }
+
+      const category = mapGoogleCategory(
+        place.primaryType,
+        place.types
+      );
+
+      const isOpen =
+        typeof place.currentOpeningHours?.openNow ===
+        "boolean"
+          ? place.currentOpeningHours.openNow
+          : null;
+
+      const distanceKm =
+        calculateDistanceKm(
+          latitude,
+          longitude,
+          placeLatitude,
+          placeLongitude
+        );
+
+      return {
+        id:
+          place.id ??
+          `${placeLatitude}-${placeLongitude}`,
+
+        name:
+          place.displayName?.text ??
+          "Nearby place",
+
+        category,
+
+        distanceKm,
+
+        vibe:
+          category === "Nightlife"
+            ? "Social"
+            : category === "Food"
+              ? "Relaxed"
+              : category === "Outdoor"
+                ? "Calm"
+                : "Active",
+
+        crowdLevel: "Unknown",
+
+        status:
+          isOpen === true
+            ? "Open"
+            : isOpen === false
+              ? "Closed"
+              : "Status unavailable",
+
+        note:
+          place.formattedAddress ??
+          "Nearby place",
+
+        address:
+          place.formattedAddress ?? null,
+
+        rating:
+          typeof place.rating === "number"
+            ? place.rating
+            : null,
+
+        reviewCount:
+          typeof place.userRatingCount ===
+          "number"
+            ? place.userRatingCount
+            : null,
+
+        isOpen,
+
+        photoUrl: null,
+
+        latitude: placeLatitude,
+        longitude: placeLongitude,
+      };
+    })
+    .filter(
+      (
+        place
+      ): place is NearbySpot =>
+        place !== null
+    );
   
   const spots = providerResults
     .map(normalizeSpot)
@@ -206,7 +433,7 @@ const providerResults: NearbySpot[] = [
   return NextResponse.json({
     spots,
     meta: {
-      source: "mock-provider",
+      source: "google-places",
       latitude,
       longitude,
       resultCount: spots.length,
