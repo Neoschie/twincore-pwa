@@ -537,6 +537,16 @@ export default function SpotsPage() {
   const [activeView, setActiveView] = useState<SpotsView>("crew");
   const [nearbyCategory, setNearbyCategory] =
   useState<NearbySpot["category"] | "All">("All");
+  
+  const [realNearbySpots, setRealNearbySpots] =
+  useState<NearbySpot[]>([]);
+
+const [nearbyLoading, setNearbyLoading] =
+  useState(false);
+
+const [nearbyError, setNearbyError] =
+  useState<string | null>(null);
+
   const [liveFilter, setLiveFilter] =
   useState<LiveActivity["activityType"] | "All">("All");
   const [postComposerOpen, setPostComposerOpen] = useState(false);
@@ -570,6 +580,7 @@ const [localLivePosts, setLocalLivePosts] =
   const [trustedIds, setTrustedIds] = useState<string[]>([]);
   const [trustedNames, setTrustedNames] = useState<string[]>([]);
 
+  
  useEffect(() => {
   async function loadSpotsPage() {
     const {
@@ -1051,15 +1062,24 @@ navigator.geolocation.getCurrentPosition(
   selectedSpot,
 ]);
 
+const availableNearbySpots = useMemo(() => {
+  return realNearbySpots.length > 0
+    ? realNearbySpots
+    : nearbySpots;
+}, [realNearbySpots]);
+
 const filteredNearbySpots = useMemo(() => {
   if (nearbyCategory === "All") {
-    return nearbySpots;
+    return availableNearbySpots;
   }
 
-  return nearbySpots.filter(
+  return availableNearbySpots.filter(
     (spot) => spot.category === nearbyCategory
   );
-}, [nearbyCategory]);
+}, [
+  nearbyCategory,
+  availableNearbySpots,
+]);
 
 const filteredLiveActivities = useMemo(() => {
   const allLiveActivities = [
@@ -1340,6 +1360,65 @@ if (bestSpot.corroborationLevel === "strong") {
   riskCount,
 ]);
 
+async function loadRealNearbySpots() {
+  if (!userCoords) {
+    setNearbyError(
+      "Location is required to discover nearby places."
+    );
+    return;
+  }
+
+  try {
+    setNearbyLoading(true);
+    setNearbyError(null);
+
+    const response = await fetch(
+      `/api/spots/nearby?lat=${userCoords.lat}&lng=${userCoords.lng}`
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        "Unable to load nearby places."
+      );
+    }
+
+    const data = await response.json();
+
+    if (!Array.isArray(data?.spots)) {
+      throw new Error(
+        "Nearby places returned an invalid response."
+      );
+    }
+
+    setRealNearbySpots(
+      data.spots as NearbySpot[]
+    );
+  } catch (error) {
+    console.error(
+      "Nearby discovery failed:",
+      error
+    );
+
+    setNearbyError(
+      "Live nearby discovery is unavailable right now. Showing fallback places."
+    );
+  } finally {
+    setNearbyLoading(false);
+  }
+}
+
+useEffect(() => {
+  if (activeView !== "nearby") return;
+  if (!userCoords) return;
+  if (realNearbySpots.length > 0) return;
+
+  void loadRealNearbySpots();
+}, [
+  activeView,
+  userCoords,
+  realNearbySpots.length,
+]);
+
 async function handlePostLiveUpdate() {
   const {
     data: { user },
@@ -1599,6 +1678,18 @@ setPostComposerOpen(false);
         activity, and what fits your current night.
       </p>
     </section>
+
+   {nearbyLoading ? (
+  <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm text-white/60">
+    Finding places near you...
+  </div>
+) : null}
+
+{nearbyError ? (
+  <div className="rounded-2xl border border-orange-300/20 bg-orange-300/[0.06] p-4 text-sm text-orange-100/80">
+    {nearbyError}
+  </div>
+) : null}
 
   <div className="flex items-center gap-2 overflow-x-auto py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
   {(
