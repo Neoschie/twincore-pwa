@@ -152,55 +152,87 @@ function mapGoogleCategory(
   primaryType?: string,
   types: string[] = []
 ): NearbyCategory {
-  const categoryText = [
+  const allTypes = [
     primaryType ?? "",
     ...types,
-  ]
-    .join(" ")
-    .toLowerCase();
+  ].map((type) => type.toLowerCase());
+
+  const hasType = (...matches: string[]) =>
+    allTypes.some((type) =>
+      matches.some((match) =>
+        type.includes(match)
+      )
+    );
 
   if (
-    categoryText.includes("restaurant") ||
-    categoryText.includes("cafe") ||
-    categoryText.includes("bakery") ||
-    categoryText.includes("food")
+    hasType(
+      "restaurant",
+      "cafe",
+      "bakery",
+      "meal_takeaway",
+      "meal_delivery",
+      "food"
+    )
   ) {
     return "Food";
   }
 
   if (
-    categoryText.includes("bar") ||
-    categoryText.includes("night_club") ||
-    categoryText.includes("pub")
+    hasType(
+      "night_club",
+      "bar",
+      "pub",
+      "cocktail_bar",
+      "wine_bar"
+    )
   ) {
     return "Nightlife";
   }
 
   if (
-    categoryText.includes("stadium") ||
-    categoryText.includes("gym") ||
-    categoryText.includes("sports")
+    hasType(
+      "gym",
+      "stadium",
+      "sports_complex",
+      "sports_club",
+      "athletic_field",
+      "fitness"
+    )
   ) {
     return "Sports";
   }
 
   if (
-    categoryText.includes("park") ||
-    categoryText.includes("beach") ||
-    categoryText.includes("hiking") ||
-    categoryText.includes("tourist_attraction")
+    hasType(
+      "park",
+      "beach",
+      "hiking_area",
+      "campground",
+      "marina",
+      "tourist_attraction",
+      "nature_preserve"
+    )
   ) {
     return "Outdoor";
+  }
+
+  if (
+    hasType(
+      "movie_theater",
+      "performing_arts_theater",
+      "event_venue",
+      "concert_hall",
+      "museum",
+      "art_gallery"
+    )
+  ) {
+    return "Events";
   }
 
   return "Events";
 }
 
 export async function GET(request: Request) {
-  console.log(
-    "Places key loaded:",
-    Boolean(process.env.PLACES_API_KEY)
-  );
 
   const { searchParams } = new URL(request.url);
 
@@ -227,14 +259,12 @@ export async function GET(request: Request) {
   }
 
   /*
-   * Temporary provider data.
-   *
-   * Later, this array will be replaced by results from
-   * Google Places, Foursquare, or another venue provider.
-   * The frontend will not need to change because every
-   * provider result will be converted into NearbySpot.
-   */
-const apiKey = process.env.PLACES_API_KEY;
+ * Google Places provider.
+ * Results are normalized into TwinCore's NearbySpot shape
+ * before being returned to the frontend.
+ */
+
+     const apiKey = process.env.PLACES_API_KEY;
 
 if (!apiKey) {
   return NextResponse.json(
@@ -245,7 +275,7 @@ if (!apiKey) {
   );
 }
 
-const googleResponse = await fetch(
+     const googleResponse = await fetch(
   "https://places.googleapis.com/v1/places:searchNearby",
   {
     method: "POST",
