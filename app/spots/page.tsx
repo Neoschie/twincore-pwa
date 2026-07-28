@@ -28,13 +28,7 @@ type SpotsView = "crew" | "nearby" | "live";
 type NearbySpot = {
   id: string;
   name: string;
-  category:
-    | "Food"
-    | "Nightlife"
-    | "Events"
-    | "Sports"
-    | "Outdoor"
-    | "Stay In";
+  category: "Food" | "Nightlife" | "Events" | "Sports" | "Outdoor" | "Stay In";
   distanceKm: number;
   vibe: string;
   status: string;
@@ -49,11 +43,7 @@ type NearbySpot = {
 };
 
 type LivePostType =
-  | "Great vibe"
-  | "Busy here"
-  | "Getting packed"
-  | "Calm spot"
-  | "Avoid area";
+  "Great vibe" | "Busy here" | "Getting packed" | "Calm spot" | "Avoid area";
 
 const nearbySpots: NearbySpot[] = [
   {
@@ -189,7 +179,7 @@ function getDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number) {
 
 function getLiveActivityDistance(
   activity: LiveActivity,
-  userCoords: { lat: number; lng: number } | null
+  userCoords: { lat: number; lng: number } | null,
 ) {
   if (
     !userCoords ||
@@ -203,7 +193,7 @@ function getLiveActivityDistance(
     userCoords.lat,
     userCoords.lng,
     activity.latitude,
-    activity.longitude
+    activity.longitude,
   );
 }
 
@@ -226,11 +216,15 @@ function parseStoredStringArray(raw: string | null): string[] {
     }
 
     if (Array.isArray(parsed?.ids)) {
-      return parsed.ids.map((item: unknown) => String(item).trim()).filter(Boolean);
+      return parsed.ids
+        .map((item: unknown) => String(item).trim())
+        .filter(Boolean);
     }
 
     if (Array.isArray(parsed?.names)) {
-      return parsed.names.map((item: unknown) => String(item).trim()).filter(Boolean);
+      return parsed.names
+        .map((item: unknown) => String(item).trim())
+        .filter(Boolean);
     }
 
     if (Array.isArray(parsed?.members)) {
@@ -239,7 +233,9 @@ function parseStoredStringArray(raw: string | null): string[] {
           if (typeof item === "string") return item.trim();
           if (item && typeof item === "object") {
             const maybeName =
-              "name" in item ? String((item as { name?: unknown }).name || "") : "";
+              "name" in item
+                ? String((item as { name?: unknown }).name || "")
+                : "";
             const maybeId =
               "id" in item ? String((item as { id?: unknown }).id || "") : "";
             return maybeName || maybeId;
@@ -324,18 +320,9 @@ type LiveActivity = {
   longitude?: number | null;
 
   activityType?:
-    | "Nightlife"
-    | "Food"
-    | "Event"
-    | "Sports"
-    | "Outdoor"
-    | "Stay In";
+    "Nightlife" | "Food" | "Event" | "Sports" | "Outdoor" | "Stay In";
 
-  crowdLevel?:
-    | "Low"
-    | "Moderate"
-    | "Busy"
-    | "Packed";
+  crowdLevel?: "Low" | "Moderate" | "Busy" | "Packed";
 
   trusted?: boolean;
   note?: string;
@@ -353,16 +340,11 @@ type LivePostRow = {
   longitude: number | null;
 };
 
-function convertLivePostRow(
-  row: LivePostRow
-): LiveActivity {
+function convertLivePostRow(row: LivePostRow): LiveActivity {
   const createdTime = new Date(row.created_at).getTime();
   const now = Date.now();
 
-  const minutesAgo = Math.max(
-    0,
-    Math.floor((now - createdTime) / 60000)
-  );
+  const minutesAgo = Math.max(0, Math.floor((now - createdTime) / 60000));
 
   // activity_type and crowd_level are not present on the DB row shape
   // map from available fields when possible
@@ -385,7 +367,7 @@ function convertLivePostRow(
   ];
 
   const crowdLevel: LiveActivity["crowdLevel"] = validCrowdLevels.includes(
-    row.crowd as LiveActivity["crowdLevel"]
+    row.crowd as LiveActivity["crowdLevel"],
   )
     ? (row.crowd as LiveActivity["crowdLevel"])
     : "Moderate";
@@ -427,7 +409,11 @@ function getPointTone(row: CrewStatusRow, distanceKm: number): SpotTone {
     return "safe";
   }
 
-  if (heartbeat >= 100 || status.includes("club") || status.includes("drinking")) {
+  if (
+    heartbeat >= 100 ||
+    status.includes("club") ||
+    status.includes("drinking")
+  ) {
     return "lit";
   }
 
@@ -516,8 +502,7 @@ function MiniMeter({ label, value }: { label: string; value: number }) {
   );
 }
 
-const getPartyStatusKey = (userId: string) =>
-  `twincore_party_status_${userId}`;
+const getPartyStatusKey = (userId: string) => `twincore_party_status_${userId}`;
 
 const getLastSharedLocationKey = (userId: string) =>
   `twincore_last_shared_location_${userId}`;
@@ -538,48 +523,65 @@ const LIVE_REPORT_COOLDOWN_MINUTES = 30;
 const isLiveReportFresh = (activity: LiveActivity) =>
   activity.minutesAgo <= LIVE_POST_EXPIRY_MINUTES;
 
+function getTimeOfDayLabel() {
+  const hour = new Date().getHours();
+
+  if (hour >= 5 && hour < 11) {
+    return "morning";
+  }
+
+  if (hour >= 11 && hour < 17) {
+    return "afternoon";
+  }
+
+  if (hour >= 17 && hour < 22) {
+    return "evening";
+  }
+
+  return "late night";
+}
 
 // PASTE ABOVE THE COMPONENT
 export default function SpotsPage() {
-
   const [activeView, setActiveView] = useState<SpotsView>("crew");
-  const [nearbyCategory, setNearbyCategory] =
-  useState<NearbySpot["category"] | "All">("All");
-  
-  const [realNearbySpots, setRealNearbySpots] =
-  useState<NearbySpot[]>([]);
+  const [nearbyCategory, setNearbyCategory] = useState<
+    NearbySpot["category"] | "All"
+  >("All");
 
-const [nearbyLoading, setNearbyLoading] =
-  useState(false);
+  const [realNearbySpots, setRealNearbySpots] = useState<NearbySpot[]>([]);
 
-const [nearbyError, setNearbyError] =
-  useState<string | null>(null);
+  const [nearbyLoading, setNearbyLoading] = useState(false);
 
-  const [liveFilter, setLiveFilter] =
-  useState<LiveActivity["activityType"] | "All">("All");
+  const [nearbyError, setNearbyError] = useState<string | null>(null);
+
+  const [liveFilter, setLiveFilter] = useState<
+    LiveActivity["activityType"] | "All"
+  >("All");
   const [postComposerOpen, setPostComposerOpen] = useState(false);
-const [databaseLivePosts, setDatabaseLivePosts] =
-  useState<LiveActivity[]>([]);
-const [livePostType, setLivePostType] =
-  useState<LivePostType>("Great vibe");
+  const [databaseLivePosts, setDatabaseLivePosts] = useState<LiveActivity[]>(
+    [],
+  );
+  const [livePostType, setLivePostType] = useState<LivePostType>("Great vibe");
 
-const [livePostNote, setLivePostNote] = useState("");
+  const [livePostNote, setLivePostNote] = useState("");
 
-const [livePostLocation, setLivePostLocation] =
-  useState("Current Location");
+  const [livePostLocation, setLivePostLocation] = useState("Current Location");
 
-const [liveLocationMode, setLiveLocationMode] =
-  useState<"current" | "venue">("current");
+  const [liveLocationMode, setLiveLocationMode] = useState<"current" | "venue">(
+    "current",
+  );
 
-const [localLivePosts, setLocalLivePosts] =
-  useState<LiveActivity[]>([]);
+  const [localLivePosts, setLocalLivePosts] = useState<LiveActivity[]>([]);
   const [displayName, setDisplayName] = useState("Neo");
   const [partyStatus, setPartyStatus] = useState<string | null>(null);
   const [hasSharedLocation, setHasSharedLocation] = useState(false);
   const [selectedSpotId, setSelectedSpotId] = useState<string>("");
   const [sweepOn, setSweepOn] = useState(true);
   const [liveTick, setLiveTick] = useState(false);
-  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [userCoords, setUserCoords] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
   const [crewRows, setCrewRows] = useState<CrewStatusRow[]>([]);
   const [locationError, setLocationError] = useState<string | null>(null);
 
@@ -588,63 +590,68 @@ const [localLivePosts, setLocalLivePosts] =
   const [trustedIds, setTrustedIds] = useState<string[]>([]);
   const [trustedNames, setTrustedNames] = useState<string[]>([]);
 
-  
- useEffect(() => {
-  async function loadSpotsPage() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+  useEffect(() => {
+    async function loadSpotsPage() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-    const savedName = user
-      ? window.localStorage.getItem(`twincore_display_name_${user.id}`)
-      : null;
-   const savedStatus = user
-  ? window.localStorage.getItem(getPartyStatusKey(user.id))
-  : null;
+      const savedName = user
+        ? window.localStorage.getItem(`twincore_display_name_${user.id}`)
+        : null;
+      const savedStatus = user
+        ? window.localStorage.getItem(getPartyStatusKey(user.id))
+        : null;
 
-    const savedLocation = user
-  ? window.localStorage.getItem(getLastSharedLocationKey(user.id))
-  : null;
+      const savedLocation = user
+        ? window.localStorage.getItem(getLastSharedLocationKey(user.id))
+        : null;
 
-    const savedGhostMode =
-      window.localStorage.getItem("twincore_ghost_mode") ||
-      window.localStorage.getItem("ghost_mode");
+      const savedGhostMode =
+        window.localStorage.getItem("twincore_ghost_mode") ||
+        window.localStorage.getItem("ghost_mode");
 
-    const savedTrustedOnly =
-      window.localStorage.getItem("twincore_trusted_only") ||
-      window.localStorage.getItem("trusted_crew_only");
+      const savedTrustedOnly =
+        window.localStorage.getItem("twincore_trusted_only") ||
+        window.localStorage.getItem("trusted_crew_only");
 
-    const savedTrustedIds =
-      window.localStorage.getItem("twincore_trusted_crew_ids") ||
-      window.localStorage.getItem("trusted_crew_ids");
+      const savedTrustedIds =
+        window.localStorage.getItem("twincore_trusted_crew_ids") ||
+        window.localStorage.getItem("trusted_crew_ids");
 
-    const savedTrustedNames =
-      window.localStorage.getItem("twincore_trusted_crew_names") ||
-      window.localStorage.getItem("trusted_crew_names") ||
-      window.localStorage.getItem("twincore_trusted_crew");
+      const savedTrustedNames =
+        window.localStorage.getItem("twincore_trusted_crew_names") ||
+        window.localStorage.getItem("trusted_crew_names") ||
+        window.localStorage.getItem("twincore_trusted_crew");
 
-    if (savedName) setDisplayName(savedName);
-    if (savedStatus) setPartyStatus(savedStatus);
-    if (savedLocation) setHasSharedLocation(true);
+      if (savedName) setDisplayName(savedName);
+      if (savedStatus) setPartyStatus(savedStatus);
+      if (savedLocation) setHasSharedLocation(true);
 
-    setGhostMode(parseStoredBoolean(savedGhostMode));
-    setTrustedOnly(parseStoredBoolean(savedTrustedOnly));
-    setTrustedIds(parseStoredStringArray(savedTrustedIds).map(normalizeValue));
-    setTrustedNames(parseStoredStringArray(savedTrustedNames).map(normalizeValue));
+      setGhostMode(parseStoredBoolean(savedGhostMode));
+      setTrustedOnly(parseStoredBoolean(savedTrustedOnly));
+      setTrustedIds(
+        parseStoredStringArray(savedTrustedIds).map(normalizeValue),
+      );
+      setTrustedNames(
+        parseStoredStringArray(savedTrustedNames).map(normalizeValue),
+      );
 
-       const interval = window.setInterval(() => {
-      setLiveTick((prev) => !prev);
-    }, 1800);
+      const interval = window.setInterval(() => {
+        setLiveTick((prev) => !prev);
+      }, 1800);
 
-    return () => window.clearInterval(interval);
-  }
+      return () => window.clearInterval(interval);
+    }
 
-  loadSpotsPage();
-}, []);
+    loadSpotsPage();
+  }, []);
 
   useEffect(() => {
     if (ghostMode) {
-      setLocationError("Ghost Mode is on. Your exact position is being visually softened.");
+      setLocationError(
+        "Ghost Mode is on. Your exact position is being visually softened.",
+      );
       return;
     }
 
@@ -652,26 +659,26 @@ const [localLivePosts, setLocalLivePosts] =
       setLocationError("Geolocation is not supported on this device.");
       return;
     }
-navigator.geolocation.getCurrentPosition(
-  (position) => {
-    const nextCoords = {
-      lat: position.coords.latitude,
-      lng: position.coords.longitude,
-    };
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const nextCoords = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        };
 
-    setUserCoords(nextCoords);
-    setLocationError(null);
-  },
-  (error) => {
-    console.error("Geolocation error:", error);
-    setLocationError("Unable to get your location.");
-  },
-  {
-    enableHighAccuracy: true,
-    timeout: 10000,
-    maximumAge: 30000,
-  }
-);
+        setUserCoords(nextCoords);
+        setLocationError(null);
+      },
+      (error) => {
+        console.error("Geolocation error:", error);
+        setLocationError("Unable to get your location.");
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 30000,
+      },
+    );
   }, [ghostMode]);
 
   useEffect(() => {
@@ -679,7 +686,7 @@ navigator.geolocation.getCurrentPosition(
       const { data, error } = await supabase
         .from("crew_status")
         .select(
-          "id,name,status,latitude,longitude,location_name,vibe_label,heartbeat_bpm,updated_at"
+          "id,name,status,latitude,longitude,location_name,vibe_label,heartbeat_bpm,updated_at",
         )
         .order("updated_at", { ascending: false })
         .limit(50);
@@ -698,7 +705,7 @@ navigator.geolocation.getCurrentPosition(
         { event: "*", schema: "public", table: "crew_status" },
         async () => {
           await loadCrewStatus();
-        }
+        },
       )
       .subscribe();
 
@@ -733,7 +740,7 @@ navigator.geolocation.getCurrentPosition(
         typeof row.latitude === "number" &&
         typeof row.longitude === "number" &&
         Number.isFinite(row.latitude) &&
-        Number.isFinite(row.longitude)
+        Number.isFinite(row.longitude),
     );
   }, [crewRows]);
 
@@ -747,7 +754,7 @@ navigator.geolocation.getCurrentPosition(
         typeof row.latitude === "number" &&
         typeof row.longitude === "number" &&
         Number.isFinite(row.latitude) &&
-        Number.isFinite(row.longitude)
+        Number.isFinite(row.longitude),
     );
 
     if (validRows.length === 0) {
@@ -759,7 +766,7 @@ navigator.geolocation.getCurrentPosition(
         userCoords.lat,
         userCoords.lng,
         row.latitude as number,
-        row.longitude as number
+        row.longitude as number,
       );
 
       const latDiff = (row.latitude as number) - userCoords.lat;
@@ -774,13 +781,13 @@ navigator.geolocation.getCurrentPosition(
         ? tone === "lit"
           ? 0.55
           : tone === "risk"
-          ? 0.35
-          : 0
+            ? 0.35
+            : 0
         : tone === "lit"
-        ? -0.55
-        : tone === "risk"
-        ? -0.35
-        : 0;
+          ? -0.55
+          : tone === "risk"
+            ? -0.35
+            : 0;
 
       const rowId = normalizeValue(row.id);
       const rowName = normalizeValue(row.name);
@@ -794,7 +801,9 @@ navigator.geolocation.getCurrentPosition(
 
       return {
         id: row.id || `crew-${index}`,
-        name: blurred ? getBlurredName(index, tone) : row.name || `Crew ${index + 1}`,
+        name: blurred
+          ? getBlurredName(index, tone)
+          : row.name || `Crew ${index + 1}`,
         originalName: row.name || `Crew ${index + 1}`,
         tone,
         crew: trusted ? (tone === "chill" || tone === "safe" ? 1 : 0) : 0,
@@ -823,7 +832,7 @@ navigator.geolocation.getCurrentPosition(
       const boostedIntensity = clamp(
         point.intensity + clusterStrength * (point.tone === "risk" ? 6 : 4),
         15,
-        100
+        100,
       );
 
       let note = point.note;
@@ -880,12 +889,16 @@ navigator.geolocation.getCurrentPosition(
     return radarPoints.filter((point) => point.distanceKm <= 1.5).length;
   }, [radarPoints]);
 
-  const trustedVisibleCount = radarPoints.filter((point) => point.trusted).length;
+  const trustedVisibleCount = radarPoints.filter(
+    (point) => point.trusted,
+  ).length;
   const visibleCount = radarPoints.length;
   const riskCount = radarPoints.filter((point) => point.tone === "risk").length;
   const litCount = radarPoints.filter((point) => point.tone === "lit").length;
   const safeCount = radarPoints.filter((point) => point.tone === "safe").length;
-  const hotspotCount = radarPoints.filter((point) => point.clusterStrength >= 3).length;
+  const hotspotCount = radarPoints.filter(
+    (point) => point.clusterStrength >= 3,
+  ).length;
 
   const radarEnergy = useMemo(() => {
     if (riskCount > 0) return "risk";
@@ -1012,7 +1025,14 @@ navigator.geolocation.getCurrentPosition(
     }
 
     return "TwinMe: this area looks more balanced. Stay aware, but it is a better choice than high-chaos spots.";
-  }, [ghostMode, trustedOnly, hasSharedLocation, userCoords, radarPoints.length, selectedSpot]);
+  }, [
+    ghostMode,
+    trustedOnly,
+    hasSharedLocation,
+    userCoords,
+    radarPoints.length,
+    selectedSpot,
+  ]);
 
   const safetyState = useMemo(() => {
     if (radarPoints.length === 0) return "waiting";
@@ -1033,9 +1053,32 @@ navigator.geolocation.getCurrentPosition(
   }, [radarEnergy, radarPoints.length]);
 
   useEffect(() => {
-  if (!selectedSpot) return;
+    if (!selectedSpot) return;
 
-  const snapshot = {
+    const snapshot = {
+      visibleCount,
+      nearbyCount,
+      hotspotCount,
+      riskCount,
+      safeCount,
+      trustedVisibleCount,
+      radarEnergy,
+      selectedTone: selectedSpot.tone,
+      selectedName: selectedSpot.originalName || selectedSpot.name || null,
+      selectedDistanceKm:
+        typeof selectedSpot.distanceKm === "number"
+          ? Number(selectedSpot.distanceKm.toFixed(2))
+          : null,
+      selectedTrusted: selectedSpot.trusted,
+      selectedBlurred: selectedSpot.blurred,
+      updatedAt: new Date().toISOString(),
+    };
+
+    window.localStorage.setItem(
+      "twincore_spots_snapshot",
+      JSON.stringify(snapshot),
+    );
+  }, [
     visibleCount,
     nearbyCount,
     hotspotCount,
@@ -1043,1584 +1086,1548 @@ navigator.geolocation.getCurrentPosition(
     safeCount,
     trustedVisibleCount,
     radarEnergy,
-    selectedTone: selectedSpot.tone,
-    selectedName:
-      selectedSpot.originalName || selectedSpot.name || null,
-    selectedDistanceKm:
-      typeof selectedSpot.distanceKm === "number"
-        ? Number(selectedSpot.distanceKm.toFixed(2))
-        : null,
-    selectedTrusted: selectedSpot.trusted,
-    selectedBlurred: selectedSpot.blurred,
-    updatedAt: new Date().toISOString(),
-  };
+    selectedSpot,
+  ]);
 
-  window.localStorage.setItem(
-    "twincore_spots_snapshot",
-    JSON.stringify(snapshot)
-  );
-}, [
-  visibleCount,
-  nearbyCount,
-  hotspotCount,
-  riskCount,
-  safeCount,
-  trustedVisibleCount,
-  radarEnergy,
-  selectedSpot,
-]);
+  const availableNearbySpots = useMemo(() => {
+    return realNearbySpots.length > 0 ? realNearbySpots : nearbySpots;
+  }, [realNearbySpots]);
 
-const availableNearbySpots = useMemo(() => {
-  return realNearbySpots.length > 0
-    ? realNearbySpots
-    : nearbySpots;
-}, [realNearbySpots]);
-
-const filteredNearbySpots = useMemo(() => {
-  if (nearbyCategory === "All") {
-    return availableNearbySpots;
-  }
-
-  return availableNearbySpots.filter(
-    (spot) => spot.category === nearbyCategory
-  );
-}, [
-  nearbyCategory,
-  availableNearbySpots,
-]);
-
-const filteredLiveActivities = useMemo(() => {
-  const allLiveActivities = [
-    ...databaseLivePosts,
-    ...localLivePosts,
-    ...liveActivities,
-  ];
-
-  const uniqueActivities = allLiveActivities.filter(
-    (activity, index, array) =>
-      array.findIndex(
-        (item) => item.id === activity.id
-      ) === index
-  );
-
-  const freshActivities = uniqueActivities.filter(
-  isLiveReportFresh
-);
-
-
-  const nearbyActivities = freshActivities.filter(
-  (activity) => {
-    const distance = getLiveActivityDistance(
-      activity,
-      userCoords
-    );
-
-    if (distance === null) {
-      return true;
+  const filteredNearbySpots = useMemo(() => {
+    if (nearbyCategory === "All") {
+      return availableNearbySpots;
     }
 
-    return distance <= 25;
-  }
-);
+    return availableNearbySpots.filter(
+      (spot) => spot.category === nearbyCategory,
+    );
+  }, [nearbyCategory, availableNearbySpots]);
 
-  if (liveFilter === "All") {
-    return nearbyActivities;
-  }
+  const filteredLiveActivities = useMemo(() => {
+    const allLiveActivities = [
+      ...databaseLivePosts,
+      ...localLivePosts,
+      ...liveActivities,
+    ];
 
-  return nearbyActivities.filter(
-    (activity) =>
-      activity.activityType === liveFilter
-  );
-}, [
-  liveFilter,
-  databaseLivePosts,
-  localLivePosts,
-  userCoords,
-]);
-
-const nearbySpotsWithLiveActivity = useMemo(() => {
-  return filteredNearbySpots.map((spot) => {
-    const matchingLiveReports = filteredLiveActivities.filter(
-      (activity) =>
-        isLiveReportFresh(activity) &&
-        activity.area.trim().toLowerCase() ===
-          spot.name.trim().toLowerCase()
+    const uniqueActivities = allLiveActivities.filter(
+      (activity, index, array) =>
+        array.findIndex((item) => item.id === activity.id) === index,
     );
 
-    const latestReport = matchingLiveReports[0] ?? null;
+    const freshActivities = uniqueActivities.filter(isLiveReportFresh);
 
-    const uniqueReporterIds = new Set(
-      matchingLiveReports
-        .map((report) => report.userId)
-        .filter((userId): userId is string => Boolean(userId))
+    const nearbyActivities = freshActivities.filter((activity) => {
+      const distance = getLiveActivityDistance(activity, userCoords);
+
+      if (distance === null) {
+        return true;
+      }
+
+      return distance <= 25;
+    });
+
+    if (liveFilter === "All") {
+      return nearbyActivities;
+    }
+
+    return nearbyActivities.filter(
+      (activity) => activity.activityType === liveFilter,
     );
+  }, [liveFilter, databaseLivePosts, localLivePosts, userCoords]);
 
-    const uniqueReporterCount = uniqueReporterIds.size;
+  const nearbySpotsWithLiveActivity = useMemo(() => {
+    return filteredNearbySpots.map((spot) => {
+      const matchingLiveReports = filteredLiveActivities.filter(
+        (activity) =>
+          isLiveReportFresh(activity) &&
+          activity.area.trim().toLowerCase() === spot.name.trim().toLowerCase(),
+      );
 
-    const liveSignalStrength = matchingLiveReports.reduce(
-      (total, report) =>
-        total + getLiveReportWeight(report.minutesAgo),
-      0
-    );
+      const latestReport = matchingLiveReports[0] ?? null;
 
-    const corroborationLevel =
-      uniqueReporterCount >= 3
-        ? "strong"
-        : uniqueReporterCount >= 2
-        ? "moderate"
-        : matchingLiveReports.length >= 1
-        ? "single"
-        : "none";
+      const uniqueReporterIds = new Set(
+        matchingLiveReports
+          .map((report) => report.userId)
+          .filter((userId): userId is string => Boolean(userId)),
+      );
+
+      const uniqueReporterCount = uniqueReporterIds.size;
+
+      const liveSignalStrength = matchingLiveReports.reduce(
+        (total, report) => total + getLiveReportWeight(report.minutesAgo),
+        0,
+      );
+
+      const corroborationLevel =
+        uniqueReporterCount >= 3
+          ? "strong"
+          : uniqueReporterCount >= 2
+            ? "moderate"
+            : matchingLiveReports.length >= 1
+              ? "single"
+              : "none";
+
+      return {
+        ...spot,
+        liveReportCount: matchingLiveReports.length,
+        uniqueReporterCount,
+        latestLiveReport: latestReport,
+        liveSignalStrength,
+        corroborationLevel,
+      };
+    });
+  }, [filteredNearbySpots, filteredLiveActivities]);
+
+  const twinMeNearbySuggestion = useMemo(() => {
+    const timeOfDay = getTimeOfDayLabel();
+
+    if (nearbySpotsWithLiveActivity.length === 0) {
+      return {
+        spotName: "No recommendation yet",
+        message:
+          "TwinMe is waiting for nearby places and live activity before making a recommendation.",
+        reasons: [],
+        matchConfidence: 0,
+      };
+    }
+
+    const normalizedPartyStatus = (partyStatus || "").trim().toLowerCase();
+
+    const crewNeedsStability =
+      riskCount > 0 ||
+      normalizedPartyStatus.includes("heading home") ||
+      normalizedPartyStatus.includes("safe");
+
+    const crewIsHighEnergy =
+      normalizedPartyStatus.includes("club") ||
+      normalizedPartyStatus.includes("drinking") ||
+      normalizedPartyStatus.includes("music");
+
+    const rankedSpots = [...nearbySpotsWithLiveActivity]
+      .map((spot) => {
+        let score = 50;
+        const reasons: string[] = [];
+
+        // DISTANCE
+        if (spot.distanceKm <= 0.5) {
+          score += 18;
+          reasons.push("Very close to you");
+        } else if (spot.distanceKm <= 1) {
+          score += 14;
+          reasons.push("Less than 1 km away");
+        } else if (spot.distanceKm <= 2) {
+          score += 9;
+          reasons.push("Nearby");
+        } else if (spot.distanceKm <= 5) {
+          score += 4;
+        }
+
+        // GOOGLE RATING
+        if (typeof spot.rating === "number" && spot.rating >= 4.7) {
+          score += 14;
+          reasons.push(`Highly rated at ${spot.rating.toFixed(1)}★`);
+        } else if (typeof spot.rating === "number" && spot.rating >= 4.3) {
+          score += 10;
+          reasons.push(`Strong ${spot.rating.toFixed(1)}★ rating`);
+        } else if (typeof spot.rating === "number" && spot.rating >= 4) {
+          score += 6;
+        }
+
+        // REVIEW CONFIDENCE
+        if (typeof spot.reviewCount === "number" && spot.reviewCount >= 100) {
+          score += 6;
+          reasons.push(`${spot.reviewCount} Google reviews`);
+        } else if (
+          typeof spot.reviewCount === "number" &&
+          spot.reviewCount >= 25
+        ) {
+          score += 3;
+        }
+
+        // OPENING STATUS
+        if (spot.isOpen === true) {
+          score += 8;
+          reasons.push("Open right now");
+        } else if (spot.isOpen === false) {
+          score -= 35;
+          reasons.push("Currently closed");
+        }
+
+        const vibe = spot.vibe.toLowerCase();
+
+        const crowdLevel =
+          spot.latestLiveReport?.crowdLevel?.toLowerCase() ?? "";
+
+        score += Math.max(0, 25 - spot.distanceKm * 5);
+
+        // LIVE SIGNAL STRENGTH
+        score += Math.min(30, spot.liveSignalStrength * 12);
+
+        // TIME-OF-DAY INTELLIGENCE
+        if (timeOfDay === "morning") {
+          if (spot.category === "Food") {
+            score += 8;
+            reasons.push("Fits the morning");
+          }
+
+          if (spot.category === "Nightlife") {
+            score -= 15;
+          }
+        }
+
+        if (timeOfDay === "afternoon") {
+          if (spot.category === "Food" || spot.category === "Outdoor") {
+            score += 6;
+            reasons.push("Good afternoon option");
+          }
+        }
+
+        if (timeOfDay === "evening") {
+          if (
+            spot.category === "Food" ||
+            spot.category === "Nightlife" ||
+            spot.category === "Events"
+          ) {
+            score += 10;
+            reasons.push("Fits the evening");
+          }
+        }
+
+        if (timeOfDay === "late night") {
+          if (spot.category === "Nightlife") {
+            score += 14;
+            reasons.push("Strong late-night fit");
+          }
+
+          if (spot.category === "Outdoor" || spot.category === "Sports") {
+            score -= 8;
+          }
+        }
+
+        // MULTIPLE REPORTS
+        if (spot.corroborationLevel === "strong") {
+          score += 20;
+          reasons.push("Multiple independent live reports confirm activity");
+        } else if (spot.corroborationLevel === "moderate") {
+          score += 12;
+          reasons.push("Live activity has been independently confirmed");
+        } else if (spot.liveReportCount > 0) {
+          score += 5;
+          reasons.push("Recent live activity reported here");
+        }
+
+        // CREW ENERGY
+        if (crewIsHighEnergy) {
+          if (vibe.includes("high energy")) {
+            score += 45;
+            reasons.push("Matches your current higher-energy Party Mode");
+          }
+
+          if (vibe.includes("active")) {
+            score += 20;
+          }
+
+          if (vibe.includes("relaxed") || vibe.includes("calm")) {
+            score -= 10;
+          }
+        }
+
+        // CREW STABILITY
+        if (crewNeedsStability) {
+          if (vibe.includes("relaxed") || vibe.includes("calm")) {
+            score += 45;
+            reasons.push("Supports a calmer, more stable crew setting");
+          }
+
+          if (vibe.includes("high energy")) {
+            score -= 25;
+          }
+        }
+
+        // CROWD LEVEL
+        if (crowdLevel === "packed") {
+          score -= crewNeedsStability ? 35 : 10;
+        }
+
+        if (crowdLevel === "busy") {
+          score -= crewNeedsStability ? 20 : 0;
+        }
+
+        if (crowdLevel === "low" && crewNeedsStability) {
+          score += 15;
+        }
+
+        const matchConfidence = Math.max(1, Math.min(99, Math.round(score)));
+
+        return {
+          ...spot,
+          twinScore: score,
+          matchConfidence,
+          reasons,
+        };
+      })
+      .sort((a, b) => b.twinScore - a.twinScore);
+
+    const bestSpot = rankedSpots[0];
+
+    if (!bestSpot) {
+      return {
+        spotName: "No recommendation yet",
+        message: "TwinMe is waiting for enough nearby context.",
+        reasons: [],
+        matchConfidence: 0,
+      };
+    }
+
+    const topReasons = bestSpot.reasons.slice(0, 4);
+
+    const recommendationSummary =
+      topReasons.length > 0
+        ? `${bestSpot.name} stands out for ${timeOfDay} because ${topReasons
+            .slice(0, 2)
+            .join(" and ")
+            .toLowerCase()}.`
+        : `${bestSpot.name} looks like your strongest ${timeOfDay} option right now.`;
 
     return {
-      ...spot,
-      liveReportCount: matchingLiveReports.length,
-      uniqueReporterCount,
-      latestLiveReport: latestReport,
-      liveSignalStrength,
-      corroborationLevel,
+      spotName: bestSpot.name,
+      message: recommendationSummary,
+      reasons: topReasons,
+      matchConfidence: bestSpot.matchConfidence,
     };
-  });
-}, [filteredNearbySpots, filteredLiveActivities]);
+  }, [nearbySpotsWithLiveActivity, partyStatus, riskCount]);
 
-const twinMeNearbySuggestion = useMemo(() => {
- if (nearbySpotsWithLiveActivity.length === 0) {
-  return {
-    spotName: "No recommendation yet",
-    message:
-      "TwinMe is waiting for nearby places and live activity before making a recommendation.",
-    reasons: [],
-    matchConfidence: 0,
-  };
-}
+  async function loadRealNearbySpots() {
+    if (!userCoords) {
+      setNearbyError("Location is required to discover nearby places.");
+      return;
+    }
 
-  const normalizedPartyStatus =
-    (partyStatus || "").trim().toLowerCase();
+    try {
+      setNearbyLoading(true);
+      setNearbyError(null);
 
-  const crewNeedsStability =
-    riskCount > 0 ||
-    normalizedPartyStatus.includes("heading home") ||
-    normalizedPartyStatus.includes("safe");
-
-  const crewIsHighEnergy =
-    normalizedPartyStatus.includes("club") ||
-    normalizedPartyStatus.includes("drinking") ||
-    normalizedPartyStatus.includes("music");
-
-  const rankedSpots = [...nearbySpotsWithLiveActivity].map((spot) => {
-      let score = 50;
-      const reasons: string[] = [];
-
-      // Distance
-if (spot.distanceKm <= 0.5) {
-  score += 18;
-  reasons.push("Very close to you");
-} else if (spot.distanceKm <= 1) {
-  score += 14;
-  reasons.push("Less than 1 km away");
-} else if (spot.distanceKm <= 2) {
-  score += 9;
-  reasons.push("Nearby");
-} else if (spot.distanceKm <= 5) {
-  score += 4;
-}
-
-// Google rating
-if (
-  typeof spot.rating === "number" &&
-  spot.rating >= 4.7
-) {
-  score += 14;
-  reasons.push(
-    `Highly rated at ${spot.rating.toFixed(1)}★`
-  );
-} else if (
-  typeof spot.rating === "number" &&
-  spot.rating >= 4.3
-) {
-  score += 10;
-  reasons.push(
-    `Strong ${spot.rating.toFixed(1)}★ rating`
-  );
-} else if (
-  typeof spot.rating === "number" &&
-  spot.rating >= 4
-) {
-  score += 6;
-}
-
-// Review confidence
-if (
-  typeof spot.reviewCount === "number" &&
-  spot.reviewCount >= 100
-) {
-  score += 6;
-  reasons.push(
-    `${spot.reviewCount} Google reviews`
-  );
-} else if (
-  typeof spot.reviewCount === "number" &&
-  spot.reviewCount >= 25
-) {
-  score += 3;
-}
-
-// Opening status
-if (spot.isOpen === true) {
-  score += 8;
-  reasons.push("Open right now");
-} else if (spot.isOpen === false) {
-  score -= 35;
-  reasons.push("Currently closed");
-}
-
-      const vibe = spot.vibe.toLowerCase();
-      const crowdLevel =
-        spot.latestLiveReport?.crowdLevel?.toLowerCase() ?? "";
-
-      score += Math.max(0, 25 - spot.distanceKm * 5);
-
-      // LIVE SIGNAL STRENGTH
-// Fresh and corroborated reports influence recommendations more.
-score += Math.min(
-  30,
-  spot.liveSignalStrength * 12
-);
-
-// MULTIPLE REPORTS
-if (spot.corroborationLevel === "strong") {
-      score += 20;
-      reasons.push(
-        "Multiple independent live reports confirm activity"
+      const response = await fetch(
+        `/api/spots/nearby?lat=${userCoords.lat}&lng=${userCoords.lng}`,
       );
-    } else if (
-      spot.corroborationLevel === "moderate"
-    ) {
-      score += 12;
-      reasons.push(
-        "Live activity has been independently confirmed"
+
+      if (!response.ok) {
+        throw new Error("Unable to load nearby places.");
+      }
+
+      const data = await response.json();
+
+      if (!Array.isArray(data?.spots)) {
+        throw new Error("Nearby places returned an invalid response.");
+      }
+
+      setRealNearbySpots(data.spots as NearbySpot[]);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
+
+      console.error("Nearby discovery failed:", error);
+
+      setNearbyError(
+        "Live nearby discovery is unavailable right now. Showing fallback places.",
       );
-    } else if (spot.liveReportCount > 0) {
-      score += 5;
-      reasons.push(
-        "Recent live activity reported here"
+    } finally {
+      setNearbyLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (activeView !== "nearby") return;
+    if (!userCoords) return;
+    if (realNearbySpots.length > 0) return;
+
+    void loadRealNearbySpots();
+  }, [activeView, userCoords, realNearbySpots.length]);
+
+  async function handlePostLiveUpdate() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      alert("You must be signed in to post a live update.");
+      return;
+    }
+
+    console.log("Posting live update as user:", user.id);
+
+    const activityType: LiveActivity["activityType"] =
+      livePostType === "Calm spot"
+        ? "Outdoor"
+        : livePostType === "Avoid area"
+          ? "Event"
+          : "Nightlife";
+
+    const crowdLevel: LiveActivity["crowdLevel"] =
+      livePostType === "Getting packed"
+        ? "Packed"
+        : livePostType === "Busy here"
+          ? "Busy"
+          : livePostType === "Calm spot"
+            ? "Low"
+            : "Moderate";
+
+    if (liveLocationMode === "venue" && !livePostLocation.trim()) {
+      alert("Please enter a venue or location name.");
+      return;
+    }
+
+    const normalizedArea =
+      liveLocationMode === "current"
+        ? "Current location"
+        : livePostLocation.trim() || "Unnamed location";
+
+    const cooldownCutoff = new Date(
+      Date.now() - LIVE_REPORT_COOLDOWN_MINUTES * 60 * 1000,
+    ).toISOString();
+
+    const { data: recentExistingPosts, error: recentPostsError } =
+      await supabase
+        .from("spots_live_posts")
+        .select("id, created_at")
+        .eq("user_id", user.id)
+        .eq("area", normalizedArea)
+        .gte("created_at", cooldownCutoff)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+    if (recentPostsError) {
+      console.error(
+        "Unable to check for recent live report:",
+        recentPostsError,
       );
     }
 
-    if (crewIsHighEnergy) {
-      // existing logic
-    }
-
-    if (crewNeedsStability) {
-      // existing logic
-    }
-
-    if (
-      crowdLevel === "low" &&
-      crewNeedsStability
-    ) {
-      score += 15;
-    }
-
-    const matchConfidence = Math.max(
-      1,
-      Math.min(99, Math.round(score))
-    );
-
-    return {
-      ...spot,
-      twinScore: score,
-      matchConfidence,
-      reasons,
+    const payload = {
+      user_id: user.id,
+      display_name: displayName,
+      title: livePostType,
+      area: normalizedArea,
+      activity_type: activityType,
+      vibe: livePostType,
+      crowd_level: crowdLevel,
+      note: livePostNote.trim() || "Live update shared from the area.",
+      latitude: userCoords?.lat ?? null,
+      longitude: userCoords?.lng ?? null,
+      trusted: false,
     };
-  })
-  .sort((a, b) => b.twinScore - a.twinScore);
 
-const bestSpot = rankedSpots[0];
+    let data;
+    let error;
 
-if (!bestSpot) {
-  return {
-    spotName: "No recommendation yet",
-    message:
-      "TwinMe is waiting for enough nearby context.",
-    reasons: [],
-    matchConfidence: 0,
-  };
-}
+    const existingPost = recentExistingPosts?.[0];
 
-const secondBestSpot = rankedSpots[1];
+    if (existingPost) {
+      const result = await supabase
+        .from("spots_live_posts")
+        .update({
+          title: payload.title,
+          activity_type: payload.activity_type,
+          vibe: payload.vibe,
+          crowd_level: payload.crowd_level,
+          note: payload.note,
+          latitude: payload.latitude,
+          longitude: payload.longitude,
+          created_at: new Date().toISOString(),
+        })
+        .eq("id", existingPost.id)
+        .eq("user_id", user.id)
+        .select()
+        .single();
 
-const scoreGap = secondBestSpot
-  ? bestSpot.twinScore - secondBestSpot.twinScore
-  : bestSpot.twinScore;
+      data = result.data;
+      error = result.error;
+    } else {
+      const result = await supabase
+        .from("spots_live_posts")
+        .insert(payload)
+        .select()
+        .single();
 
-const matchConfidence = Math.min(
-  95,
-  Math.max(55, Math.round(65 + scoreGap))
-);
-
-  const reasons: string[] = [];
-
-  if (crewIsHighEnergy) {
-    reasons.push(
-      "Matches your current higher-energy Party Mode."
-    );
-  }
-
-  if (crewNeedsStability) {
-    reasons.push(
-      "Crew safety and stability signals were prioritized."
-    );
-  }
-
-  reasons.push(
-    `${bestSpot.distanceKm.toFixed(1)} km away.`
-  );
-
-  if (bestSpot.liveReportCount > 0) {
-  reasons.push(
-    `${bestSpot.liveReportCount} recent live report${
-      bestSpot.liveReportCount === 1 ? "" : "s"
-    } considered.`
-  );
-}
-
-if (bestSpot.corroborationLevel === "strong") {
-  reasons.push(
-    `${bestSpot.uniqueReporterCount} different people support the current activity signal.`
-  );
-} else if (bestSpot.corroborationLevel === "moderate") {
-  reasons.push(
-    `${bestSpot.uniqueReporterCount} different people reported activity here.`
-  );
-} else if (
-  bestSpot.liveReportCount > 1 &&
-  bestSpot.uniqueReporterCount === 1
-) {
-  reasons.push(
-    "Multiple updates were posted, but they came from the same reporter."
-  );
-}
-
-  if (bestSpot.latestLiveReport) {
-    reasons.push(
-      `Latest update: "${bestSpot.latestLiveReport.title}".`
-    );
-  }
-
-  return {
-  spotName: bestSpot.name,
-  message: `${bestSpot.name} looks like the strongest match right now.`,
-  reasons,
-  matchConfidence,
-};
-
-}, [
-  nearbySpotsWithLiveActivity,
-  partyStatus,
-  riskCount,
-]);
-
-async function loadRealNearbySpots() {
-  if (!userCoords) {
-    setNearbyError(
-      "Location is required to discover nearby places."
-    );
-    return;
-  }
-
-  try {
-    setNearbyLoading(true);
-    setNearbyError(null);
-
-    const response = await fetch(
-      `/api/spots/nearby?lat=${userCoords.lat}&lng=${userCoords.lng}`
-    );
-
-    if (!response.ok) {
-      throw new Error(
-        "Unable to load nearby places."
-      );
+      data = result.data;
+      error = result.error;
     }
 
-    const data = await response.json();
+    if (error) {
+      console.error("Live post failed");
+      console.error("message:", error.message);
+      console.error("details:", error.details);
+      console.error("hint:", error.hint);
+      console.error("code:", error.code);
 
-    if (!Array.isArray(data?.spots)) {
-      throw new Error(
-        "Nearby places returned an invalid response."
-      );
+      alert(`Your live update could not be posted.\n\n${error.message}`);
+
+      return;
     }
 
-    setRealNearbySpots(
-      data.spots as NearbySpot[]
-    );
-  } catch (error) {
-  if (
-    error instanceof DOMException &&
-    error.name === "AbortError"
-  ) {
-    return;
+    if (data) {
+      const newPost = convertLivePostRow(data as LivePostRow);
+
+      setDatabaseLivePosts((current) => [
+        newPost,
+        ...current.filter((post) => post.id !== newPost.id),
+      ]);
+    }
+
+    setLivePostNote("");
+    setLivePostLocation("Current Location");
+    setLiveLocationMode("current");
+    setPostComposerOpen(false);
   }
-
-  console.error(
-    "Nearby discovery failed:",
-    error
-  );
-
-  setNearbyError(
-    "Live nearby discovery is unavailable right now. Showing fallback places."
-  );
-}
-  finally {
-    setNearbyLoading(false);
-  }
-}
-
-useEffect(() => {
-  if (activeView !== "nearby") return;
-  if (!userCoords) return;
-  if (realNearbySpots.length > 0) return;
-
-  void loadRealNearbySpots();
-}, [
-  activeView,
-  userCoords,
-  realNearbySpots.length,
-]);
-
-async function handlePostLiveUpdate() {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    alert("You must be signed in to post a live update.");
-    return;
-  }
-
-
-console.log("Posting live update as user:", user.id);
-
-  const activityType: LiveActivity["activityType"] =
-    livePostType === "Calm spot"
-      ? "Outdoor"
-      : livePostType === "Avoid area"
-      ? "Event"
-      : "Nightlife";
-
-  const crowdLevel: LiveActivity["crowdLevel"] =
-    livePostType === "Getting packed"
-      ? "Packed"
-      : livePostType === "Busy here"
-      ? "Busy"
-      : livePostType === "Calm spot"
-      ? "Low"
-      : "Moderate";
-
-if (
-  liveLocationMode === "venue" &&
-  !livePostLocation.trim()
-) {
-  alert("Please enter a venue or location name.");
-  return;
-}
-
-const normalizedArea =
-  liveLocationMode === "current"
-    ? "Current location"
-    : livePostLocation.trim() || "Unnamed location";
-
-const cooldownCutoff = new Date(
-  Date.now() - LIVE_REPORT_COOLDOWN_MINUTES * 60 * 1000
-).toISOString();
-
-const { data: recentExistingPosts, error: recentPostsError } =
-  await supabase
-    .from("spots_live_posts")
-    .select("id, created_at")
-    .eq("user_id", user.id)
-    .eq("area", normalizedArea)
-    .gte("created_at", cooldownCutoff)
-    .order("created_at", { ascending: false })
-    .limit(1);
-
-if (recentPostsError) {
-  console.error(
-    "Unable to check for recent live report:",
-    recentPostsError
-  );
-}
-
-  const payload = {
-    user_id: user.id,
-    display_name: displayName,
-    title: livePostType,
-    area: normalizedArea,
-    activity_type: activityType,
-    vibe: livePostType,
-    crowd_level: crowdLevel,
-    note:
-      livePostNote.trim() ||
-      "Live update shared from the area.",
-    latitude: userCoords?.lat ?? null,
-    longitude: userCoords?.lng ?? null,
-    trusted: false,
-  };
-
-  let data;
-let error;
-
-const existingPost = recentExistingPosts?.[0];
-
-if (existingPost) {
-  const result = await supabase
-    .from("spots_live_posts")
-    .update({
-      title: payload.title,
-      activity_type: payload.activity_type,
-      vibe: payload.vibe,
-      crowd_level: payload.crowd_level,
-      note: payload.note,
-      latitude: payload.latitude,
-      longitude: payload.longitude,
-      created_at: new Date().toISOString(),
-    })
-    .eq("id", existingPost.id)
-    .eq("user_id", user.id)
-    .select()
-    .single();
-
-  data = result.data;
-  error = result.error;
-} else {
-  const result = await supabase
-    .from("spots_live_posts")
-    .insert(payload)
-    .select()
-    .single();
-
-  data = result.data;
-  error = result.error;
-}
-
-  if (error) {
-  console.error("Live post failed");
-  console.error("message:", error.message);
-  console.error("details:", error.details);
-  console.error("hint:", error.hint);
-  console.error("code:", error.code);
-
-  alert(
-    `Your live update could not be posted.\n\n${error.message}`
-  );
-
-  return;
-}
-
-  if (data) {
-    const newPost = convertLivePostRow(
-      data as LivePostRow
-    );
-
-    setDatabaseLivePosts((current) => [
-      newPost,
-      ...current.filter(
-        (post) => post.id !== newPost.id
-      ),
-    ]);
-  }
-
-  setLivePostNote("");
-setLivePostLocation("Current Location");
-setLiveLocationMode("current");
-setPostComposerOpen(false);
-}
   return (
     <AuthGuard>
-    <main className="min-h-screen overflow-hidden bg-[#0A0A0B] text-white">
-      <Link
-  href="/"
-  className="relative z-20 inline-flex rounded-xl border border-white/15 px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/10"
->
-  ← Dashboard
-</Link>
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className={`absolute inset-0 ${ambientClasses.top}`} />
-        <div
-          className={`absolute left-1/2 top-14 h-[24rem] w-[24rem] -translate-x-1/2 rounded-full blur-3xl animate-orb-drift ${ambientClasses.orbA}`}
-        />
-        <div
-          className={`absolute bottom-10 right-[-8%] h-64 w-64 rounded-full blur-3xl animate-orb-drift ${ambientClasses.orbB}`}
-        />
-        <div className="absolute inset-0 opacity-[0.08] [background-image:linear-gradient(rgba(255,255,255,0.55)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.55)_1px,transparent_1px)] [background-size:26px_26px]" />
-      </div>
-
-       <div className="relative mx-auto w-full max-w-2xl px-4 py-8 sm:px-6 lg:px-8">
-        <header className="mb-8">
-          <div className="mb-2 text-xs tracking-[0.3em] text-white/50">TWINCORE</div>
-
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h1 className="text-4xl font-semibold tracking-tight">
-  Spots
-</h1>
-             <p className="mt-2 text-sm text-white/60">
-  Crew awareness, nearby places, and live activity
-</p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setSweepOn((prev) => !prev)}
-              className={`twincore-press rounded-2xl bg-[linear-gradient(180deg,#1A1A1F,#141419)] px-4 py-3 text-sm font-medium text-white shadow-[0_8px_24px_rgba(0,0,0,0.35)] ${
-  activeView === "crew" ? "inline-flex" : "hidden"
-}`}
-            >
-              {sweepOn ? "Radar On" : "Radar Off"}
-            </button>
-          </div>
-           </header>
-
-           {/* SPOTS VIEW SWITCHER */}
-<section className="mb-6 rounded-3xl border border-white/10 bg-white/[0.035] p-2 backdrop-blur-xl">
-  <div className="grid grid-cols-3 gap-2">
-    {(
-      [
-        {
-          id: "crew",
-          label: "Crew",
-          description: "Private radar",
-        },
-        {
-          id: "nearby",
-          label: "Nearby",
-          description: "Places & events",
-        },
-        {
-          id: "live",
-          label: "Live",
-          description: "Happening now",
-        },
-      ] as const
-    ).map((view) => {
-      const active = activeView === view.id;
-
-      return (
-        <button
-          key={view.id}
-          type="button"
-          onClick={() => setActiveView(view.id)}
-          className={`rounded-2xl px-3 py-3 text-center transition active:scale-[0.98] ${
-            active
-              ? "border border-cyan-300/25 bg-cyan-300/10 text-cyan-100 shadow-[0_0_25px_rgba(34,211,238,0.12)]"
-              : "border border-transparent text-white/55 hover:bg-white/[0.05] hover:text-white/80"
-          }`}
+      <main className="min-h-screen overflow-hidden bg-[#0A0A0B] text-white">
+        <Link
+          href="/"
+          className="relative z-20 inline-flex rounded-xl border border-white/15 px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/10"
         >
-          <div className="text-sm font-black">
-            {view.label}
-          </div>
-
-          <div className="mt-1 hidden text-[10px] font-medium text-white/40 sm:block">
-            {view.description}
-          </div>
-        </button>
-      );
-    })}
-  </div>
-</section>
-
-{/* NEARBY VIEW */}
-{activeView === "nearby" ? (
-  <div className="space-y-5">
-    <section className="rounded-3xl border border-fuchsia-300/20 bg-[radial-gradient(circle_at_top,rgba(217,70,239,0.14),transparent_45%),linear-gradient(180deg,#15111d,#0b0b0f)] p-5 shadow-[0_0_45px_rgba(217,70,239,0.10)]">
-      <div className="inline-flex items-center gap-2 rounded-full border border-fuchsia-300/20 bg-fuchsia-300/10 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-fuchsia-100">
-        <MapPin className="h-3.5 w-3.5" />
-        Nearby Discovery
-      </div>
-
-      <h2 className="mt-4 text-2xl font-black text-white">
-        Find What Fits Right Now
-      </h2>
-
-      <p className="mt-2 text-sm leading-6 text-white/65">
-        Discover nearby places based on distance, energy,
-        activity, and what fits your current night.
-      </p>
-    </section>
-
-   {nearbyLoading ? (
-  <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm text-white/60">
-    Finding places near you...
-  </div>
-) : null}
-
-{nearbyError ? (
-  <div className="rounded-2xl border border-orange-300/20 bg-orange-300/[0.06] p-4 text-sm text-orange-100/80">
-    {nearbyError}
-  </div>
-) : null}
-
-  <div className="flex items-center gap-2 overflow-x-auto py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-  {(
-    [
-      "All",
-      "Food",
-      "Nightlife",
-      "Events",
-      "Sports",
-      "Outdoor",
-      "Stay In",
-    ] as const
-  ).map((category) => {
-    const active = nearbyCategory === category;
-
-    return (
-      <button
-        key={category}
-        type="button"
-        onClick={() => setNearbyCategory(category)}
-        className={`shrink-0 rounded-full border px-3 py-2 text-xs font-semibold transition ${
-          active
-            ? "border-cyan-300/30 bg-cyan-300/10 text-cyan-100"
-            : "border-white/10 bg-white/[0.04] text-white/55"
-        }`}
-      >
-        {category}
-      </button>
-    );
-  })}
-</div>
-
-    <section className="space-y-3">
-      {nearbySpotsWithLiveActivity.map((spot) => (
-        <div
-          key={spot.id}
-          className="rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#14141a,#0c0c10)] p-4"
-        >
-          <div className="flex items-start justify-between gap-3">
-     <div>
-  <div className="text-lg font-semibold text-white">
-    {spot.name}
-  </div>
-
-  {spot.address ? (
-    <div className="mt-1 text-xs text-white/45">
-      📍 {spot.address}
-    </div>
-  ) : null}
-
-  <div className="mt-1 text-xs text-white/45">
-    {spot.category}
-  </div>
-</div>
-
-            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-white/70">
-              {spot.distanceKm === 0
-                ? "Home"
-                : `${spot.distanceKm.toFixed(1)} km`}
-            </span>
-          </div>
-
-          <div className="mt-3 flex flex-wrap gap-2">
-            <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-white/70">
-              {spot.vibe}
-            </span>
-
-            <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-white/70">
-              {spot.status}
-            </span>
-
-           {typeof spot.rating === "number" ? (
-  <span className="rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1 text-xs font-semibold text-amber-100">
-    ★ {spot.rating.toFixed(1)}
-    {typeof spot.reviewCount === "number"
-      ? ` (${spot.reviewCount})`
-      : ""}
-  </span>
-) : null}
-
-{spot.isOpen === true ? (
-  <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-semibold text-emerald-100">
-    Open now
-  </span>
-) : spot.isOpen === false ? (
-  <span className="rounded-full border border-red-300/20 bg-red-300/10 px-3 py-1 text-xs font-semibold text-red-100">
-    Closed
-  </span>
-) : null}
-
-           {spot.liveReportCount > 0 ? (
-  <>
-    <span className="rounded-full border border-orange-300/20 bg-orange-300/10 px-3 py-1 text-xs font-semibold text-orange-100">
-      🔥 {spot.liveReportCount} live report
-      {spot.liveReportCount === 1 ? "" : "s"}
-    </span>
-
-    {spot.corroborationLevel === "strong" ? (
-      <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-semibold text-emerald-100">
-        Strong signal
-      </span>
-    ) : spot.corroborationLevel === "moderate" ? (
-      <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-semibold text-cyan-100">
-        Confirmed activity
-      </span>
-    ) : null}
-  </>
-) : null}
-
-          </div>
-
-          <p className="mt-3 text-sm leading-6 text-white/60">
-            {spot.note}
-          </p>
-        {spot.latestLiveReport ? (
-  <div className="mt-3 rounded-2xl border border-orange-300/15 bg-orange-300/[0.06] p-3">
-    <div className="text-xs font-black uppercase tracking-[0.16em] text-orange-100">
-      Live now
-    </div>
-
-    <p className="mt-1 text-sm font-semibold text-white/85">
-      {spot.latestLiveReport.title}
-    </p>
-
-    <p className="mt-1 text-xs text-white/50">
-      {spot.latestLiveReport.minutesAgo} min ago
-    </p>
-  </div>
-) : null}
-
+          ← Dashboard
+        </Link>
+        <div className="pointer-events-none fixed inset-0 overflow-hidden">
+          <div className={`absolute inset-0 ${ambientClasses.top}`} />
+          <div
+            className={`absolute left-1/2 top-14 h-[24rem] w-[24rem] -translate-x-1/2 rounded-full blur-3xl animate-orb-drift ${ambientClasses.orbA}`}
+          />
+          <div
+            className={`absolute bottom-10 right-[-8%] h-64 w-64 rounded-full blur-3xl animate-orb-drift ${ambientClasses.orbB}`}
+          />
+          <div className="absolute inset-0 opacity-[0.08] [background-image:linear-gradient(rgba(255,255,255,0.55)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.55)_1px,transparent_1px)] [background-size:26px_26px]" />
         </div>
-      ))}
-    </section>
 
-    <section className="rounded-3xl border border-blue-500/20 bg-[linear-gradient(180deg,#1a1f2e,#0c0f1a)] p-5">
-      <div className="mb-2 inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-blue-100">
-        <Sparkles className="h-3.5 w-3.5" />
-        TwinMe Suggests
-      </div>
-
-     <div>
-  <div className="flex items-center justify-between gap-3">
-  <p className="text-lg font-semibold text-white">
-    {twinMeNearbySuggestion.spotName}
-  </p>
-
-  {twinMeNearbySuggestion.matchConfidence > 0 ? (
-    <span className="shrink-0 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-bold text-cyan-100">
-      {twinMeNearbySuggestion.matchConfidence}% Match
-    </span>
-  ) : null}
-</div>
-
-  <p className="mt-2 text-sm leading-6 text-white/75">
-    {twinMeNearbySuggestion.message}
-  </p>
-
-  {twinMeNearbySuggestion.reasons.length > 0 ? (
-    <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-      <div className="text-xs font-black uppercase tracking-[0.18em] text-white/45">
-        Why this?
-      </div>
-
-      <div className="mt-3 space-y-2">
-        {twinMeNearbySuggestion.reasons.map(
-          (reason, index) => (
-            <div
-              key={`${reason}-${index}`}
-              className="flex items-start gap-2 text-sm text-white/65"
-            >
-              <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-300" />
-
-              <span>
-                {reason}
-              </span>
-            </div>
-          )
-        )}
-      </div>
-    </div>
-  ) : null}
-</div>
-
-    </section>
-  </div>
-) : null}
-
-{/* LIVE VIEW */}
-{activeView === "live" ? (
-  <div className="space-y-5">
-    <section className="rounded-3xl border border-orange-300/20 bg-[radial-gradient(circle_at_top,rgba(251,146,60,0.14),transparent_45%),linear-gradient(180deg,#1c130e,#0b0b0f)] p-5 shadow-[0_0_45px_rgba(251,146,60,0.10)]">
-      <div className="inline-flex items-center gap-2 rounded-full border border-orange-300/20 bg-orange-300/10 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-orange-100">
-        <Flame className="h-3.5 w-3.5" />
-        Happening Now
-      </div>
-
-      <h2 className="mt-4 text-2xl font-black text-white">
-        Live From the Area
-      </h2>
-
-      <p className="mt-2 text-sm leading-6 text-white/65">
-        Real-time crowd movement, atmosphere checks, event activity,
-        and trusted reports from nearby.
-      </p>
-
-<button
-  type="button"
-  onClick={() =>
-    setPostComposerOpen((current) => !current)
-  }
-  className="mt-4 w-full rounded-2xl border border-orange-300/25 bg-orange-300/10 px-4 py-3 text-sm font-bold text-orange-100 transition hover:bg-orange-300/15 active:scale-[0.98]"
->
-  {postComposerOpen
-    ? "Close Update"
-    : "+ Post Live Update"}
-</button>
-
-
-{postComposerOpen ? (
-  <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4">
-    <div className="text-xs font-black uppercase tracking-[0.18em] text-white/50">
-      What&apos;s happening?
-    </div>
-
-    <div className="mt-3 flex flex-wrap gap-2">
-      {(
-        [
-          "Great vibe",
-          "Busy here",
-          "Getting packed",
-          "Calm spot",
-          "Avoid area",
-        ] as const
-      ).map((type) => {
-        const active = livePostType === type;
-
-        return (
-          <button
-            key={type}
-            type="button"
-            onClick={() => setLivePostType(type)}
-            className={`rounded-full border px-3 py-2 text-xs font-semibold transition ${
-              active
-                ? "border-orange-300/30 bg-orange-300/10 text-orange-100"
-                : "border-white/10 bg-white/[0.04] text-white/55"
-            }`}
-          >
-            {type}
-          </button>
-        );
-      })}
-    </div>
-
-<div className="mt-4">
-  <div className="text-xs font-black uppercase tracking-[0.18em] text-white/50">
-    Where is this happening?
-  </div>
-
-  <div className="mt-3 grid grid-cols-2 gap-2">
-    <button
-      type="button"
-      onClick={() => {
-        setLiveLocationMode("current");
-        setLivePostLocation("Current Location");
-      }}
-      className={`rounded-2xl border px-3 py-3 text-xs font-semibold transition ${
-        liveLocationMode === "current"
-          ? "border-orange-300/30 bg-orange-300/10 text-orange-100"
-          : "border-white/10 bg-white/[0.04] text-white/55"
-      }`}
-    >
-      Use Current Location
-    </button>
-
-    <button
-      type="button"
-      onClick={() => {
-        setLiveLocationMode("venue");
-
-        if (livePostLocation === "Current Location") {
-          setLivePostLocation("");
-        }
-      }}
-      className={`rounded-2xl border px-3 py-3 text-xs font-semibold transition ${
-        liveLocationMode === "venue"
-          ? "border-orange-300/30 bg-orange-300/10 text-orange-100"
-          : "border-white/10 bg-white/[0.04] text-white/55"
-      }`}
-    >
-      Enter Venue
-    </button>
-  </div>
-
-  {liveLocationMode === "current" ? (
-    <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3">
-      <p className="text-sm font-semibold text-white/80">
-        Current Location
-      </p>
-
-      <p className="mt-1 text-xs text-white/45">
-        Your current coordinates will be attached to this live update.
-      </p>
-    </div>
-  ) : (
-    <input
-      id="live-post-location"
-      type="text"
-      value={livePostLocation}
-      onChange={(event) =>
-        setLivePostLocation(event.target.value)
-      }
-      placeholder="Enter venue or location name"
-      className="mt-3 w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-orange-300/30"
-    />
-  )}
-</div>
-
-    <textarea
-      value={livePostNote}
-      onChange={(event) =>
-        setLivePostNote(event.target.value)
-      }
-      placeholder="Add a quick note..."
-      className="mt-4 min-h-[90px] w-full resize-none rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-orange-300/30"
-    />
-
-    <button
-      type="button"
-      onClick={handlePostLiveUpdate}
-      className="mt-3 w-full rounded-2xl bg-orange-500 px-4 py-3 text-sm font-black text-white transition hover:bg-orange-600 active:scale-[0.98]"
-    >
-      Post Update
-    </button>
-  </div>
-) : null}
-
-    </section>
-
-    <div className="flex items-center gap-2 overflow-x-auto py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      {(
-        [
-          "All",
-          "Nightlife",
-          "Food",
-          "Event",
-          "Sports",
-          "Outdoor",
-        ] as const
-      ).map((filter) => {
-        const active = liveFilter === filter;
-
-        return (
-          <button
-            key={filter}
-            type="button"
-            onClick={() => setLiveFilter(filter)}
-            className={`shrink-0 rounded-full border px-3 py-2 text-xs font-semibold transition ${
-              active
-                ? "border-orange-300/30 bg-orange-300/10 text-orange-100"
-                : "border-white/10 bg-white/[0.04] text-white/55"
-            }`}
-          >
-            {filter}
-          </button>
-        );
-      })}
-    </div>
-
-    <section className="space-y-3">
-      {filteredLiveActivities.map((activity) => {
-  const distance = getLiveActivityDistance(
-    activity,
-    userCoords
-  );
-
-  return (
-        <div
-          key={activity.id}
-          className="rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#14141a,#0c0c10)] p-4"
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="text-lg font-semibold text-white">
-                {activity.title}
-              </div>
-
-              <div className="mt-1 text-xs text-white/45">
-                {activity.area}
-              </div>
+        <div className="relative mx-auto w-full max-w-2xl px-4 py-8 sm:px-6 lg:px-8">
+          <header className="mb-8">
+            <div className="mb-2 text-xs tracking-[0.3em] text-white/50">
+              TWINCORE
             </div>
 
-            <div className="shrink-0">
-              <div className="flex shrink-0 flex-col items-end gap-2">
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-white/70">
-                  {activity.minutesAgo} min ago
-                </span>
-
-                {distance !== null ? (
-                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-white/70">
-                    {distance.toFixed(1)} km
-                  </span>
-                ) : null}
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-3 flex flex-wrap gap-2">
-            <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-white/70">
-              {activity.activityType}
-            </span>
-
-            <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-white/70">
-              {activity.vibe}
-            </span>
-
-            <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-white/70">
-              Crowd: {activity.crowdLevel}
-            </span>
-
-            {activity.trusted ? (
-              <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-semibold text-emerald-100">
-                Trusted report
-              </span>
-            ) : null}
-          </div>
-
-          <p className="mt-3 text-sm leading-6 text-white/60">
-            {activity.note}
-          </p>
-        </div>
-        );
-})}
-    </section>
-
-    <section className="rounded-3xl border border-blue-500/20 bg-[linear-gradient(180deg,#1a1f2e,#0c0f1a)] p-5">
-      <div className="mb-2 inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-blue-100">
-        <Sparkles className="h-3.5 w-3.5" />
-        TwinMe Live Read
-      </div>
-
-      <p className="text-sm leading-6 text-white/75">
-        Activity is changing in real time. Use trusted reports, crowd
-        levels, distance, and your crew state together before deciding
-        where to move next.
-      </p>
-    </section>
-  </div>
-) : null}
-
-{/* CREW VIEW */}
-{activeView === "crew" ? (
-  <div>
-    <section className="mb-6 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#14141a,#0c0c10)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
-      <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold tracking-[0.22em] text-white/80">
-        <Radar className="h-3.5 w-3.5" />
-        LIVE RADAR
-      </div>
-
-      <h2 className="text-2xl font-semibold text-white">
-        {displayName}&apos;s Awareness Grid
-      </h2>
-
-          <p className="mt-3 text-sm leading-6 text-white/70">
-            This layer compares live crew distance, signal intensity, and safer movement options before you move.
-          </p>
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
-              <span className="twincore-live-dot" />
-              LIVE
-            </span>
-
-            <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
-              {hasSharedLocation ? "LOCATION ON" : "LOCATION OFF"}
-            </span>
-
-            <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
-              {partyStatus || "NOT ACTIVE"}
-            </span>
-
-            <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
-              {nearbyCount} NEARBY
-            </span>
-
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
-              <EyeOff className="h-3.5 w-3.5" />
-              {ghostMode ? "GHOST ON" : "GHOST OFF"}
-            </span>
-
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
-              <Lock className="h-3.5 w-3.5" />
-              {trustedOnly ? "TRUSTED ONLY" : `${trustedVisibleCount} TRUSTED`}
-            </span>
-          </div>
-
-          {locationError ? (
-            <div className="mt-4 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-100">
-              {locationError}
-            </div>
-          ) : null}
-        </section>
-
-        <section className="mb-6 grid grid-cols-2 gap-3">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="mb-2 inline-flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-white/55">
-              <Zap className="h-3.5 w-3.5" />
-              Grid Energy
-            </div>
-            <div className="text-2xl font-semibold">{gridLabel}</div>
-            <p className="mt-1 text-sm text-white/60">
-              {hotspotCount} hotspot{hotspotCount === 1 ? "" : "s"}
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="mb-2 inline-flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-white/55">
-              <Activity className="h-3.5 w-3.5" />
-              Visible Layer
-            </div>
-            <div className="text-2xl font-semibold">{visibleCount}</div>
-            <p className="mt-1 text-sm text-white/60">signals on map</p>
-          </div>
-        </section>
-
-        <section className="mb-6 rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,#101216,#090A0D)] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.42)]">
-          <div className="relative aspect-square overflow-hidden rounded-[1.6rem] border border-white/10 bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.10),rgba(0,0,0,0.4)_52%,rgba(0,0,0,0.88)_100%)]">
-            <div className="absolute inset-6 rounded-full border border-white/10" />
-            <div className="absolute inset-12 rounded-full border border-white/10" />
-            <div className="absolute inset-20 rounded-full border border-white/10" />
-            <div className="absolute inset-28 rounded-full border border-white/10" />
-
-            <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-white/10" />
-            <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-white/10" />
-
-            {hotspotCount > 0
-              ? radarPoints
-                  .filter((spot) => spot.clusterStrength >= 3)
-                  .slice(0, 3)
-                  .map((spot) => {
-                    const tone = getToneClasses(spot.tone);
-                    const hotspotSize = clamp(spot.clusterStrength * 42, 70, 130);
-
-                    return (
-                      <div
-                        key={`hotspot-${spot.id}`}
-                        className={`pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 rounded-full blur-2xl ${tone.haze} opacity-60`}
-                        style={{
-                          left: `${spot.x}%`,
-                          top: `${spot.y}%`,
-                          width: `${hotspotSize}px`,
-                          height: `${hotspotSize}px`,
-                        }}
-                      />
-                    );
-                  })
-              : null}
-
-            {sweepOn ? (
-              <div className="pointer-events-none absolute inset-0">
-                <div
-                  className="absolute left-1/2 top-1/2 h-[48%] w-[48%] -translate-x-1/2 -translate-y-1/2 origin-bottom-right rounded-tl-full bg-[conic-gradient(from_0deg,rgba(96,165,250,0.0)_0deg,rgba(96,165,250,0.0)_280deg,rgba(96,165,250,0.28)_340deg,rgba(96,165,250,0.0)_360deg)]"
-                  style={{
-                    animation: `spin ${sweepDuration}s linear infinite`,
-                  }}
-                />
-              </div>
-            ) : null}
-
-            <div
-              className={`absolute z-20 flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 backdrop-blur ${
-                ghostMode ? "bg-white/8 opacity-60 blur-[1px]" : "bg-white/15"
-              }`}
-              style={{ left: `${userPosition.x}%`, top: `${userPosition.y}%` }}
-            >
-              <LocateFixed className={`h-4 w-4 text-white ${ghostMode ? "opacity-70" : ""}`} />
-            </div>
-
-            {ghostMode ? (
-              <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/10 bg-white/5 blur-sm" />
-            ) : null}
-
-            {radarPoints.length > 0 ? (
-              radarPoints.map((spot) => {
-                const tone = getToneClasses(spot.tone);
-                const selected = selectedSpot?.id === spot.id;
-                const glowScale = spot.blurred
-                  ? 0.38
-                  : clamp(0.4 + spot.intensity / 120, 0.45, 1.15);
-
-                const nodeSize = clamp(34 + spot.clusterStrength * 3, 34, 46);
-
-                return (
-                  <button
-                    key={spot.id}
-                    type="button"
-                    onClick={() => setSelectedSpotId(spot.id)}
-                    className={`absolute z-20 -translate-x-1/2 -translate-y-1/2 ${
-                      spot.blurred ? "opacity-80" : ""
-                    }`}
-                    style={{ left: `${spot.x}%`, top: `${spot.y}%` }}
-                  >
-                    <span
-                      className={`absolute inset-0 rounded-full ${
-                        spot.blurred ? "bg-white/60" : tone.dot
-                      } ${spot.tone === "risk" ? "animate-ping" : spot.tone === "lit" ? "animate-pulse" : ""}`}
-                      style={{
-                        opacity: spot.blurred ? 0.16 : glowScale,
-                        filter: spot.blurred ? "blur(12px)" : "blur(10px)",
-                        transform: `scale(${spot.clusterStrength >= 3 ? 1.6 : 1.2})`,
-                      }}
-                    />
-                    <span
-                      className={`relative flex items-center justify-center rounded-full border bg-black/50 backdrop-blur ${
-                        spot.blurred ? "border-white/20" : tone.ring
-                      } ${selected ? "scale-110" : "scale-100"} transition-all duration-200`}
-                      style={{ width: `${nodeSize}px`, height: `${nodeSize}px` }}
-                    >
-                      <span
-                        className={`rounded-full ${
-                          spot.blurred ? "bg-white/60 blur-[1px]" : tone.dot
-                        }`}
-                        style={{
-                          width: `${clamp(10 + spot.clusterStrength, 10, 15)}px`,
-                          height: `${clamp(10 + spot.clusterStrength, 10, 15)}px`,
-                        }}
-                      />
-                    </span>
-                  </button>
-                );
-              })
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center p-8">
-                <div className="max-w-[260px] rounded-3xl border border-white/10 bg-black/30 px-5 py-6 text-center backdrop-blur">
-                  <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/5">
-                    <Radar className="h-5 w-5 text-white/75" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-white">No live signals yet</h3>
-                  <p className="mt-2 text-sm leading-6 text-white/60">{emptyStateReason}</p>
-                </div>
-              </div>
-            )}
-
-            <div className="absolute left-4 top-4 rounded-full bg-white/10 px-3 py-1 text-[11px] font-medium text-white/75">
-              NORTH
-            </div>
-
-            <div className="absolute bottom-4 right-4 rounded-full bg-white/10 px-3 py-1 text-[11px] font-medium text-white/75">
-              RANGE: {ghostMode ? "MASKED" : "LIVE"}
-            </div>
-          </div>
-        </section>
-
-        {selectedSpot ? (
-          <section
-            className={`mb-6 rounded-3xl border p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)] ${
-              getToneClasses(selectedSpot.tone).card
-            } ${selectedSpot.blurred ? "backdrop-blur-sm" : ""}`}
-          >
-            <div className="mb-3 flex items-start justify-between gap-3">
+            <div className="flex items-center justify-between gap-3">
               <div>
-                <div
-                  className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold tracking-wide ${
-                    selectedSpot.blurred
-                      ? "bg-white/10 text-white/80"
-                      : getToneClasses(selectedSpot.tone).badge
-                  }`}
-                >
-                  {selectedSpot.blurred ? <Lock className="h-4 w-4" /> : getToneIcon(selectedSpot.tone)}
-                  {selectedSpot.blurred ? "LIMITED DETAIL" : selectedSpot.tone.toUpperCase()}
-                </div>
-
-                <h3 className={`mt-3 text-2xl font-semibold text-white ${selectedSpot.blurred ? "blur-[1.2px]" : ""}`}>
-                  {selectedSpot.name}
-                </h3>
+                <h1 className="text-4xl font-semibold tracking-tight">Spots</h1>
+                <p className="mt-2 text-sm text-white/60">
+                  Crew awareness, nearby places, and live activity
+                </p>
               </div>
 
-              <div className="rounded-2xl bg-white/10 px-3 py-2 text-sm font-medium text-white/85">
-                <span className="inline-flex items-center gap-1.5">
-                  <Users className="h-4 w-4" />
-                  {selectedSpot.crew}
-                </span>
-              </div>
+              <button
+                type="button"
+                onClick={() => setSweepOn((prev) => !prev)}
+                className={`twincore-press rounded-2xl bg-[linear-gradient(180deg,#1A1A1F,#141419)] px-4 py-3 text-sm font-medium text-white shadow-[0_8px_24px_rgba(0,0,0,0.35)] ${
+                  activeView === "crew" ? "inline-flex" : "hidden"
+                }`}
+              >
+                {sweepOn ? "Radar On" : "Radar Off"}
+              </button>
             </div>
+          </header>
 
-            <p className="text-sm leading-6 text-white/75">{selectedSpot.note}</p>
-
-            <div className="mt-3 flex flex-wrap gap-2">
-              <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
-                Intensity {selectedSpot.intensity}
-              </span>
-              <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
-                Cluster {selectedSpot.clusterStrength}
-              </span>
-            </div>
-
-            <div className="mt-4 grid grid-cols-3 gap-3">
-              <MiniMeter
-                label="Risk"
-                value={
-                  selectedSpot.tone === "risk"
-                    ? clamp(selectedSpot.intensity, 60, 100)
-                    : selectedSpot.tone === "lit"
-                    ? 68
-                    : selectedSpot.tone === "safe"
-                    ? 18
-                    : 36
-                }
-              />
-              <MiniMeter
-                label="Crew"
-                value={selectedSpot.blurred ? 12 : Math.min(100, selectedSpot.clusterStrength * 24)}
-              />
-              <MiniMeter
-                label="Exit"
-                value={
-                  selectedSpot.tone === "safe"
-                    ? 92
-                    : selectedSpot.tone === "chill"
-                    ? 74
-                    : selectedSpot.tone === "lit"
-                    ? 52
-                    : 24
-                }
-              />
-            </div>
-          </section>
-        ) : (
-          <section className="mb-6 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#14141a,#0c0c10)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold tracking-wide text-white/80">
-              <Activity className="h-3.5 w-3.5" />
-              SIGNAL STATE
-            </div>
-
-            <h3 className="text-2xl font-semibold text-white">Waiting for live movement</h3>
-            <p className="mt-3 text-sm leading-6 text-white/70">{emptyStateReason}</p>
-
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="text-xs uppercase tracking-[0.18em] text-white/50">Location</div>
-                <div className="mt-2 text-lg font-semibold">
-                  {hasSharedLocation || userCoords ? "Ready" : "Needed"}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="text-xs uppercase tracking-[0.18em] text-white/50">Crew Layer</div>
-                <div className="mt-2 text-lg font-semibold">
-                  {hasRealSignals ? "Listening" : "Standby"}
-                </div>
-              </div>
-            </div>
-          </section>
-        )}
-
-        <section className="mb-6 rounded-3xl border border-blue-500/20 bg-[linear-gradient(180deg,#1a1f2e,#0c0f1a)] p-5 shadow-[0_18px_50px_rgba(59,130,246,0.18)]">
-          <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold tracking-wide text-white/80">
-            <Sparkles className="h-3.5 w-3.5" />
-            TWINME SIGNAL
-          </div>
-
-          <p className="text-sm leading-6 text-white/82">{twinInsight}</p>
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
-              STATE: {safetyState.toUpperCase()}
-            </span>
-            {selectedSpot ? (
-              <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
-                POINT: {selectedSpot.name.toUpperCase()}
-              </span>
-            ) : null}
-          </div>
-        </section>
-
-        <section className="mb-6">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-white">Live Points</h2>
-            <span className="text-sm text-white/55">{visibleCount} visible</span>
-          </div>
-
-          {radarPoints.length > 0 ? (
-            <div className="space-y-3">
-              {radarPoints.map((spot) => {
-                const tone = getToneClasses(spot.tone);
-                const selected = selectedSpot?.id === spot.id;
+          {/* SPOTS VIEW SWITCHER */}
+          <section className="mb-6 rounded-3xl border border-white/10 bg-white/[0.035] p-2 backdrop-blur-xl">
+            <div className="grid grid-cols-3 gap-2">
+              {(
+                [
+                  {
+                    id: "crew",
+                    label: "Crew",
+                    description: "Private radar",
+                  },
+                  {
+                    id: "nearby",
+                    label: "Nearby",
+                    description: "Places & events",
+                  },
+                  {
+                    id: "live",
+                    label: "Live",
+                    description: "Happening now",
+                  },
+                ] as const
+              ).map((view) => {
+                const active = activeView === view.id;
 
                 return (
                   <button
-                    key={spot.id}
+                    key={view.id}
                     type="button"
-                    onClick={() => setSelectedSpotId(spot.id)}
-                    className={`twincore-press w-full rounded-3xl border p-4 text-left shadow-[0_12px_30px_rgba(0,0,0,0.28)] ${
-                      spot.blurred
-                        ? "border-white/10 bg-[linear-gradient(180deg,#17181d,#0d0e12)]"
-                        : tone.card
-                    } ${selected ? "ring-1 ring-white/20" : ""}`}
+                    onClick={() => setActiveView(view.id)}
+                    className={`rounded-2xl px-3 py-3 text-center transition active:scale-[0.98] ${
+                      active
+                        ? "border border-cyan-300/25 bg-cyan-300/10 text-cyan-100 shadow-[0_0_25px_rgba(34,211,238,0.12)]"
+                        : "border border-transparent text-white/55 hover:bg-white/[0.05] hover:text-white/80"
+                    }`}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="flex items-center gap-2 text-white">
-                          {spot.blurred ? <Lock className="h-4 w-4" /> : getToneIcon(spot.tone)}
-                          <span className={`text-lg font-semibold ${spot.blurred ? "blur-[1px]" : ""}`}>
-                            {spot.name}
-                          </span>
-                        </div>
+                    <div className="text-sm font-black">{view.label}</div>
 
-                        <p className="mt-2 text-sm leading-6 text-white/70">{spot.note}</p>
-                      </div>
-
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs font-semibold tracking-wide ${
-                          spot.blurred ? "bg-white/10 text-white/75" : tone.badge
-                        }`}
-                      >
-                        {spot.blurred ? "blurred" : spot.tone}
-                      </span>
-                    </div>
-
-                    <div className="mt-3 flex items-center justify-between text-sm text-white/65">
-                      <span className="inline-flex items-center gap-1.5">
-                        <Users className="h-4 w-4" />
-                        Crew nearby: {spot.clusterStrength}
-                      </span>
-
-                      <span className="inline-flex items-center gap-1.5">
-                        <Route className="h-4 w-4" />
-                        {spot.distanceKm.toFixed(2)} km
-                      </span>
+                    <div className="mt-1 hidden text-[10px] font-medium text-white/40 sm:block">
+                      {view.description}
                     </div>
                   </button>
                 );
               })}
             </div>
-          ) : (
-            <div className="rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#14141a,#0c0c10)] p-5 shadow-[0_12px_30px_rgba(0,0,0,0.28)]">
-              <p className="text-lg font-semibold text-white">No live points yet</p>
-              <p className="mt-2 text-sm leading-6 text-white/65">{emptyStateReason}</p>
+          </section>
+
+          {/* NEARBY VIEW */}
+          {activeView === "nearby" ? (
+            <div className="space-y-5">
+              <section className="rounded-3xl border border-fuchsia-300/20 bg-[radial-gradient(circle_at_top,rgba(217,70,239,0.14),transparent_45%),linear-gradient(180deg,#15111d,#0b0b0f)] p-5 shadow-[0_0_45px_rgba(217,70,239,0.10)]">
+                <div className="inline-flex items-center gap-2 rounded-full border border-fuchsia-300/20 bg-fuchsia-300/10 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-fuchsia-100">
+                  <MapPin className="h-3.5 w-3.5" />
+                  Nearby Discovery
+                </div>
+
+                <h2 className="mt-4 text-2xl font-black text-white">
+                  Find What Fits Right Now
+                </h2>
+
+                <p className="mt-2 text-sm leading-6 text-white/65">
+                  Discover nearby places based on distance, energy, activity,
+                  and what fits your current night.
+                </p>
+              </section>
+
+              {nearbyLoading ? (
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm text-white/60">
+                  Finding places near you...
+                </div>
+              ) : null}
+
+              {nearbyError ? (
+                <div className="rounded-2xl border border-orange-300/20 bg-orange-300/[0.06] p-4 text-sm text-orange-100/80">
+                  {nearbyError}
+                </div>
+              ) : null}
+
+              <div className="flex items-center gap-2 overflow-x-auto py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {(
+                  [
+                    "All",
+                    "Food",
+                    "Nightlife",
+                    "Events",
+                    "Sports",
+                    "Outdoor",
+                    "Stay In",
+                  ] as const
+                ).map((category) => {
+                  const active = nearbyCategory === category;
+
+                  return (
+                    <button
+                      key={category}
+                      type="button"
+                      onClick={() => setNearbyCategory(category)}
+                      className={`shrink-0 rounded-full border px-3 py-2 text-xs font-semibold transition ${
+                        active
+                          ? "border-cyan-300/30 bg-cyan-300/10 text-cyan-100"
+                          : "border-white/10 bg-white/[0.04] text-white/55"
+                      }`}
+                    >
+                      {category}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <section className="space-y-3">
+                {nearbySpotsWithLiveActivity.map((spot) => (
+                  <div
+                    key={spot.id}
+                    className="rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#14141a,#0c0c10)] p-4"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-lg font-semibold text-white">
+                          {spot.name}
+                        </div>
+
+                        {spot.address ? (
+                          <div className="mt-1 text-xs text-white/45">
+                            📍 {spot.address}
+                          </div>
+                        ) : null}
+
+                        <div className="mt-1 text-xs text-white/45">
+                          {spot.category}
+                        </div>
+                      </div>
+
+                      <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-white/70">
+                        {spot.distanceKm === 0
+                          ? "Home"
+                          : `${spot.distanceKm.toFixed(1)} km`}
+                      </span>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-white/70">
+                        {spot.vibe}
+                      </span>
+
+                      <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-white/70">
+                        {spot.status}
+                      </span>
+
+                      {typeof spot.rating === "number" ? (
+                        <span className="rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1 text-xs font-semibold text-amber-100">
+                          ★ {spot.rating.toFixed(1)}
+                          {typeof spot.reviewCount === "number"
+                            ? ` (${spot.reviewCount})`
+                            : ""}
+                        </span>
+                      ) : null}
+
+                      {spot.isOpen === true ? (
+                        <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-semibold text-emerald-100">
+                          Open now
+                        </span>
+                      ) : spot.isOpen === false ? (
+                        <span className="rounded-full border border-red-300/20 bg-red-300/10 px-3 py-1 text-xs font-semibold text-red-100">
+                          Closed
+                        </span>
+                      ) : null}
+
+                      {spot.liveReportCount > 0 ? (
+                        <>
+                          <span className="rounded-full border border-orange-300/20 bg-orange-300/10 px-3 py-1 text-xs font-semibold text-orange-100">
+                            🔥 {spot.liveReportCount} live report
+                            {spot.liveReportCount === 1 ? "" : "s"}
+                          </span>
+
+                          {spot.corroborationLevel === "strong" ? (
+                            <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-semibold text-emerald-100">
+                              Strong signal
+                            </span>
+                          ) : spot.corroborationLevel === "moderate" ? (
+                            <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-semibold text-cyan-100">
+                              Confirmed activity
+                            </span>
+                          ) : null}
+                        </>
+                      ) : null}
+                    </div>
+
+                    <p className="mt-3 text-sm leading-6 text-white/60">
+                      {spot.note}
+                    </p>
+                    {spot.latestLiveReport ? (
+                      <div className="mt-3 rounded-2xl border border-orange-300/15 bg-orange-300/[0.06] p-3">
+                        <div className="text-xs font-black uppercase tracking-[0.16em] text-orange-100">
+                          Live now
+                        </div>
+
+                        <p className="mt-1 text-sm font-semibold text-white/85">
+                          {spot.latestLiveReport.title}
+                        </p>
+
+                        <p className="mt-1 text-xs text-white/50">
+                          {spot.latestLiveReport.minutesAgo} min ago
+                        </p>
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              </section>
+
+              <section className="rounded-3xl border border-blue-500/20 bg-[linear-gradient(180deg,#1a1f2e,#0c0f1a)] p-5">
+                <div className="mb-2 inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-blue-100">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  TwinMe Suggests
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-lg font-semibold text-white">
+                      {twinMeNearbySuggestion.spotName}
+                    </p>
+
+                    {twinMeNearbySuggestion.matchConfidence > 0 ? (
+                      <span className="shrink-0 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-bold text-cyan-100">
+                        {twinMeNearbySuggestion.matchConfidence}% Match
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <span className="text-xs text-white/45">
+                    {twinMeNearbySuggestion.matchConfidence >= 90
+                      ? "Excellent fit"
+                      : twinMeNearbySuggestion.matchConfidence >= 75
+                        ? "Strong fit"
+                        : twinMeNearbySuggestion.matchConfidence >= 60
+                          ? "Good fit"
+                          : "Possible fit"}
+                  </span>
+
+                  <p className="mt-2 text-sm leading-6 text-white/75">
+                    {twinMeNearbySuggestion.message}
+                  </p>
+
+                  {twinMeNearbySuggestion.reasons.length > 0 ? (
+                    <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                      <div className="text-xs font-black uppercase tracking-[0.18em] text-white/45">
+                        Why this?
+                      </div>
+
+                      <div className="mt-3 space-y-2">
+                        {twinMeNearbySuggestion.reasons.map((reason, index) => (
+                          <div
+                            key={`${reason}-${index}`}
+                            className="flex items-start gap-2 text-sm text-white/65"
+                          >
+                            <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-300" />
+
+                            <span>{reason}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </section>
             </div>
-          )}
-        </section>
+          ) : null}
 
-        <nav className="grid grid-cols-2 gap-3">
-          <Link
-            href="/"
-            className="twincore-press rounded-2xl bg-[linear-gradient(180deg,#1A1A1F,#141419)] px-4 py-4 text-center text-sm font-medium text-white shadow-[0_8px_24px_rgba(0,0,0,0.35)]"
-          >
-            Home
-          </Link>
+          {/* LIVE VIEW */}
+          {activeView === "live" ? (
+            <div className="space-y-5">
+              <section className="rounded-3xl border border-orange-300/20 bg-[radial-gradient(circle_at_top,rgba(251,146,60,0.14),transparent_45%),linear-gradient(180deg,#1c130e,#0b0b0f)] p-5 shadow-[0_0_45px_rgba(251,146,60,0.10)]">
+                <div className="inline-flex items-center gap-2 rounded-full border border-orange-300/20 bg-orange-300/10 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-orange-100">
+                  <Flame className="h-3.5 w-3.5" />
+                  Happening Now
+                </div>
 
-          <Link
-            href="/crew"
-            className="twincore-press rounded-2xl bg-[linear-gradient(180deg,#1A1A1F,#141419)] px-4 py-4 text-center text-sm font-medium text-white shadow-[0_8px_24px_rgba(0,0,0,0.35)]"
-          >
-            Crew
-          </Link>
-                     </nav>
+                <h2 className="mt-4 text-2xl font-black text-white">
+                  Live From the Area
+                </h2>
 
-      </div>
-    ) : null}
+                <p className="mt-2 text-sm leading-6 text-white/65">
+                  Real-time crowd movement, atmosphere checks, event activity,
+                  and trusted reports from nearby.
+                </p>
 
-  </div>
-</main>
-</AuthGuard>
-);
+                <button
+                  type="button"
+                  onClick={() => setPostComposerOpen((current) => !current)}
+                  className="mt-4 w-full rounded-2xl border border-orange-300/25 bg-orange-300/10 px-4 py-3 text-sm font-bold text-orange-100 transition hover:bg-orange-300/15 active:scale-[0.98]"
+                >
+                  {postComposerOpen ? "Close Update" : "+ Post Live Update"}
+                </button>
+
+                {postComposerOpen ? (
+                  <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4">
+                    <div className="text-xs font-black uppercase tracking-[0.18em] text-white/50">
+                      What&apos;s happening?
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {(
+                        [
+                          "Great vibe",
+                          "Busy here",
+                          "Getting packed",
+                          "Calm spot",
+                          "Avoid area",
+                        ] as const
+                      ).map((type) => {
+                        const active = livePostType === type;
+
+                        return (
+                          <button
+                            key={type}
+                            type="button"
+                            onClick={() => setLivePostType(type)}
+                            className={`rounded-full border px-3 py-2 text-xs font-semibold transition ${
+                              active
+                                ? "border-orange-300/30 bg-orange-300/10 text-orange-100"
+                                : "border-white/10 bg-white/[0.04] text-white/55"
+                            }`}
+                          >
+                            {type}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="mt-4">
+                      <div className="text-xs font-black uppercase tracking-[0.18em] text-white/50">
+                        Where is this happening?
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLiveLocationMode("current");
+                            setLivePostLocation("Current Location");
+                          }}
+                          className={`rounded-2xl border px-3 py-3 text-xs font-semibold transition ${
+                            liveLocationMode === "current"
+                              ? "border-orange-300/30 bg-orange-300/10 text-orange-100"
+                              : "border-white/10 bg-white/[0.04] text-white/55"
+                          }`}
+                        >
+                          Use Current Location
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLiveLocationMode("venue");
+
+                            if (livePostLocation === "Current Location") {
+                              setLivePostLocation("");
+                            }
+                          }}
+                          className={`rounded-2xl border px-3 py-3 text-xs font-semibold transition ${
+                            liveLocationMode === "venue"
+                              ? "border-orange-300/30 bg-orange-300/10 text-orange-100"
+                              : "border-white/10 bg-white/[0.04] text-white/55"
+                          }`}
+                        >
+                          Enter Venue
+                        </button>
+                      </div>
+
+                      {liveLocationMode === "current" ? (
+                        <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+                          <p className="text-sm font-semibold text-white/80">
+                            Current Location
+                          </p>
+
+                          <p className="mt-1 text-xs text-white/45">
+                            Your current coordinates will be attached to this
+                            live update.
+                          </p>
+                        </div>
+                      ) : (
+                        <input
+                          id="live-post-location"
+                          type="text"
+                          value={livePostLocation}
+                          onChange={(event) =>
+                            setLivePostLocation(event.target.value)
+                          }
+                          placeholder="Enter venue or location name"
+                          className="mt-3 w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-orange-300/30"
+                        />
+                      )}
+                    </div>
+
+                    <textarea
+                      value={livePostNote}
+                      onChange={(event) => setLivePostNote(event.target.value)}
+                      placeholder="Add a quick note..."
+                      className="mt-4 min-h-[90px] w-full resize-none rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-orange-300/30"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={handlePostLiveUpdate}
+                      className="mt-3 w-full rounded-2xl bg-orange-500 px-4 py-3 text-sm font-black text-white transition hover:bg-orange-600 active:scale-[0.98]"
+                    >
+                      Post Update
+                    </button>
+                  </div>
+                ) : null}
+              </section>
+
+              <div className="flex items-center gap-2 overflow-x-auto py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {(
+                  [
+                    "All",
+                    "Nightlife",
+                    "Food",
+                    "Event",
+                    "Sports",
+                    "Outdoor",
+                  ] as const
+                ).map((filter) => {
+                  const active = liveFilter === filter;
+
+                  return (
+                    <button
+                      key={filter}
+                      type="button"
+                      onClick={() => setLiveFilter(filter)}
+                      className={`shrink-0 rounded-full border px-3 py-2 text-xs font-semibold transition ${
+                        active
+                          ? "border-orange-300/30 bg-orange-300/10 text-orange-100"
+                          : "border-white/10 bg-white/[0.04] text-white/55"
+                      }`}
+                    >
+                      {filter}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <section className="space-y-3">
+                {filteredLiveActivities.map((activity) => {
+                  const distance = getLiveActivityDistance(
+                    activity,
+                    userCoords,
+                  );
+
+                  return (
+                    <div
+                      key={activity.id}
+                      className="rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#14141a,#0c0c10)] p-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-lg font-semibold text-white">
+                            {activity.title}
+                          </div>
+
+                          <div className="mt-1 text-xs text-white/45">
+                            {activity.area}
+                          </div>
+                        </div>
+
+                        <div className="shrink-0">
+                          <div className="flex shrink-0 flex-col items-end gap-2">
+                            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-white/70">
+                              {activity.minutesAgo} min ago
+                            </span>
+
+                            {distance !== null ? (
+                              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-white/70">
+                                {distance.toFixed(1)} km
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-white/70">
+                          {activity.activityType}
+                        </span>
+
+                        <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-white/70">
+                          {activity.vibe}
+                        </span>
+
+                        <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-white/70">
+                          Crowd: {activity.crowdLevel}
+                        </span>
+
+                        {activity.trusted ? (
+                          <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-semibold text-emerald-100">
+                            Trusted report
+                          </span>
+                        ) : null}
+                      </div>
+
+                      <p className="mt-3 text-sm leading-6 text-white/60">
+                        {activity.note}
+                      </p>
+                    </div>
+                  );
+                })}
+              </section>
+
+              <section className="rounded-3xl border border-blue-500/20 bg-[linear-gradient(180deg,#1a1f2e,#0c0f1a)] p-5">
+                <div className="mb-2 inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-blue-100">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  TwinMe Live Read
+                </div>
+
+                <p className="text-sm leading-6 text-white/75">
+                  Activity is changing in real time. Use trusted reports, crowd
+                  levels, distance, and your crew state together before deciding
+                  where to move next.
+                </p>
+              </section>
+            </div>
+          ) : null}
+
+          {/* CREW VIEW */}
+          {activeView === "crew" ? (
+            <div>
+              <section className="mb-6 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#14141a,#0c0c10)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
+                <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold tracking-[0.22em] text-white/80">
+                  <Radar className="h-3.5 w-3.5" />
+                  LIVE RADAR
+                </div>
+
+                <h2 className="text-2xl font-semibold text-white">
+                  {displayName}&apos;s Awareness Grid
+                </h2>
+
+                <p className="mt-3 text-sm leading-6 text-white/70">
+                  This layer compares live crew distance, signal intensity, and
+                  safer movement options before you move.
+                </p>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
+                    <span className="twincore-live-dot" />
+                    LIVE
+                  </span>
+
+                  <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
+                    {hasSharedLocation ? "LOCATION ON" : "LOCATION OFF"}
+                  </span>
+
+                  <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
+                    {partyStatus || "NOT ACTIVE"}
+                  </span>
+
+                  <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
+                    {nearbyCount} NEARBY
+                  </span>
+
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
+                    <EyeOff className="h-3.5 w-3.5" />
+                    {ghostMode ? "GHOST ON" : "GHOST OFF"}
+                  </span>
+
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
+                    <Lock className="h-3.5 w-3.5" />
+                    {trustedOnly
+                      ? "TRUSTED ONLY"
+                      : `${trustedVisibleCount} TRUSTED`}
+                  </span>
+                </div>
+
+                {locationError ? (
+                  <div className="mt-4 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+                    {locationError}
+                  </div>
+                ) : null}
+              </section>
+
+              <section className="mb-6 grid grid-cols-2 gap-3">
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <div className="mb-2 inline-flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-white/55">
+                    <Zap className="h-3.5 w-3.5" />
+                    Grid Energy
+                  </div>
+                  <div className="text-2xl font-semibold">{gridLabel}</div>
+                  <p className="mt-1 text-sm text-white/60">
+                    {hotspotCount} hotspot{hotspotCount === 1 ? "" : "s"}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <div className="mb-2 inline-flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-white/55">
+                    <Activity className="h-3.5 w-3.5" />
+                    Visible Layer
+                  </div>
+                  <div className="text-2xl font-semibold">{visibleCount}</div>
+                  <p className="mt-1 text-sm text-white/60">signals on map</p>
+                </div>
+              </section>
+
+              <section className="mb-6 rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,#101216,#090A0D)] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.42)]">
+                <div className="relative aspect-square overflow-hidden rounded-[1.6rem] border border-white/10 bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.10),rgba(0,0,0,0.4)_52%,rgba(0,0,0,0.88)_100%)]">
+                  <div className="absolute inset-6 rounded-full border border-white/10" />
+                  <div className="absolute inset-12 rounded-full border border-white/10" />
+                  <div className="absolute inset-20 rounded-full border border-white/10" />
+                  <div className="absolute inset-28 rounded-full border border-white/10" />
+
+                  <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-white/10" />
+                  <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-white/10" />
+
+                  {hotspotCount > 0
+                    ? radarPoints
+                        .filter((spot) => spot.clusterStrength >= 3)
+                        .slice(0, 3)
+                        .map((spot) => {
+                          const tone = getToneClasses(spot.tone);
+                          const hotspotSize = clamp(
+                            spot.clusterStrength * 42,
+                            70,
+                            130,
+                          );
+
+                          return (
+                            <div
+                              key={`hotspot-${spot.id}`}
+                              className={`pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 rounded-full blur-2xl ${tone.haze} opacity-60`}
+                              style={{
+                                left: `${spot.x}%`,
+                                top: `${spot.y}%`,
+                                width: `${hotspotSize}px`,
+                                height: `${hotspotSize}px`,
+                              }}
+                            />
+                          );
+                        })
+                    : null}
+
+                  {sweepOn ? (
+                    <div className="pointer-events-none absolute inset-0">
+                      <div
+                        className="absolute left-1/2 top-1/2 h-[48%] w-[48%] -translate-x-1/2 -translate-y-1/2 origin-bottom-right rounded-tl-full bg-[conic-gradient(from_0deg,rgba(96,165,250,0.0)_0deg,rgba(96,165,250,0.0)_280deg,rgba(96,165,250,0.28)_340deg,rgba(96,165,250,0.0)_360deg)]"
+                        style={{
+                          animation: `spin ${sweepDuration}s linear infinite`,
+                        }}
+                      />
+                    </div>
+                  ) : null}
+
+                  <div
+                    className={`absolute z-20 flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 backdrop-blur ${
+                      ghostMode
+                        ? "bg-white/8 opacity-60 blur-[1px]"
+                        : "bg-white/15"
+                    }`}
+                    style={{
+                      left: `${userPosition.x}%`,
+                      top: `${userPosition.y}%`,
+                    }}
+                  >
+                    <LocateFixed
+                      className={`h-4 w-4 text-white ${ghostMode ? "opacity-70" : ""}`}
+                    />
+                  </div>
+
+                  {ghostMode ? (
+                    <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/10 bg-white/5 blur-sm" />
+                  ) : null}
+
+                  {radarPoints.length > 0 ? (
+                    radarPoints.map((spot) => {
+                      const tone = getToneClasses(spot.tone);
+                      const selected = selectedSpot?.id === spot.id;
+                      const glowScale = spot.blurred
+                        ? 0.38
+                        : clamp(0.4 + spot.intensity / 120, 0.45, 1.15);
+
+                      const nodeSize = clamp(
+                        34 + spot.clusterStrength * 3,
+                        34,
+                        46,
+                      );
+
+                      return (
+                        <button
+                          key={spot.id}
+                          type="button"
+                          onClick={() => setSelectedSpotId(spot.id)}
+                          className={`absolute z-20 -translate-x-1/2 -translate-y-1/2 ${
+                            spot.blurred ? "opacity-80" : ""
+                          }`}
+                          style={{ left: `${spot.x}%`, top: `${spot.y}%` }}
+                        >
+                          <span
+                            className={`absolute inset-0 rounded-full ${
+                              spot.blurred ? "bg-white/60" : tone.dot
+                            } ${spot.tone === "risk" ? "animate-ping" : spot.tone === "lit" ? "animate-pulse" : ""}`}
+                            style={{
+                              opacity: spot.blurred ? 0.16 : glowScale,
+                              filter: spot.blurred
+                                ? "blur(12px)"
+                                : "blur(10px)",
+                              transform: `scale(${spot.clusterStrength >= 3 ? 1.6 : 1.2})`,
+                            }}
+                          />
+                          <span
+                            className={`relative flex items-center justify-center rounded-full border bg-black/50 backdrop-blur ${
+                              spot.blurred ? "border-white/20" : tone.ring
+                            } ${selected ? "scale-110" : "scale-100"} transition-all duration-200`}
+                            style={{
+                              width: `${nodeSize}px`,
+                              height: `${nodeSize}px`,
+                            }}
+                          >
+                            <span
+                              className={`rounded-full ${
+                                spot.blurred
+                                  ? "bg-white/60 blur-[1px]"
+                                  : tone.dot
+                              }`}
+                              style={{
+                                width: `${clamp(10 + spot.clusterStrength, 10, 15)}px`,
+                                height: `${clamp(10 + spot.clusterStrength, 10, 15)}px`,
+                              }}
+                            />
+                          </span>
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center p-8">
+                      <div className="max-w-[260px] rounded-3xl border border-white/10 bg-black/30 px-5 py-6 text-center backdrop-blur">
+                        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/5">
+                          <Radar className="h-5 w-5 text-white/75" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-white">
+                          No live signals yet
+                        </h3>
+                        <p className="mt-2 text-sm leading-6 text-white/60">
+                          {emptyStateReason}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="absolute left-4 top-4 rounded-full bg-white/10 px-3 py-1 text-[11px] font-medium text-white/75">
+                    NORTH
+                  </div>
+
+                  <div className="absolute bottom-4 right-4 rounded-full bg-white/10 px-3 py-1 text-[11px] font-medium text-white/75">
+                    RANGE: {ghostMode ? "MASKED" : "LIVE"}
+                  </div>
+                </div>
+              </section>
+
+              {selectedSpot ? (
+                <section
+                  className={`mb-6 rounded-3xl border p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)] ${
+                    getToneClasses(selectedSpot.tone).card
+                  } ${selectedSpot.blurred ? "backdrop-blur-sm" : ""}`}
+                >
+                  <div className="mb-3 flex items-start justify-between gap-3">
+                    <div>
+                      <div
+                        className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold tracking-wide ${
+                          selectedSpot.blurred
+                            ? "bg-white/10 text-white/80"
+                            : getToneClasses(selectedSpot.tone).badge
+                        }`}
+                      >
+                        {selectedSpot.blurred ? (
+                          <Lock className="h-4 w-4" />
+                        ) : (
+                          getToneIcon(selectedSpot.tone)
+                        )}
+                        {selectedSpot.blurred
+                          ? "LIMITED DETAIL"
+                          : selectedSpot.tone.toUpperCase()}
+                      </div>
+
+                      <h3
+                        className={`mt-3 text-2xl font-semibold text-white ${selectedSpot.blurred ? "blur-[1.2px]" : ""}`}
+                      >
+                        {selectedSpot.name}
+                      </h3>
+                    </div>
+
+                    <div className="rounded-2xl bg-white/10 px-3 py-2 text-sm font-medium text-white/85">
+                      <span className="inline-flex items-center gap-1.5">
+                        <Users className="h-4 w-4" />
+                        {selectedSpot.crew}
+                      </span>
+                    </div>
+                  </div>
+
+                  <p className="text-sm leading-6 text-white/75">
+                    {selectedSpot.note}
+                  </p>
+
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
+                      Intensity {selectedSpot.intensity}
+                    </span>
+                    <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
+                      Cluster {selectedSpot.clusterStrength}
+                    </span>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-3 gap-3">
+                    <MiniMeter
+                      label="Risk"
+                      value={
+                        selectedSpot.tone === "risk"
+                          ? clamp(selectedSpot.intensity, 60, 100)
+                          : selectedSpot.tone === "lit"
+                            ? 68
+                            : selectedSpot.tone === "safe"
+                              ? 18
+                              : 36
+                      }
+                    />
+                    <MiniMeter
+                      label="Crew"
+                      value={
+                        selectedSpot.blurred
+                          ? 12
+                          : Math.min(100, selectedSpot.clusterStrength * 24)
+                      }
+                    />
+                    <MiniMeter
+                      label="Exit"
+                      value={
+                        selectedSpot.tone === "safe"
+                          ? 92
+                          : selectedSpot.tone === "chill"
+                            ? 74
+                            : selectedSpot.tone === "lit"
+                              ? 52
+                              : 24
+                      }
+                    />
+                  </div>
+                </section>
+              ) : (
+                <section className="mb-6 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#14141a,#0c0c10)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
+                  <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold tracking-wide text-white/80">
+                    <Activity className="h-3.5 w-3.5" />
+                    SIGNAL STATE
+                  </div>
+
+                  <h3 className="text-2xl font-semibold text-white">
+                    Waiting for live movement
+                  </h3>
+                  <p className="mt-3 text-sm leading-6 text-white/70">
+                    {emptyStateReason}
+                  </p>
+
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                      <div className="text-xs uppercase tracking-[0.18em] text-white/50">
+                        Location
+                      </div>
+                      <div className="mt-2 text-lg font-semibold">
+                        {hasSharedLocation || userCoords ? "Ready" : "Needed"}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                      <div className="text-xs uppercase tracking-[0.18em] text-white/50">
+                        Crew Layer
+                      </div>
+                      <div className="mt-2 text-lg font-semibold">
+                        {hasRealSignals ? "Listening" : "Standby"}
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              )}
+
+              <section className="mb-6 rounded-3xl border border-blue-500/20 bg-[linear-gradient(180deg,#1a1f2e,#0c0f1a)] p-5 shadow-[0_18px_50px_rgba(59,130,246,0.18)]">
+                <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold tracking-wide text-white/80">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  TWINME SIGNAL
+                </div>
+
+                <p className="text-sm leading-6 text-white/82">{twinInsight}</p>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
+                    STATE: {safetyState.toUpperCase()}
+                  </span>
+                  {selectedSpot ? (
+                    <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
+                      POINT: {selectedSpot.name.toUpperCase()}
+                    </span>
+                  ) : null}
+                </div>
+              </section>
+
+              <section className="mb-6">
+                <div className="mb-3 flex items-center justify-between">
+                  <h2 className="text-xl font-semibold text-white">
+                    Live Points
+                  </h2>
+                  <span className="text-sm text-white/55">
+                    {visibleCount} visible
+                  </span>
+                </div>
+
+                {radarPoints.length > 0 ? (
+                  <div className="space-y-3">
+                    {radarPoints.map((spot) => {
+                      const tone = getToneClasses(spot.tone);
+                      const selected = selectedSpot?.id === spot.id;
+
+                      return (
+                        <button
+                          key={spot.id}
+                          type="button"
+                          onClick={() => setSelectedSpotId(spot.id)}
+                          className={`twincore-press w-full rounded-3xl border p-4 text-left shadow-[0_12px_30px_rgba(0,0,0,0.28)] ${
+                            spot.blurred
+                              ? "border-white/10 bg-[linear-gradient(180deg,#17181d,#0d0e12)]"
+                              : tone.card
+                          } ${selected ? "ring-1 ring-white/20" : ""}`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <div className="flex items-center gap-2 text-white">
+                                {spot.blurred ? (
+                                  <Lock className="h-4 w-4" />
+                                ) : (
+                                  getToneIcon(spot.tone)
+                                )}
+                                <span
+                                  className={`text-lg font-semibold ${spot.blurred ? "blur-[1px]" : ""}`}
+                                >
+                                  {spot.name}
+                                </span>
+                              </div>
+
+                              <p className="mt-2 text-sm leading-6 text-white/70">
+                                {spot.note}
+                              </p>
+                            </div>
+
+                            <span
+                              className={`rounded-full px-3 py-1 text-xs font-semibold tracking-wide ${
+                                spot.blurred
+                                  ? "bg-white/10 text-white/75"
+                                  : tone.badge
+                              }`}
+                            >
+                              {spot.blurred ? "blurred" : spot.tone}
+                            </span>
+                          </div>
+
+                          <div className="mt-3 flex items-center justify-between text-sm text-white/65">
+                            <span className="inline-flex items-center gap-1.5">
+                              <Users className="h-4 w-4" />
+                              Crew nearby: {spot.clusterStrength}
+                            </span>
+
+                            <span className="inline-flex items-center gap-1.5">
+                              <Route className="h-4 w-4" />
+                              {spot.distanceKm.toFixed(2)} km
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#14141a,#0c0c10)] p-5 shadow-[0_12px_30px_rgba(0,0,0,0.28)]">
+                    <p className="text-lg font-semibold text-white">
+                      No live points yet
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-white/65">
+                      {emptyStateReason}
+                    </p>
+                  </div>
+                )}
+              </section>
+
+              <nav className="grid grid-cols-2 gap-3">
+                <Link
+                  href="/"
+                  className="twincore-press rounded-2xl bg-[linear-gradient(180deg,#1A1A1F,#141419)] px-4 py-4 text-center text-sm font-medium text-white shadow-[0_8px_24px_rgba(0,0,0,0.35)]"
+                >
+                  Home
+                </Link>
+
+                <Link
+                  href="/crew"
+                  className="twincore-press rounded-2xl bg-[linear-gradient(180deg,#1A1A1F,#141419)] px-4 py-4 text-center text-sm font-medium text-white shadow-[0_8px_24px_rgba(0,0,0,0.35)]"
+                >
+                  Crew
+                </Link>
+              </nav>
+            </div>
+          ) : null}
+        </div>
+      </main>
+    </AuthGuard>
+  );
 }
