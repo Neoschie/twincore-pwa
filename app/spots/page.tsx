@@ -541,7 +541,59 @@ function getTimeOfDayLabel() {
   return "late night";
 }
 
-// PASTE ABOVE THE COMPONENT
+function getArrivalRecommendation(
+  spot: {
+    isOpen?: boolean | null;
+    distanceKm: number;
+    liveReportCount: number;
+    corroborationLevel: string;
+    latestLiveReport?: LiveActivity | null;
+  },
+  timeOfDay: string
+) {
+  const crowdLevel =
+    spot.latestLiveReport?.crowdLevel?.toLowerCase() ?? "";
+
+  if (spot.isOpen === false) {
+    return {
+      label: "Closed",
+      colour: "red",
+      message: "Currently closed.",
+    };
+  }
+
+  if (
+    spot.corroborationLevel === "strong" &&
+    crowdLevel === "packed"
+  ) {
+    return {
+      label: "Wait",
+      colour: "amber",
+      message:
+        "Very busy right now. Consider waiting a little.",
+    };
+  }
+
+  if (
+    spot.distanceKm <= 1 &&
+    spot.liveReportCount > 0
+  ) {
+    return {
+      label: "Go now",
+      colour: "emerald",
+      message:
+        `Good ${timeOfDay} option with recent activity.`,
+    };
+  }
+
+  return {
+    label: "Good option",
+    colour: "blue",
+    message:
+      `Worth visiting this ${timeOfDay}.`,
+  };
+}
+
 export default function SpotsPage() {
   const [activeView, setActiveView] = useState<SpotsView>("crew");
   const [nearbyCategory, setNearbyCategory] = useState<
@@ -1380,7 +1432,14 @@ export default function SpotsPage() {
       };
     }
 
-    const topReasons = bestSpot.reasons.slice(0, 4);
+  const arrivalRecommendation =
+  getArrivalRecommendation(
+    bestSpot,
+    timeOfDay
+  );
+
+    const topReasons = 
+      bestSpot.reasons.slice(0, 4);
 
     const recommendationSummary =
       topReasons.length > 0
@@ -1391,11 +1450,13 @@ export default function SpotsPage() {
         : `${bestSpot.name} looks like your strongest ${timeOfDay} option right now.`;
 
     return {
-      spotName: bestSpot.name,
-      message: recommendationSummary,
-      reasons: topReasons,
-      matchConfidence: bestSpot.matchConfidence,
-    };
+  spotName: bestSpot.name,
+  message: recommendationSummary,
+  reasons: topReasons,
+  matchConfidence: bestSpot.matchConfidence,
+  arrivalRecommendation,
+};
+
   }, [nearbySpotsWithLiveActivity, partyStatus, riskCount]);
 
   async function loadRealNearbySpots() {
@@ -1864,30 +1925,53 @@ export default function SpotsPage() {
                           : "Possible fit"}
                   </span>
 
-                  <p className="mt-2 text-sm leading-6 text-white/75">
-                    {twinMeNearbySuggestion.message}
-                  </p>
+                 <p className="mt-2 text-sm leading-6 text-white/75">
+  {twinMeNearbySuggestion.message}
+</p>
 
-                  {twinMeNearbySuggestion.reasons.length > 0 ? (
-                    <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-                      <div className="text-xs font-black uppercase tracking-[0.18em] text-white/45">
-                        Why this?
-                      </div>
+{twinMeNearbySuggestion.arrivalRecommendation ? (
+  <>
+    <div
+      className={`mt-3 inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold ${
+        twinMeNearbySuggestion.arrivalRecommendation.colour === "emerald"
+          ? "bg-emerald-500/15 text-emerald-300"
+          : twinMeNearbySuggestion.arrivalRecommendation.colour === "amber"
+          ? "bg-amber-500/15 text-amber-300"
+          : twinMeNearbySuggestion.arrivalRecommendation.colour === "red"
+          ? "bg-red-500/15 text-red-300"
+          : "bg-cyan-500/15 text-cyan-300"
+      }`}
+    >
+      {twinMeNearbySuggestion.arrivalRecommendation.label}
+    </div>
 
-                      <div className="mt-3 space-y-2">
-                        {twinMeNearbySuggestion.reasons.map((reason, index) => (
-                          <div
-                            key={`${reason}-${index}`}
-                            className="flex items-start gap-2 text-sm text-white/65"
-                          >
-                            <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-300" />
+    <p className="mt-2 text-sm text-white/60">
+      {twinMeNearbySuggestion.arrivalRecommendation.message}
+    </p>
+  </>
+) : null}
 
-                            <span>{reason}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
+{twinMeNearbySuggestion.reasons.length > 0 ? (
+  <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+    <div className="text-xs font-black uppercase tracking-[0.18em] text-white/45">
+      Why this?
+    </div>
+
+    <div className="mt-3 space-y-2">
+      {twinMeNearbySuggestion.reasons.map((reason, index) => (
+        <div
+          key={`${reason}-${index}`}
+          className="flex items-start gap-2 text-sm text-white/65"
+        >
+          <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-300" />
+
+          <span>{reason}</span>
+        </div>
+      ))}
+    </div>
+  </div>
+) : null}
+
                 </div>
               </section>
             </div>
