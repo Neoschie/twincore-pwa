@@ -1982,9 +1982,6 @@ twinMeNearbySuggestion.matchConfidence >= 90 ? (
 
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="text-lg font-semibold text-white">
-                          {spot.name}
-                        </div>
 
                         {spot.address ? (
                           <div className="mt-1 text-xs text-white/45">
@@ -2167,20 +2164,30 @@ twinMeNearbySuggestion.matchConfidence >= 90 ? (
 
                   {twinMeNearbySuggestion.reasons.length > 0 ? (
                     <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-                      <div className="text-xs font-black uppercase tracking-[0.18em] text-white/45">
-                        Why this?
-                      </div>
+                      <div className="flex items-center justify-between gap-3">
+  <div className="text-xs font-black uppercase tracking-[0.18em] text-cyan-200">
+    Why TwinMe picked this
+  </div>
+
+  <div className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-cyan-100">
+    AI reasoning
+  </div>
+</div>
 
                       <div className="mt-3 space-y-2">
                         {twinMeNearbySuggestion.reasons.map((reason, index) => (
                           <div
-                            key={`${reason}-${index}`}
-                            className="flex items-start gap-2 text-sm text-white/65"
-                          >
-                            <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-300" />
+  key={`${reason}-${index}`}
+  className="flex items-start gap-3 rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2.5 text-sm text-white/70"
+>
+  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-cyan-300/10 text-[11px] font-black text-cyan-200">
+    {index + 1}
+  </span>
 
-                            <span>{reason}</span>
-                          </div>
+  <span className="leading-5">
+    {reason}
+  </span>
+</div>
                         ))}
                       </div>
                     </div>
