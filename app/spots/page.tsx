@@ -523,6 +523,74 @@ const LIVE_REPORT_COOLDOWN_MINUTES = 30;
 const isLiveReportFresh = (activity: LiveActivity) =>
   activity.minutesAgo <= LIVE_POST_EXPIRY_MINUTES;
 
+type CrowdTrend = "rising" | "steady" | "falling" | "unknown";
+
+function getCrowdTrend(activities: LiveActivity[]): CrowdTrend {
+  const crowdScore = (crowdLevel?: string) => {
+    const normalized = crowdLevel?.trim().toLowerCase();
+
+    if (normalized === "packed") return 4;
+    if (normalized === "busy") return 3;
+    if (normalized === "moderate") return 2;
+    if (normalized === "low") return 1;
+
+    return null;
+  };
+
+  const usableReports = activities
+    .filter(isLiveReportFresh)
+    .map((activity) => ({
+      minutesAgo: activity.minutesAgo,
+      score: crowdScore(activity.crowdLevel),
+    }))
+    .filter(
+      (
+        report,
+      ): report is {
+        minutesAgo: number;
+        score: number;
+      } => report.score !== null,
+    )
+    .sort((a, b) => a.minutesAgo - b.minutesAgo);
+
+  if (usableReports.length < 2) {
+    return "unknown";
+  }
+
+  const midpoint = Math.ceil(usableReports.length / 2);
+
+  const newerReports = usableReports.slice(0, midpoint);
+
+  const olderReports = usableReports.slice(midpoint);
+
+  if (olderReports.length === 0) {
+    return "unknown";
+  }
+
+  const average = (
+    reports: Array<{
+      score: number;
+    }>,
+  ) =>
+    reports.reduce((total, report) => total + report.score, 0) / reports.length;
+
+  const newerAverage = average(newerReports);
+
+  const olderAverage = average(olderReports);
+
+  const difference = newerAverage - olderAverage;
+
+  if (difference >= 0.75) {
+    return "rising";
+  }
+
+  if (difference <= -0.75) {
+    return "falling";
+  }
+
+  return "steady";
+}
+
 function getTimeOfDayLabel() {
   const hour = new Date().getHours();
 
@@ -548,12 +616,15 @@ function getArrivalRecommendation(
     liveReportCount: number;
     corroborationLevel: string;
     latestLiveReport?: LiveActivity | null;
+    crowdTrend?: CrowdTrend;
   },
-  timeOfDay: string
+  timeOfDay: string,
 ) {
-  const crowdLevel =
-    spot.latestLiveReport?.crowdLevel?.toLowerCase() ?? "";
+  const crowdLevel = spot.latestLiveReport?.crowdLevel?.toLowerCase() ?? "";
 
+  // ==========================
+  // 1. CLOSED CHECK
+  // ==========================
   if (spot.isOpen === false) {
     return {
       label: "Closed",
@@ -562,35 +633,43 @@ function getArrivalRecommendation(
     };
   }
 
-  if (
-    spot.corroborationLevel === "strong" &&
-    crowdLevel === "packed"
-  ) {
+  if (spot.crowdTrend === "rising" && crowdLevel === "packed") {
     return {
       label: "Wait",
       colour: "amber",
-      message:
-        "Very busy right now. Consider waiting a little.",
+      message: "The crowd is already packed and still getting busier.",
     };
   }
 
-  if (
-    spot.distanceKm <= 1 &&
-    spot.liveReportCount > 0
-  ) {
+  if (spot.crowdTrend === "falling" && spot.liveReportCount >= 2) {
+    return {
+      label: "Go soon",
+      colour: "emerald",
+      message:
+        "The crowd appears to be calming down, making this a better time to go.",
+    };
+  }
+
+  if (spot.corroborationLevel === "strong" && crowdLevel === "packed") {
+    return {
+      label: "Wait",
+      colour: "amber",
+      message: "Very busy right now. Consider waiting a little.",
+    };
+  }
+
+  if (spot.distanceKm <= 1 && spot.liveReportCount > 0) {
     return {
       label: "Go now",
       colour: "emerald",
-      message:
-        `Good ${timeOfDay} option with recent activity.`,
+      message: `Good ${timeOfDay} option with recent activity.`,
     };
   }
 
   return {
     label: "Good option",
     colour: "blue",
-    message:
-      `Worth visiting this ${timeOfDay}.`,
+    message: `Worth visiting this ${timeOfDay}.`,
   };
 }
 
@@ -1196,6 +1275,10 @@ export default function SpotsPage() {
           activity.area.trim().toLowerCase() === spot.name.trim().toLowerCase(),
       );
 
+      const crowdTrend = getCrowdTrend(
+        matchingLiveReports
+      );
+
       const latestReport = matchingLiveReports[0] ?? null;
 
       const uniqueReporterIds = new Set(
@@ -1227,6 +1310,7 @@ export default function SpotsPage() {
         latestLiveReport: latestReport,
         liveSignalStrength,
         corroborationLevel,
+        crowdTrend,
       };
     });
   }, [filteredNearbySpots, filteredLiveActivities]);
@@ -1369,6 +1453,26 @@ export default function SpotsPage() {
           reasons.push("Recent live activity reported here");
         }
 
+        // CROWD TREND
+        if (spot.crowdTrend === "rising") {
+          score += 8;
+          reasons.push("Activity is getting busier");
+        }
+
+        if (spot.crowdTrend === "steady") {
+          score += 3;
+          reasons.push("Crowd activity is holding steady");
+        }
+
+        if (spot.crowdTrend === "falling") {
+          if (crewNeedsStability) {
+            score += 8;
+            reasons.push("The crowd appears to be calming down");
+          } else {
+            score -= 4;
+          }
+        }
+
         // CREW ENERGY
         if (crewIsHighEnergy) {
           if (vibe.includes("high energy")) {
@@ -1432,14 +1536,9 @@ export default function SpotsPage() {
       };
     }
 
-  const arrivalRecommendation =
-  getArrivalRecommendation(
-    bestSpot,
-    timeOfDay
-  );
+    const arrivalRecommendation = getArrivalRecommendation(bestSpot, timeOfDay);
 
-    const topReasons = 
-      bestSpot.reasons.slice(0, 4);
+    const topReasons = bestSpot.reasons.slice(0, 4);
 
     const recommendationSummary =
       topReasons.length > 0
@@ -1450,13 +1549,12 @@ export default function SpotsPage() {
         : `${bestSpot.name} looks like your strongest ${timeOfDay} option right now.`;
 
     return {
-  spotName: bestSpot.name,
-  message: recommendationSummary,
-  reasons: topReasons,
-  matchConfidence: bestSpot.matchConfidence,
-  arrivalRecommendation,
-};
-
+      spotName: bestSpot.name,
+      message: recommendationSummary,
+      reasons: topReasons,
+      matchConfidence: bestSpot.matchConfidence,
+      arrivalRecommendation,
+    };
   }, [nearbySpotsWithLiveActivity, partyStatus, riskCount]);
 
   async function loadRealNearbySpots() {
@@ -1874,6 +1972,20 @@ export default function SpotsPage() {
                       ) : null}
                     </div>
 
+                    {spot.crowdTrend === "rising" ? (
+                      <span className="rounded-full border border-orange-300/20 bg-orange-300/10 px-3 py-1 text-xs font-semibold text-orange-100">
+                        ↗ Getting busier
+                      </span>
+                    ) : spot.crowdTrend === "steady" ? (
+                      <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-semibold text-cyan-100">
+                        → Holding steady
+                      </span>
+                    ) : spot.crowdTrend === "falling" ? (
+                      <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-semibold text-emerald-100">
+                        ↘ Calming down
+                      </span>
+                    ) : null}
+
                     <p className="mt-3 text-sm leading-6 text-white/60">
                       {spot.note}
                     </p>
@@ -1925,53 +2037,55 @@ export default function SpotsPage() {
                           : "Possible fit"}
                   </span>
 
-                 <p className="mt-2 text-sm leading-6 text-white/75">
-  {twinMeNearbySuggestion.message}
-</p>
+                  <p className="mt-2 text-sm leading-6 text-white/75">
+                    {twinMeNearbySuggestion.message}
+                  </p>
 
-{twinMeNearbySuggestion.arrivalRecommendation ? (
-  <>
-    <div
-      className={`mt-3 inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold ${
-        twinMeNearbySuggestion.arrivalRecommendation.colour === "emerald"
-          ? "bg-emerald-500/15 text-emerald-300"
-          : twinMeNearbySuggestion.arrivalRecommendation.colour === "amber"
-          ? "bg-amber-500/15 text-amber-300"
-          : twinMeNearbySuggestion.arrivalRecommendation.colour === "red"
-          ? "bg-red-500/15 text-red-300"
-          : "bg-cyan-500/15 text-cyan-300"
-      }`}
-    >
-      {twinMeNearbySuggestion.arrivalRecommendation.label}
-    </div>
+                  {twinMeNearbySuggestion.arrivalRecommendation ? (
+                    <>
+                      <div
+                        className={`mt-3 inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold ${
+                          twinMeNearbySuggestion.arrivalRecommendation
+                            .colour === "emerald"
+                            ? "bg-emerald-500/15 text-emerald-300"
+                            : twinMeNearbySuggestion.arrivalRecommendation
+                                  .colour === "amber"
+                              ? "bg-amber-500/15 text-amber-300"
+                              : twinMeNearbySuggestion.arrivalRecommendation
+                                    .colour === "red"
+                                ? "bg-red-500/15 text-red-300"
+                                : "bg-cyan-500/15 text-cyan-300"
+                        }`}
+                      >
+                        {twinMeNearbySuggestion.arrivalRecommendation.label}
+                      </div>
 
-    <p className="mt-2 text-sm text-white/60">
-      {twinMeNearbySuggestion.arrivalRecommendation.message}
-    </p>
-  </>
-) : null}
+                      <p className="mt-2 text-sm text-white/60">
+                        {twinMeNearbySuggestion.arrivalRecommendation.message}
+                      </p>
+                    </>
+                  ) : null}
 
-{twinMeNearbySuggestion.reasons.length > 0 ? (
-  <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-    <div className="text-xs font-black uppercase tracking-[0.18em] text-white/45">
-      Why this?
-    </div>
+                  {twinMeNearbySuggestion.reasons.length > 0 ? (
+                    <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                      <div className="text-xs font-black uppercase tracking-[0.18em] text-white/45">
+                        Why this?
+                      </div>
 
-    <div className="mt-3 space-y-2">
-      {twinMeNearbySuggestion.reasons.map((reason, index) => (
-        <div
-          key={`${reason}-${index}`}
-          className="flex items-start gap-2 text-sm text-white/65"
-        >
-          <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-300" />
+                      <div className="mt-3 space-y-2">
+                        {twinMeNearbySuggestion.reasons.map((reason, index) => (
+                          <div
+                            key={`${reason}-${index}`}
+                            className="flex items-start gap-2 text-sm text-white/65"
+                          >
+                            <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-300" />
 
-          <span>{reason}</span>
-        </div>
-      ))}
-    </div>
-  </div>
-) : null}
-
+                            <span>{reason}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               </section>
             </div>
