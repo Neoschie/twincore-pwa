@@ -525,6 +525,8 @@ const isLiveReportFresh = (activity: LiveActivity) =>
 
 type CrowdTrend = "rising" | "steady" | "falling" | "unknown";
 
+type VenueMomentum = "building" | "peak" | "cooling" | "stable";
+
 function getCrowdTrend(activities: LiveActivity[]): CrowdTrend {
   const crowdScore = (crowdLevel?: string) => {
     const normalized = crowdLevel?.trim().toLowerCase();
@@ -589,6 +591,31 @@ function getCrowdTrend(activities: LiveActivity[]): CrowdTrend {
   }
 
   return "steady";
+}
+
+function getVenueMomentum(
+  crowdTrend: CrowdTrend,
+  crowdLevel: string,
+  timeOfDay: string,
+): VenueMomentum {
+  const level = crowdLevel.trim().toLowerCase();
+
+  if (
+    crowdTrend === "rising" &&
+    (timeOfDay === "evening" || timeOfDay === "late night")
+  ) {
+    return "building";
+  }
+
+  if (crowdTrend === "rising" && level === "packed") {
+    return "peak";
+  }
+
+  if (crowdTrend === "falling") {
+    return "cooling";
+  }
+
+  return "stable";
 }
 
 function getTimeOfDayLabel() {
@@ -1269,17 +1296,23 @@ export default function SpotsPage() {
 
   const nearbySpotsWithLiveActivity = useMemo(() => {
     return filteredNearbySpots.map((spot) => {
+     
       const matchingLiveReports = filteredLiveActivities.filter(
         (activity) =>
           isLiveReportFresh(activity) &&
           activity.area.trim().toLowerCase() === spot.name.trim().toLowerCase(),
       );
+    
+const latestReport =
+  matchingLiveReports[0] ?? null;
 
-      const crowdTrend = getCrowdTrend(
-        matchingLiveReports
-      );
+      const crowdTrend = getCrowdTrend(matchingLiveReports);
 
-      const latestReport = matchingLiveReports[0] ?? null;
+      const momentum = getVenueMomentum(
+  crowdTrend,
+  latestReport?.crowdLevel ?? "",
+  getTimeOfDayLabel()
+);
 
       const uniqueReporterIds = new Set(
         matchingLiveReports
@@ -1311,6 +1344,7 @@ export default function SpotsPage() {
         liveSignalStrength,
         corroborationLevel,
         crowdTrend,
+        momentum,
       };
     });
   }, [filteredNearbySpots, filteredLiveActivities]);
@@ -1972,6 +2006,7 @@ export default function SpotsPage() {
                       ) : null}
                     </div>
 
+                    {/* MOMENTUM BADGE*/}
                     {spot.crowdTrend === "rising" ? (
                       <span className="rounded-full border border-orange-300/20 bg-orange-300/10 px-3 py-1 text-xs font-semibold text-orange-100">
                         ↗ Getting busier
@@ -1985,6 +2020,24 @@ export default function SpotsPage() {
                         ↘ Calming down
                       </span>
                     ) : null}
+
+                    {spot.momentum === "building" ? (
+                      <span className="rounded-full border border-violet-300/20 bg-violet-300/10 px-3 py-1 text-xs font-semibold text-violet-100">
+                        📈 Building momentum
+                      </span>
+                    ) : spot.momentum === "peak" ? (
+                      <span className="rounded-full border border-red-300/20 bg-red-300/10 px-3 py-1 text-xs font-semibold text-red-100">
+                        🔥 Peak activity
+                      </span>
+                    ) : spot.momentum === "cooling" ? (
+                      <span className="rounded-full border border-sky-300/20 bg-sky-300/10 px-3 py-1 text-xs font-semibold text-sky-100">
+                        🌙 Cooling down
+                      </span>
+                    ) : (
+                      <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-white/70">
+                        ➖ Stable
+                      </span>
+                    )}
 
                     <p className="mt-3 text-sm leading-6 text-white/60">
                       {spot.note}
