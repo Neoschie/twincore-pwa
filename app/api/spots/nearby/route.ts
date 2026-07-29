@@ -1,12 +1,7 @@
 import { NextResponse } from "next/server";
 
 type NearbyCategory =
-  | "Food"
-  | "Nightlife"
-  | "Events"
-  | "Sports"
-  | "Outdoor"
-  | "Stay In";
+  "Food" | "Nightlife" | "Events" | "Sports" | "Outdoor" | "Stay In";
 
 type NearbySpot = {
   id: string;
@@ -28,21 +23,26 @@ type NearbySpot = {
 
 type GooglePlace = {
   id?: string;
+
   displayName?: {
     text?: string;
   };
+
   formattedAddress?: string;
+
   location?: {
     latitude?: number;
     longitude?: number;
   };
   rating?: number;
   userRatingCount?: number;
+
   currentOpeningHours?: {
     openNow?: boolean;
   };
   primaryType?: string;
   types?: string[];
+
   photos?: Array<{
     name?: string;
   }>;
@@ -70,7 +70,7 @@ type ProviderPlace = Partial<NearbySpot> & {
 function parseCoordinate(
   value: string | null,
   minimum: number,
-  maximum: number
+  maximum: number,
 ) {
   if (!value) return null;
 
@@ -87,47 +87,39 @@ function parseCoordinate(
   return parsedValue;
 }
 
-function normalizeSpot(
-  spot: NearbySpot
-): NearbySpot {
+function normalizeSpot(spot: NearbySpot): NearbySpot {
   return {
-  id: spot.id.trim(),
-  name: spot.name.trim(),
-  category: spot.category,
-  distanceKm: Math.max(
-    0,
-    Number(spot.distanceKm.toFixed(1))
-  ),
-  vibe: spot.vibe.trim(),
-  crowdLevel: spot.crowdLevel.trim(),
-  status: spot.status.trim(),
-  note: spot.note.trim(),
-  address: spot.address?.trim() || null,
-  rating:
-    typeof spot.rating === "number"
-      ? Number(spot.rating.toFixed(1))
-      : null,
-  reviewCount:
-    typeof spot.reviewCount === "number"
-      ? Math.max(0, spot.reviewCount)
-      : null,
-  isOpen: spot.isOpen,
-  photoUrl: spot.photoUrl,
-  latitude: spot.latitude,
-  longitude: spot.longitude,
-};
+    id: spot.id.trim(),
+    name: spot.name.trim(),
+    category: spot.category,
+    distanceKm: Math.max(0, Number(spot.distanceKm.toFixed(1))),
+    vibe: spot.vibe.trim(),
+    crowdLevel: spot.crowdLevel.trim(),
+    status: spot.status.trim(),
+    note: spot.note.trim(),
+    address: spot.address?.trim() || null,
+    rating:
+      typeof spot.rating === "number" ? Number(spot.rating.toFixed(1)) : null,
+    reviewCount:
+      typeof spot.reviewCount === "number"
+        ? Math.max(0, spot.reviewCount)
+        : null,
+    isOpen: spot.isOpen,
+    photoUrl: spot.photoUrl,
+    latitude: spot.latitude,
+    longitude: spot.longitude,
+  };
 }
 
 function calculateDistanceKm(
   lat1: number,
   lng1: number,
   lat2: number,
-  lng2: number
+  lng2: number,
 ) {
   const earthRadiusKm = 6371;
 
-  const toRadians = (value: number) =>
-    (value * Math.PI) / 180;
+  const toRadians = (value: number) => (value * Math.PI) / 180;
 
   const latDifference = toRadians(lat2 - lat1);
   const lngDifference = toRadians(lng2 - lng1);
@@ -138,31 +130,21 @@ function calculateDistanceKm(
       Math.cos(toRadians(lat2)) *
       Math.sin(lngDifference / 2) ** 2;
 
-  const c =
-    2 *
-    Math.atan2(
-      Math.sqrt(a),
-      Math.sqrt(1 - a)
-    );
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
   return earthRadiusKm * c;
 }
 
 function mapGoogleCategory(
   primaryType?: string,
-  types: string[] = []
+  types: string[] = [],
 ): NearbyCategory {
-  const allTypes = [
-    primaryType ?? "",
-    ...types,
-  ].map((type) => type.toLowerCase());
+  const allTypes = [primaryType ?? "", ...types].map((type) =>
+    type.toLowerCase(),
+  );
 
   const hasType = (...matches: string[]) =>
-    allTypes.some((type) =>
-      matches.some((match) =>
-        type.includes(match)
-      )
-    );
+    allTypes.some((type) => matches.some((match) => type.includes(match)));
 
   if (
     hasType(
@@ -171,21 +153,13 @@ function mapGoogleCategory(
       "bakery",
       "meal_takeaway",
       "meal_delivery",
-      "food"
+      "food",
     )
   ) {
     return "Food";
   }
 
-  if (
-    hasType(
-      "night_club",
-      "bar",
-      "pub",
-      "cocktail_bar",
-      "wine_bar"
-    )
-  ) {
+  if (hasType("night_club", "bar", "pub", "cocktail_bar", "wine_bar")) {
     return "Nightlife";
   }
 
@@ -196,7 +170,7 @@ function mapGoogleCategory(
       "sports_complex",
       "sports_club",
       "athletic_field",
-      "fitness"
+      "fitness",
     )
   ) {
     return "Sports";
@@ -210,7 +184,7 @@ function mapGoogleCategory(
       "campground",
       "marina",
       "tourist_attraction",
-      "nature_preserve"
+      "nature_preserve",
     )
   ) {
     return "Outdoor";
@@ -223,7 +197,7 @@ function mapGoogleCategory(
       "event_venue",
       "concert_hall",
       "museum",
-      "art_gallery"
+      "art_gallery",
     )
   ) {
     return "Events";
@@ -232,135 +206,185 @@ function mapGoogleCategory(
   return "Events";
 }
 
-export async function GET(request: Request) {
+async function getGooglePlacePhotoName(
+  placeId: string,
+  apiKey: string
+): Promise<string | null> {
+  const response = await fetch(
+    `https://places.googleapis.com/v1/places/${encodeURIComponent(
+      placeId
+    )}`,
+    {
+      headers: {
+        "X-Goog-Api-Key": apiKey,
+        "X-Goog-FieldMask": "*" },
+      cache: "no-store",
+    }
+  );
 
+  if (!response.ok) {
+    const errorText = await response.text();
+
+    console.error(
+      "Google Place Details photo request failed:",
+      {
+        placeId,
+        status: response.status,
+        response: errorText,
+      }
+    );
+
+    return null;
+  }
+
+  const data = (await response.json()) as {
+    photos?: Array<{
+      name?: string;
+    }>;
+  };
+
+  console.log(
+  "Complete Google Place Details response:",
+  placeId,
+  JSON.stringify(data, null, 2)
+);
+
+  console.log(
+    "Google photo details result:",
+    placeId,
+    data.photos?.[0]?.name ?? "No photo returned"
+  );
+
+  return data.photos?.[0]?.name ?? null;
+}
+
+ 
+
+export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
 
-  const latitude = parseCoordinate(
-    searchParams.get("lat"),
-    -90,
-    90
-  );
+  const latitude = parseCoordinate(searchParams.get("lat"), -90, 90);
 
-  const longitude = parseCoordinate(
-    searchParams.get("lng"),
-    -180,
-    180
-  );
+  const longitude = parseCoordinate(searchParams.get("lng"), -180, 180);
 
   if (latitude === null || longitude === null) {
     return NextResponse.json(
       {
-        error:
-          "Valid latitude and longitude values are required.",
+        error: "Valid latitude and longitude values are required.",
       },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
   /*
- * Google Places provider.
- * Results are normalized into TwinCore's NearbySpot shape
- * before being returned to the frontend.
- */
+   * Google Places provider.
+   * Results are normalized into TwinCore's NearbySpot shape
+   * before being returned to the frontend.
+   */
 
-     const apiKey = process.env.PLACES_API_KEY;
+  const apiKey = process.env.PLACES_API_KEY;
 
-if (!apiKey) {
-  return NextResponse.json(
-    {
-      error: "Nearby provider is not configured.",
-    },
-    { status: 503 }
-  );
-}
-
-     const googleResponse = await fetch(
-  "https://places.googleapis.com/v1/places:searchNearby",
-  {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Goog-Api-Key": apiKey,
-      "X-Goog-FieldMask": [
-        "places.id",
-        "places.displayName",
-        "places.formattedAddress",
-        "places.location",
-        "places.rating",
-        "places.userRatingCount",
-        "places.currentOpeningHours",
-        "places.primaryType",
-        "places.types",
-      ].join(","),
-    },
-
-    body: JSON.stringify({
-      includedTypes: [
-        "restaurant",
-        "cafe",
-        "bar",
-        "night_club",
-        "park",
-        "tourist_attraction",
-        "movie_theater",
-        "gym",
-      ],
-
-      maxResultCount: 20,
-
-      locationRestriction: {
-        circle: {
-          center: {
-            latitude,
-            longitude,
-          },
-          radius: 5000,
-        },
+  if (!apiKey) {
+    return NextResponse.json(
+      {
+        error: "Nearby provider is not configured.",
       },
-    }),
-
-    cache: "no-store",
+      { status: 503 },
+    );
   }
-);
 
-if (!googleResponse.ok) {
-  const googleError =
-    await googleResponse.text();
-
-  console.error(
-    "Google Places request failed:",
-    googleResponse.status,
-    googleError
-  );
-
-  return NextResponse.json(
+  const googleResponse = await fetch(
+    "https://places.googleapis.com/v1/places:searchNearby",
     {
-      error:
-        "Unable to retrieve nearby places.",
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": apiKey,
+        "X-Goog-FieldMask": [
+          "places.id",
+          "places.displayName",
+          "places.formattedAddress",
+          "places.location",
+          "places.rating",
+          "places.userRatingCount",
+          "places.currentOpeningHours",
+          "places.primaryType",
+          "places.types",
+          "places.photos",
+        ].join(","),
+      },
+
+      body: JSON.stringify({
+        includedTypes: [
+          "restaurant",
+          "cafe",
+          "bar",
+          "night_club",
+          "park",
+          "tourist_attraction",
+          "movie_theater",
+          "gym",
+        ],
+
+        maxResultCount: 20,
+
+        locationRestriction: {
+          circle: {
+            center: {
+              latitude,
+              longitude,
+            },
+            radius: 5000,
+          },
+        },
+      }),
+
+      cache: "no-store",
     },
-    {
-      status: 502,
-    }
   );
-}
 
-const googleData =
-  (await googleResponse.json()) as GooglePlacesResponse;
+  if (!googleResponse.ok) {
+    const googleError = await googleResponse.text();
 
-const googlePlaces =
-  Array.isArray(googleData.places)
+    console.error(
+      "Google Places request failed:",
+      googleResponse.status,
+      googleError,
+    );
+
+    return NextResponse.json(
+      {
+        error: "Unable to retrieve nearby places.",
+      },
+      {
+        status: 502,
+      },
+    );
+  }
+
+  const googleData = (await googleResponse.json()) as GooglePlacesResponse;
+
+  const googlePlaces = Array.isArray(googleData.places)
     ? googleData.places
     : [];
 
-const providerResults: NearbySpot[] =
-  googlePlaces
-    .map((place): NearbySpot | null => {
-      const placeLatitude =
-        place.location?.latitude;
+  const photoNames = await Promise.all(
+    googlePlaces.map(async (place, index) => {
+      if (!place.id || index !== 0) {
+        return null;
+      }
 
-      const placeLongitude =
-        place.location?.longitude;
+      return getGooglePlacePhotoName(place.id, apiKey);
+    }),
+  );
+
+  const providerResults: NearbySpot[] = googlePlaces
+    .map((place, index): NearbySpot | null => {
+      const photoName = photoNames[index] ?? place.photos?.[0]?.name ?? null;
+
+      const placeLatitude = place.location?.latitude;
+
+      const placeLongitude = place.location?.longitude;
 
       if (
         typeof placeLatitude !== "number" ||
@@ -369,33 +393,24 @@ const providerResults: NearbySpot[] =
         return null;
       }
 
-      const category = mapGoogleCategory(
-        place.primaryType,
-        place.types
-      );
+      const category = mapGoogleCategory(place.primaryType, place.types);
 
       const isOpen =
-        typeof place.currentOpeningHours?.openNow ===
-        "boolean"
+        typeof place.currentOpeningHours?.openNow === "boolean"
           ? place.currentOpeningHours.openNow
           : null;
 
-      const distanceKm =
-        calculateDistanceKm(
-          latitude,
-          longitude,
-          placeLatitude,
-          placeLongitude
-        );
+      const distanceKm = calculateDistanceKm(
+        latitude,
+        longitude,
+        placeLatitude,
+        placeLongitude,
+      );
 
       return {
-        id:
-          place.id ??
-          `${placeLatitude}-${placeLongitude}`,
+        id: place.id ?? `${placeLatitude}-${placeLongitude}`,
 
-        name:
-          place.displayName?.text ??
-          "Nearby place",
+        name: place.displayName?.text ?? "Nearby place",
 
         category,
 
@@ -419,45 +434,33 @@ const providerResults: NearbySpot[] =
               ? "Closed"
               : "Status unavailable",
 
-        note:
-          place.formattedAddress ??
-          "Nearby place",
+        note: place.formattedAddress ?? "Nearby place",
 
-        address:
-          place.formattedAddress ?? null,
+        address: place.formattedAddress ?? null,
 
-        rating:
-          typeof place.rating === "number"
-            ? place.rating
-            : null,
+        rating: typeof place.rating === "number" ? place.rating : null,
 
         reviewCount:
-          typeof place.userRatingCount ===
-          "number"
+          typeof place.userRatingCount === "number"
             ? place.userRatingCount
             : null,
 
         isOpen,
 
-        photoUrl: null,
+        photoUrl: photoName
+          ? `/api/spots/photo?name=${encodeURIComponent(photoName)}`
+          : null,
 
         latitude: placeLatitude,
         longitude: placeLongitude,
       };
     })
-    .filter(
-      (
-        place
-      ): place is NearbySpot =>
-        place !== null
-    );
-  
+    .filter((place): place is NearbySpot => place !== null);
+
   const spots = providerResults
     .map(normalizeSpot)
     .sort(
-      (firstSpot, secondSpot) =>
-        firstSpot.distanceKm -
-        secondSpot.distanceKm
+      (firstSpot, secondSpot) => firstSpot.distanceKm - secondSpot.distanceKm,
     );
 
   return NextResponse.json({

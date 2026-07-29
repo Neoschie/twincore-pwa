@@ -1934,6 +1934,52 @@ const latestReport =
                     key={spot.id}
                     className="rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#14141a,#0c0c10)] p-4"
                   >
+
+<div
+  className={`relative mb-5 h-36 overflow-hidden rounded-2xl ${
+    spot.category === "Food"
+      ? "bg-gradient-to-br from-orange-500/30 to-red-500/20"
+      : spot.category === "Nightlife"
+      ? "bg-gradient-to-br from-violet-500/30 to-indigo-500/20"
+      : spot.category === "Outdoor"
+      ? "bg-gradient-to-br from-emerald-500/30 to-green-500/20"
+      : "bg-gradient-to-br from-cyan-500/25 to-sky-500/20"
+  }`}
+>
+  <div className="absolute inset-0 bg-black/25" />
+
+  {spot.momentum === "building" ? (
+  <div className="absolute left-4 top-4 rounded-full bg-orange-500/90 px-3 py-1 text-xs font-bold text-white">
+    🔥 Building Momentum
+  </div>
+) : spot.momentum === "peak" ? (
+  <div className="absolute left-4 top-4 rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white">
+    🚀 Peak Activity
+  </div>
+) : spot.momentum === "cooling" ? (
+  <div className="absolute left-4 top-4 rounded-full bg-sky-500 px-3 py-1 text-xs font-bold text-white">
+    🌙 Cooling Down
+  </div>
+) : null}
+
+{spot.name === twinMeNearbySuggestion.spotName &&
+twinMeNearbySuggestion.matchConfidence >= 90 ? (
+  <div className="absolute right-4 top-4 rounded-full bg-cyan-400 px-3 py-1 text-xs font-black text-slate-900 shadow-lg">
+    ✨ TwinMe Pick
+  </div>
+) : null}
+
+  <div className="absolute bottom-4 left-4">
+    <div className="text-xs font-black uppercase tracking-[0.25em] text-white/70">
+      {spot.category}
+    </div>
+
+    <div className="mt-1 text-2xl font-black text-white">
+      {spot.name}
+    </div>
+  </div>
+</div>
+
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="text-lg font-semibold text-white">
