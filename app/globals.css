@@ -301,7 +301,12 @@ button {
     animation: none !important;
     transition: none !important;
   }
-  :root {
+}
+
+/* =========================
+   SAFE AREA
+========================= */
+:root {
   --safe-top: env(safe-area-inset-top);
   --safe-bottom: env(safe-area-inset-bottom);
 }
@@ -314,7 +319,6 @@ button {
 
 .safe-bottom-pad {
   padding-bottom: max(1rem, calc(var(--safe-bottom) + 1rem));
-}
 }
 
 @keyframes twinHeartbeat {
@@ -346,6 +350,7 @@ button {
 
 .twin-heartbeat {
   animation: twinHeartbeat 2.2s ease-in-out infinite;
+}
 
 @keyframes radarSweep{
 
@@ -473,7 +478,6 @@ animation:presenceGlow 7s ease-in-out infinite;
 }
 
 }
-}
 
 @keyframes orb-breathe {
   0%,
@@ -494,3 +498,1513 @@ animation:presenceGlow 7s ease-in-out infinite;
   transform-origin: center;
   will-change: transform, filter;
 }
+/* =========================================================
+   TwinCore Party Hero V3
+   Append to app/globals.css
+   ========================================================= */
+
+.tc-orb {
+  position: relative;
+  width: min(100%, 380px);
+  aspect-ratio: 1;
+  isolation: isolate;
+}
+
+.tc-orb__light-spill {
+  position: absolute;
+  inset: -18%;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(255, 44, 219, calc((var(--energy) / 100) * .18)), transparent 48%),
+    radial-gradient(circle at 70% 30%, rgba(0, 150, 255, calc((var(--energy) / 100) * .16)), transparent 45%);
+  filter: blur(28px);
+  animation: tcLightSpill 2.8s ease-in-out infinite;
+}
+
+.tc-orb__heat {
+  position: absolute;
+  inset: 4%;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, transparent 50%, rgba(255, 255, 255, .04) 62%, transparent 72%);
+  filter: blur(3px);
+  animation: tcHeat 2.2s ease-in-out infinite alternate;
+}
+
+.tc-orb__core {
+  position: absolute;
+  z-index: 5;
+  inset: 17%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(242, 97, 255, .62);
+  border-radius: 50%;
+  text-align: center;
+  background:
+    radial-gradient(circle at 50% 40%, rgba(145, 49, 185, .32), rgba(6, 3, 14, .98) 68%);
+  box-shadow:
+    0 0 26px rgba(235, 70, 255, .42),
+    0 0 58px rgba(0, 142, 255, .16),
+    inset 0 0 32px rgba(160, 50, 220, .27);
+}
+
+.tc-orb__eyebrow {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .24em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.54);
+}
+
+.tc-orb__core strong {
+  margin-top: 2px;
+  font-size: clamp(4.6rem, 12vw, 6.3rem);
+  line-height: .92;
+  color: white;
+  text-shadow:
+    0 0 16px rgba(255,255,255,.52),
+    0 0 30px rgba(217,70,239,.72);
+}
+
+.tc-orb__label {
+  margin-top: 4px;
+  font-size: 14px;
+  font-weight: 900;
+  color: #f4d8ff;
+}
+
+.tc-orb__momentum {
+  margin-top: 10px;
+  padding: 5px 10px;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 999px;
+  background: rgba(0,0,0,.3);
+  font-size: 12px;
+  font-weight: 800;
+  color: rgba(255,255,255,.72);
+}
+
+.tc-orb__flames,
+.tc-orb__particles,
+.tc-orb__arcs {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.tc-orb__flames {
+  z-index: 3;
+  animation: tcOrbRotate 15s linear infinite;
+}
+
+.tc-orb__flames i {
+  --angle: calc((360deg / var(--flame-count)) * var(--flame-index));
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--flame-width);
+  height: var(--flame-height);
+  border-radius: 55% 45% 70% 30% / 74% 46% 54% 26%;
+  transform:
+    translate(-50%, -50%)
+    rotate(var(--angle))
+    translateY(-165px)
+    skewX(-10deg);
+  transform-origin: center bottom;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255,255,255,.96),
+      rgba(255,66,225,.95) 26%,
+      rgba(161,50,255,.8) 58%,
+      rgba(0,147,255,.16)
+    );
+  box-shadow:
+    0 0 6px rgba(255,255,255,.58),
+    0 0 14px rgba(255,44,219,.88),
+    0 0 22px rgba(0,141,255,.28);
+  mix-blend-mode: screen;
+  animation:
+    tcFlameTongue 1.15s var(--flame-delay) ease-in-out infinite alternate,
+    tcFlameFlicker .38s var(--flame-delay) steps(2, end) infinite;
+}
+
+.tc-orb__flames i:nth-child(3n) {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255,255,255,.98),
+      rgba(54,194,255,.95) 35%,
+      rgba(0,119,255,.65) 68%,
+      rgba(0,100,255,.06)
+    );
+}
+
+.tc-orb__flames i:nth-child(5n) {
+  transform:
+    translate(-50%, -50%)
+    rotate(var(--angle))
+    translateY(-157px)
+    skewX(13deg);
+}
+
+.tc-orb__arcs {
+  z-index: 4;
+  overflow: visible;
+  mix-blend-mode: screen;
+  animation: tcArcRotate 12s linear infinite;
+}
+
+.tc-orb__arc {
+  fill: none;
+  stroke: url(#tcArcGradient);
+  stroke-width: 2.3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 12 130;
+  opacity: 0;
+}
+
+.tc-orb__arc--a {
+  animation: tcArcTravel 3.7s .3s ease-in-out infinite;
+}
+
+.tc-orb__arc--b {
+  animation: tcArcTravel 4.4s 1.6s ease-in-out infinite;
+}
+
+.tc-orb__arc--c {
+  animation: tcArcTravel 5.1s 3.2s ease-in-out infinite;
+}
+
+.tc-orb__particles {
+  z-index: 2;
+  animation: tcOrbRotate 20s linear infinite reverse;
+}
+
+.tc-orb__particles i {
+  --angle: calc((360deg / var(--particle-count)) * var(--particle-index));
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  transform:
+    translate(-50%, -50%)
+    rotate(var(--angle))
+    translateY(calc(var(--particle-distance) * -1));
+  background: white;
+  box-shadow:
+    0 0 5px #fff,
+    0 0 10px #ff34de,
+    0 0 16px rgba(0,150,255,.72);
+  opacity: 0;
+  animation:
+    tcParticleDrift var(--particle-duration)
+    var(--particle-delay)
+    ease-out infinite;
+}
+
+.tc-orb--standby .tc-orb__flames,
+.tc-orb--standby .tc-orb__particles {
+  opacity: .25;
+}
+
+.tc-orb--watch .tc-orb__flames {
+  opacity: .58;
+}
+
+.tc-orb--building .tc-orb__flames {
+  opacity: .82;
+}
+
+.tc-orb--peak .tc-orb__flames {
+  opacity: 1;
+}
+
+.tc-orb.is-paused .tc-orb__flames,
+.tc-orb.is-paused .tc-orb__particles,
+.tc-orb.is-paused .tc-orb__arcs,
+.tc-orb.is-paused .tc-orb__light-spill {
+  animation-play-state: paused;
+  opacity: .12;
+}
+
+.tc-vital-card {
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.tc-vital-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(236,72,153,.28);
+  box-shadow: 0 10px 34px rgba(0,0,0,.24), 0 0 22px rgba(217,70,239,.08);
+}
+
+.tc-vital-wave {
+  stroke-dasharray: 140;
+  stroke-dashoffset: 140;
+  animation:
+    tcWaveDraw 2.4s var(--wave-delay) linear infinite,
+    tcWaveGlow 1.4s ease-in-out infinite alternate;
+}
+
+.tc-party-banner__orb {
+  animation: tcBannerOrb 1.8s ease-in-out infinite;
+}
+
+.tc-party-banner__wave i {
+  position: absolute;
+  left: -15%;
+  top: 50%;
+  width: 120%;
+  height: 16px;
+  border-radius: 50%;
+  border-top: 1px solid;
+  transform: translateY(-50%);
+  opacity: .85;
+}
+
+.tc-party-banner__wave i:nth-child(1) {
+  color: #bf50ff;
+  animation: tcBannerWave 2.5s linear infinite;
+}
+
+.tc-party-banner__wave i:nth-child(2) {
+  color: #f04bff;
+  animation: tcBannerWave 1.9s .5s linear infinite reverse;
+}
+
+.tc-party-banner__wave i:nth-child(3) {
+  color: #00b7ff;
+  animation: tcBannerWave 2.9s .9s linear infinite;
+}
+
+@keyframes tcOrbRotate {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes tcArcRotate {
+  to { transform: rotate(-360deg); }
+}
+
+@keyframes tcFlameTongue {
+  0% {
+    height: calc(var(--flame-height) * .6);
+    opacity: .46;
+    filter: brightness(.85);
+  }
+  55% {
+    height: calc(var(--flame-height) * 1.12);
+    opacity: 1;
+    filter: brightness(1.6);
+  }
+  100% {
+    height: calc(var(--flame-height) * .82);
+    opacity: .78;
+    filter: brightness(1.18);
+  }
+}
+
+@keyframes tcFlameFlicker {
+  0%, 100% { margin-left: -1px; }
+  50% { margin-left: 2px; }
+}
+
+@keyframes tcArcTravel {
+  0%, 68%, 100% {
+    opacity: 0;
+    stroke-dashoffset: 145;
+  }
+  73% { opacity: .95; }
+  88% {
+    opacity: .82;
+    stroke-dashoffset: 0;
+  }
+  95% {
+    opacity: 0;
+    stroke-dashoffset: -110;
+  }
+}
+
+@keyframes tcParticleDrift {
+  0% {
+    opacity: 0;
+    transform:
+      translate(-50%, -50%)
+      rotate(var(--angle))
+      translateY(calc(var(--particle-distance) * -.76))
+      scale(.65);
+  }
+  16% { opacity: .95; }
+  70% { opacity: .55; }
+  100% {
+    opacity: 0;
+    transform:
+      translate(-50%, -50%)
+      rotate(calc(var(--angle) + 17deg))
+      translateY(calc(var(--particle-distance) * -1.38))
+      translateX(9px)
+      scale(.12);
+  }
+}
+
+@keyframes tcLightSpill {
+  0%, 100% {
+    opacity: .32;
+    transform: scale(.96);
+  }
+  50% {
+    opacity: .82;
+    transform: scale(1.07);
+  }
+}
+
+@keyframes tcHeat {
+  from {
+    opacity: .32;
+    transform: scale(.98) rotate(-1deg);
+  }
+  to {
+    opacity: .72;
+    transform: scale(1.04) rotate(1deg);
+  }
+}
+
+@keyframes tcWaveDraw {
+  0% {
+    stroke-dashoffset: 140;
+    opacity: .22;
+  }
+  48% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: -140;
+    opacity: .24;
+  }
+}
+
+@keyframes tcWaveGlow {
+  to {
+    filter: drop-shadow(0 0 6px currentColor);
+  }
+}
+
+@keyframes tcBannerOrb {
+  0%, 100% {
+    transform: scale(.96);
+    box-shadow: 0 0 12px rgba(217,70,239,.3);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow:
+      0 0 24px rgba(217,70,239,.72),
+      0 0 36px rgba(0,174,255,.22);
+  }
+}
+
+@keyframes tcBannerWave {
+  from {
+    transform: translate(-10%, -50%) scaleY(.55) skewX(-12deg);
+  }
+  50% {
+    transform: translate(2%, -50%) scaleY(1.4) skewX(7deg);
+  }
+  to {
+    transform: translate(14%, -50%) scaleY(.72) skewX(-4deg);
+  }
+}
+
+@media (max-width: 1023px) {
+  .tc-orb {
+    width: min(100%, 330px);
+  }
+
+  .tc-orb__flames i {
+    transform:
+      translate(-50%, -50%)
+      rotate(var(--angle))
+      translateY(-143px)
+      skewX(-10deg);
+  }
+
+  .tc-orb__flames i:nth-child(5n) {
+    transform:
+      translate(-50%, -50%)
+      rotate(var(--angle))
+      translateY(-136px)
+      skewX(13deg);
+  }
+}
+
+@media (max-width: 640px) {
+  .tc-orb {
+    width: min(100%, 280px);
+  }
+
+  .tc-orb__flames i {
+    transform:
+      translate(-50%, -50%)
+      rotate(var(--angle))
+      translateY(-120px)
+      skewX(-10deg);
+  }
+
+  .tc-orb__flames i:nth-child(5n) {
+    transform:
+      translate(-50%, -50%)
+      rotate(var(--angle))
+      translateY(-114px)
+      skewX(13deg);
+  }
+
+  .tc-orb__core strong {
+    font-size: 4.7rem;
+  }
+
+  .tc-party-banner {
+    grid-template-columns: 48px 1fr;
+  }
+
+  .tc-party-banner__wave {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tc-orb *,
+  .tc-vital-wave,
+  .tc-party-banner__orb,
+  .tc-party-banner__wave i {
+    animation: none !important;
+  }
+}
+
+.tc-orb__flames i {
+  transform:
+    translate(-50%, -50%)
+    rotate(var(--angle))
+    translateY(calc(-165px + var(--flame-offset)))
+    skewX(var(--flame-tilt));
+
+  animation:
+    tcFlameTongue var(--flame-duration)
+      var(--flame-delay)
+      ease-in-out infinite alternate,
+    tcFlameFlicker 420ms
+      var(--flame-delay)
+      steps(2, end) infinite;
+}
+
+.tc-orb__flames i:nth-child(2n) {
+  opacity: 0.82;
+}
+
+.tc-orb__flames i:nth-child(3n) {
+  filter: hue-rotate(22deg) brightness(1.15);
+}
+
+.tc-orb__flames i:nth-child(5n) {
+  filter: hue-rotate(165deg) brightness(1.12);
+}
+
+.tc-orb__flames i:nth-child(7n) {
+  opacity: 0.48;
+  transform:
+    translate(-50%, -50%)
+    rotate(var(--angle))
+    translateY(calc(-154px + var(--flame-offset)))
+    skewX(calc(var(--flame-tilt) * -1));
+}
+
+.tc-energy-ring {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  animation:
+    tcEnergyRingBreathe 4.8s ease-in-out infinite,
+    tcEnergyRingRotate 24s linear infinite;
+}
+
+.tc-energy-ring__halo {
+  fill: none;
+  stroke: rgba(190, 54, 255, 0.2);
+  stroke-width: 22;
+  opacity: calc(0.2 + var(--ring-intensity) * 0.35);
+  filter: blur(10px);
+}
+
+.tc-energy-ring__plasma {
+  fill: none;
+  stroke: url(#tcEnergyGradient);
+  stroke-linecap: round;
+  transform-origin: 150px 150px;
+}
+
+.tc-energy-ring__plasma--outer {
+  stroke-width: 13;
+  opacity: calc(0.38 + var(--ring-intensity) * 0.45);
+  stroke-dasharray: 52 15 31 10 66 18;
+  animation: tcEnergyDashOuter 8s linear infinite;
+}
+
+.tc-energy-ring__plasma--main {
+  stroke-width: 8;
+  opacity: calc(0.55 + var(--ring-intensity) * 0.42);
+  stroke-dasharray: 78 12 36 8 54 16;
+  animation:
+    tcEnergyDashMain 5.7s linear infinite,
+    tcEnergyPlasmaPulse 1.9s ease-in-out infinite;
+}
+
+.tc-energy-ring__plasma--inner {
+  stroke-width: 3;
+  opacity: 0.72;
+  stroke-dasharray: 24 9 44 12;
+  animation: tcEnergyDashInner 4.2s linear infinite reverse;
+}
+
+.tc-energy-ring__flare-group {
+  transform-origin: 150px 150px;
+  animation: tcEnergyFlareRotate 18s linear infinite reverse;
+}
+
+.tc-energy-ring__flare {
+  fill: none;
+  stroke: url(#tcEnergyGradient);
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: calc(0.35 + var(--ring-intensity) * 0.55);
+  filter:
+    drop-shadow(0 0 4px #ff34dc)
+    drop-shadow(0 0 9px rgba(0, 155, 255, 0.5));
+  animation: tcEnergyFlareFlicker 1.3s ease-in-out infinite alternate;
+}
+
+.tc-energy-ring__flare--two {
+  animation-delay: -0.45s;
+}
+
+.tc-energy-ring__flare--three {
+  animation-delay: -0.9s;
+}
+
+.tc-energy-ring__flare--four {
+  animation-delay: -1.2s;
+}
+
+.tc-energy-ring.is-paused {
+  opacity: 0.14;
+}
+
+.tc-energy-ring.is-paused,
+.tc-energy-ring.is-paused * {
+  animation-play-state: paused !important;
+}
+
+@keyframes tcEnergyRingRotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes tcEnergyRingBreathe {
+  0%,
+  100% {
+    scale: 0.985;
+    opacity: 0.82;
+  }
+
+  50% {
+    scale: 1.025;
+    opacity: 1;
+  }
+}
+
+@keyframes tcEnergyDashOuter {
+  to {
+    stroke-dashoffset: -220;
+  }
+}
+
+@keyframes tcEnergyDashMain {
+  to {
+    stroke-dashoffset: 260;
+  }
+}
+
+@keyframes tcEnergyDashInner {
+  to {
+    stroke-dashoffset: -180;
+  }
+}
+
+@keyframes tcEnergyPlasmaPulse {
+  0%,
+  100% {
+    stroke-width: 7;
+    filter: brightness(0.95);
+  }
+
+  50% {
+    stroke-width: 10;
+    filter: brightness(1.55);
+  }
+}
+
+@keyframes tcEnergyFlareRotate {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+@keyframes tcEnergyFlareFlicker {
+  0% {
+    opacity: 0.3;
+    transform: scale(0.94);
+  }
+
+  55% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+
+  100% {
+    opacity: 0.58;
+    transform: scale(0.98);
+  }
+}
+
+.tc-orb__base {
+  position: absolute;
+  inset: 1%;
+  z-index: 3;
+  pointer-events: none;
+  filter:
+    drop-shadow(0 0 14px rgba(255, 46, 219, 0.75))
+    drop-shadow(0 0 22px rgba(0, 145, 255, 0.55));
+  animation: tcOrbBaseBreathe 4.8s ease-in-out infinite;
+}
+
+.tc-orb__base img {
+  user-select: none;
+}
+
+.tc-orb.is-paused .tc-orb__base {
+  opacity: 0.28;
+  filter: grayscale(0.6) brightness(0.7);
+  animation-play-state: paused;
+}
+
+@keyframes tcOrbBaseBreathe {
+  0%,
+  100% {
+    transform: scale(0.985);
+    opacity: 0.9;
+  }
+
+  50% {
+    transform: scale(1.025);
+    opacity: 1;
+  }
+}
+
+/* =========================
+   VISUAL WEEK — SIGNATURE HOME
+========================= */
+
+.twincore-home {
+  position: relative;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 18% 12%, rgba(34, 211, 238, 0.055), transparent 28%),
+    radial-gradient(circle at 82% 18%, rgba(139, 92, 246, 0.065), transparent 30%),
+    linear-gradient(180deg, #07101b 0%, #05080f 48%, #060912 100%);
+}
+
+.twincore-home-grid {
+  opacity: 0.34;
+  background-image:
+    linear-gradient(rgba(125, 211, 252, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(125, 211, 252, 0.035) 1px, transparent 1px);
+  background-size: 38px 38px;
+  mask-image: linear-gradient(to bottom, black 0%, rgba(0,0,0,.78) 55%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 0%, rgba(0,0,0,.78) 55%, transparent 100%);
+}
+
+.twincore-fyi::after {
+  content: "";
+  position: absolute;
+  inset: -40%;
+  pointer-events: none;
+  background: conic-gradient(
+    from 210deg,
+    transparent 0deg,
+    rgba(34, 211, 238, 0.09) 55deg,
+    transparent 100deg,
+    transparent 220deg,
+    rgba(168, 85, 247, 0.07) 270deg,
+    transparent 320deg
+  );
+  animation: twincore-fyi-energy 14s linear infinite;
+}
+
+@keyframes twincore-fyi-energy {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .twincore-fyi::after {
+    animation: none;
+  }
+}
+
+/* VISUAL WEEK V1B.1 — FYI ENERGY RIBBON */
+
+.twincore-fyi-ribbon {
+  transform: rotate(-8deg);
+  filter: saturate(1.15);
+}
+
+.twincore-fyi-ribbon-core {
+  border-radius: 50%;
+  background:
+    linear-gradient(
+      120deg,
+      transparent 12%,
+      rgba(34, 211, 238, 0.02) 24%,
+      rgba(34, 211, 238, 0.16) 39%,
+      rgba(96, 165, 250, 0.10) 50%,
+      rgba(168, 85, 247, 0.13) 63%,
+      rgba(236, 72, 153, 0.07) 72%,
+      transparent 86%
+    );
+  filter: blur(5px);
+  transform: skewX(-14deg);
+  animation: twincore-fyi-ribbon-drift 8s ease-in-out infinite alternate;
+}
+
+.twincore-fyi-ribbon-glow {
+  border-radius: 50%;
+  background:
+    radial-gradient(
+      ellipse at center,
+      rgba(34, 211, 238, 0.09),
+      rgba(59, 130, 246, 0.055) 36%,
+      rgba(168, 85, 247, 0.045) 58%,
+      transparent 74%
+    );
+  filter: blur(24px);
+  animation: twincore-fyi-ribbon-breathe 6s ease-in-out infinite;
+}
+
+@keyframes twincore-fyi-ribbon-drift {
+  from {
+    transform: translate3d(-3%, 2%, 0) skewX(-14deg) scale(0.96);
+    opacity: 0.58;
+  }
+  to {
+    transform: translate3d(4%, -3%, 0) skewX(-10deg) scale(1.05);
+    opacity: 0.92;
+  }
+}
+
+@keyframes twincore-fyi-ribbon-breathe {
+  0%,
+  100% {
+    opacity: 0.46;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 0.86;
+    transform: scale(1.05);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .twincore-fyi-ribbon-core,
+  .twincore-fyi-ribbon-glow {
+    animation: none;
+  }
+}
+
+/* =========================================================
+   TWINCORE COMMERCIAL NAVIGATION SHELL
+   Visual Week V2
+   ========================================================= */
+
+.twincore-app-content {
+  padding-top: 5.75rem;
+  padding-bottom: 1rem;
+}
+
+.twincore-desktop-nav {
+  position: fixed;
+  inset: 1rem 0 auto;
+  z-index: 80;
+  pointer-events: none;
+  padding-inline: 1.25rem;
+}
+
+.twincore-desktop-nav-inner {
+  pointer-events: auto;
+  width: min(1180px, 100%);
+  min-height: 4.15rem;
+  margin-inline: auto;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.55rem 0.65rem 0.55rem 0.8rem;
+  border: 1px solid rgba(125, 211, 252, 0.13);
+  border-radius: 1.45rem;
+  background:
+    linear-gradient(
+      135deg,
+      rgba(10, 28, 48, 0.975),
+      rgba(10, 16, 30, 0.985) 48%,
+      rgba(21, 13, 35, 0.98)
+    );
+  box-shadow:
+    0 22px 70px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.055),
+    0 0 42px rgba(34, 211, 238, 0.035);
+  backdrop-filter: blur(28px) saturate(135%);
+  -webkit-backdrop-filter: blur(28px) saturate(135%);
+}
+
+.twincore-nav-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: max-content;
+  color: white;
+  text-decoration: none;
+}
+
+.twincore-nav-brand-mark {
+  width: 2.55rem;
+  height: 2.55rem;
+  display: grid;
+  place-items: center;
+  border-radius: 0.9rem;
+  border: 1px solid rgba(103, 232, 249, 0.24);
+  background:
+    radial-gradient(circle at 30% 20%, rgba(103, 232, 249, 0.22), transparent 45%),
+    linear-gradient(145deg, rgba(8, 145, 178, 0.16), rgba(99, 102, 241, 0.13));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    0 0 22px rgba(34, 211, 238, 0.08);
+}
+
+.twincore-nav-brand-mark svg {
+  width: 1.05rem;
+  height: 1.05rem;
+  color: rgb(165 243 252);
+}
+
+.twincore-nav-brand-copy {
+  display: grid;
+  line-height: 1;
+}
+
+.twincore-nav-brand-copy strong {
+  font-size: 0.88rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.twincore-nav-brand-copy small {
+  margin-top: 0.32rem;
+  font-size: 0.46rem;
+  font-weight: 800;
+  letter-spacing: 0.24em;
+  color: rgba(165, 243, 252, 0.45);
+}
+
+.twincore-desktop-nav-links {
+  justify-self: center;
+  display: flex;
+  align-items: center;
+  gap: 0.22rem;
+  padding: 0.28rem;
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.twincore-desktop-nav-link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.55rem;
+  padding: 0 0.78rem;
+  border-radius: 0.78rem;
+  color: rgba(226, 232, 240, 0.5);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition:
+    color 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.twincore-desktop-nav-link svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.twincore-desktop-nav-link:hover {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.twincore-desktop-nav-link.is-active {
+  color: white;
+  background:
+    linear-gradient(
+      135deg,
+      rgba(34, 211, 238, 0.12),
+      rgba(59, 130, 246, 0.11),
+      rgba(168, 85, 247, 0.09)
+    );
+  box-shadow:
+    inset 0 0 0 1px rgba(125, 211, 252, 0.12),
+    0 0 22px rgba(59, 130, 246, 0.06);
+}
+
+.twincore-desktop-nav-link.is-active::after {
+  content: "";
+  position: absolute;
+  left: 30%;
+  right: 30%;
+  bottom: 0.18rem;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #67e8f9, transparent);
+  box-shadow: 0 0 8px rgba(103, 232, 249, 0.7);
+}
+
+.twincore-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.twincore-nav-icon-button,
+.twincore-nav-avatar {
+  width: 2.55rem;
+  height: 2.55rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 0.88rem;
+  color: rgba(226, 232, 240, 0.55);
+  background: rgba(255, 255, 255, 0.035);
+  text-decoration: none;
+  transition: 180ms ease;
+}
+
+.twincore-nav-icon-button svg,
+.twincore-nav-avatar svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.twincore-nav-icon-button:hover,
+.twincore-nav-avatar:hover,
+.twincore-nav-icon-button.is-active,
+.twincore-nav-avatar.is-active {
+  color: white;
+  border-color: rgba(103, 232, 249, 0.18);
+  background: rgba(34, 211, 238, 0.07);
+}
+
+.twincore-mobile-nav {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .twincore-desktop-nav {
+    display: none;
+  }
+
+  .twincore-app-content {
+    padding-top: 0;
+    padding-bottom: calc(6.75rem + env(safe-area-inset-bottom));
+  }
+
+  .twincore-mobile-nav {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 90;
+    display: block;
+    pointer-events: none;
+    padding:
+      0 0.65rem
+      max(0.6rem, env(safe-area-inset-bottom));
+  }
+
+  .twincore-mobile-nav-inner {
+    pointer-events: auto;
+    width: min(34rem, 100%);
+    min-height: 4.25rem;
+    margin-inline: auto;
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    align-items: center;
+    gap: 0.1rem;
+    padding: 0.38rem;
+    border: 1px solid rgba(125, 211, 252, 0.13);
+    border-radius: 1.35rem;
+    background:
+      linear-gradient(
+        135deg,
+        rgba(8, 25, 43, 0.94),
+        rgba(9, 14, 27, 0.96) 50%,
+        rgba(20, 12, 32, 0.95)
+      );
+    box-shadow:
+      0 -16px 50px rgba(0, 0, 0, 0.32),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 0 30px rgba(34, 211, 238, 0.035);
+    backdrop-filter: blur(26px) saturate(140%);
+    -webkit-backdrop-filter: blur(26px) saturate(140%);
+  }
+
+  .twincore-mobile-nav-link {
+    position: relative;
+    min-width: 0;
+    min-height: 3.45rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.22rem;
+    border: 0;
+    border-radius: 0.95rem;
+    color: rgba(203, 213, 225, 0.43);
+    background: transparent;
+    font: inherit;
+    font-size: 0.53rem;
+    font-weight: 750;
+    text-decoration: none;
+    cursor: pointer;
+    transition: 180ms ease;
+  }
+
+  .twincore-mobile-nav-icon {
+    width: 1.8rem;
+    height: 1.8rem;
+    display: grid;
+    place-items: center;
+    border-radius: 0.72rem;
+    transition: 180ms ease;
+  }
+
+  .twincore-mobile-nav-icon svg {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .twincore-mobile-nav-link.is-active {
+    color: white;
+    background:
+      linear-gradient(
+        180deg,
+        rgba(34, 211, 238, 0.085),
+        rgba(59, 130, 246, 0.045)
+      );
+  }
+
+  .twincore-mobile-nav-link.is-active .twincore-mobile-nav-icon {
+    color: rgb(165 243 252);
+    background: rgba(34, 211, 238, 0.09);
+    box-shadow:
+      inset 0 0 0 1px rgba(103, 232, 249, 0.12),
+      0 0 18px rgba(34, 211, 238, 0.08);
+  }
+
+  .twincore-mobile-nav-link.is-active::before {
+    content: "";
+    position: absolute;
+    top: 0.12rem;
+    width: 1.35rem;
+    height: 1px;
+    background: #67e8f9;
+    box-shadow: 0 0 8px rgba(103, 232, 249, 0.75);
+  }
+
+  .twincore-mobile-more {
+    pointer-events: auto;
+    position: absolute;
+    left: 50%;
+    bottom: calc(5.35rem + env(safe-area-inset-bottom));
+    width: min(calc(100% - 1.3rem), 30rem);
+    transform: translateX(-50%);
+    overflow: hidden;
+    padding: 1rem;
+    border: 1px solid rgba(125, 211, 252, 0.13);
+    border-radius: 1.35rem;
+    background:
+      linear-gradient(
+        145deg,
+        rgba(12, 31, 51, 0.97),
+        rgba(9, 14, 27, 0.985) 55%,
+        rgba(25, 13, 38, 0.97)
+      );
+    box-shadow:
+      0 24px 70px rgba(0, 0, 0, 0.5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
+  }
+
+  .twincore-mobile-more-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.85rem;
+    padding-inline: 0.15rem;
+  }
+
+  .twincore-mobile-more-heading > div {
+    display: grid;
+  }
+
+  .twincore-mobile-more-heading span {
+    font-size: 0.48rem;
+    font-weight: 850;
+    letter-spacing: 0.28em;
+    color: rgba(165, 243, 252, 0.38);
+  }
+
+  .twincore-mobile-more-heading strong {
+    margin-top: 0.2rem;
+    font-size: 1rem;
+    color: white;
+  }
+
+  .twincore-mobile-more-heading button {
+    width: 2.2rem;
+    height: 2.2rem;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 0.75rem;
+    color: rgba(255, 255, 255, 0.6);
+    background: rgba(255, 255, 255, 0.035);
+  }
+
+  .twincore-mobile-more-heading button svg {
+    width: 0.95rem;
+    height: 0.95rem;
+  }
+
+  .twincore-mobile-more-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem;
+  }
+
+  .twincore-mobile-more-grid > a {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.85rem;
+    border: 1px solid rgba(255, 255, 255, 0.065);
+    border-radius: 1rem;
+    color: white;
+    background: rgba(255, 255, 255, 0.025);
+    text-decoration: none;
+  }
+
+  .twincore-mobile-more-grid > a > svg {
+    width: 1rem;
+    height: 1rem;
+    flex: 0 0 auto;
+    color: rgb(165 243 252);
+  }
+
+  .twincore-mobile-more-grid > a > span {
+    min-width: 0;
+    display: grid;
+  }
+
+  .twincore-mobile-more-grid strong {
+    font-size: 0.72rem;
+    font-weight: 750;
+  }
+
+  .twincore-mobile-more-grid small {
+    margin-top: 0.16rem;
+    overflow: hidden;
+    color: rgba(203, 213, 225, 0.42);
+    font-size: 0.55rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 380px) {
+  .twincore-mobile-nav {
+    padding-inline: 0.35rem;
+  }
+
+  .twincore-mobile-nav-inner {
+    padding-inline: 0.2rem;
+  }
+
+  .twincore-mobile-nav-link {
+    font-size: 0.48rem;
+  }
+
+  .twincore-mobile-nav-icon {
+    width: 1.65rem;
+    height: 1.65rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .twincore-desktop-nav-link,
+  .twincore-nav-icon-button,
+  .twincore-nav-avatar,
+  .twincore-mobile-nav-link,
+  .twincore-mobile-nav-icon {
+    transition: none;
+  }
+}
+
+/* =========================================================
+   VISUAL WEEK V2B — MOBILE NAVIGATION POLISH
+   ========================================================= */
+
+.twincore-global-twinme-dock {
+  bottom: 1rem;
+}
+
+@media (max-width: 900px) {
+  .twincore-app-content {
+    padding-bottom: calc(7.25rem + env(safe-area-inset-bottom));
+  }
+
+  .twincore-mobile-nav {
+    padding:
+      0 0.7rem
+      max(0.65rem, env(safe-area-inset-bottom));
+  }
+
+  .twincore-mobile-nav-shell {
+    position: relative;
+    width: min(31rem, 100%);
+    margin-inline: auto;
+    pointer-events: auto;
+  }
+
+  .twincore-mobile-nav-inner {
+    width: 100%;
+    min-height: 4.45rem;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.15rem;
+    padding: 0.42rem 3.35rem 0.42rem 0.42rem;
+    border-color: rgba(103, 232, 249, 0.17);
+    border-radius: 1.45rem;
+    background:
+      linear-gradient(
+        135deg,
+        rgba(7, 27, 46, 0.965),
+        rgba(8, 14, 29, 0.975) 52%,
+        rgba(25, 12, 38, 0.965)
+      );
+    box-shadow:
+      0 -18px 55px rgba(0, 0, 0, 0.38),
+      inset 0 1px 0 rgba(255, 255, 255, 0.075),
+      0 0 38px rgba(34, 211, 238, 0.055);
+  }
+
+  .twincore-mobile-nav-link {
+    min-height: 3.5rem;
+    gap: 0.18rem;
+    border-radius: 0.95rem;
+    font-size: 0.52rem;
+    letter-spacing: -0.01em;
+  }
+
+  .twincore-mobile-nav-icon {
+    width: 1.95rem;
+    height: 1.95rem;
+  }
+
+  .twincore-mobile-nav-icon svg {
+    width: 1.03rem;
+    height: 1.03rem;
+  }
+
+  .twincore-mobile-nav-link.is-active {
+    background:
+      linear-gradient(
+        180deg,
+        rgba(34, 211, 238, 0.13),
+        rgba(59, 130, 246, 0.055)
+      );
+    box-shadow:
+      inset 0 0 0 1px rgba(103, 232, 249, 0.09);
+  }
+
+  .twincore-mobile-more-trigger {
+    position: absolute;
+    right: 0.42rem;
+    top: 50%;
+    z-index: 2;
+    width: 2.65rem;
+    height: 2.65rem;
+    transform: translateY(-50%);
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(167, 139, 250, 0.17);
+    border-radius: 0.92rem;
+    color: rgba(226, 232, 240, 0.58);
+    background:
+      linear-gradient(
+        145deg,
+        rgba(129, 140, 248, 0.10),
+        rgba(168, 85, 247, 0.075)
+      );
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.055),
+      0 0 20px rgba(139, 92, 246, 0.055);
+    cursor: pointer;
+    transition: 180ms ease;
+  }
+
+  .twincore-mobile-more-trigger svg {
+    width: 1.05rem;
+    height: 1.05rem;
+  }
+
+  .twincore-mobile-more-trigger.is-active {
+    color: white;
+    border-color: rgba(196, 181, 253, 0.28);
+    background:
+      linear-gradient(
+        145deg,
+        rgba(129, 140, 248, 0.20),
+        rgba(168, 85, 247, 0.14)
+      );
+  }
+
+  .twincore-mobile-more {
+    bottom: calc(5.75rem + env(safe-area-inset-bottom));
+  }
+
+  .twincore-global-twinme-dock {
+    bottom: calc(6.25rem + env(safe-area-inset-bottom));
+    padding-inline: 0.7rem;
+  }
+
+  .twincore-global-twinme-dock > div {
+    max-width: 31rem;
+  }
+}
+
+@media (max-width: 410px) {
+  .twincore-mobile-nav {
+    padding-inline: 0.45rem;
+  }
+
+  .twincore-mobile-nav-inner {
+    padding-right: 3.15rem;
+  }
+
+  .twincore-mobile-nav-link {
+    font-size: 0.49rem;
+  }
+
+  .twincore-mobile-nav-icon {
+    width: 1.8rem;
+    height: 1.8rem;
+  }
+
+  .twincore-mobile-more-trigger {
+    right: 0.36rem;
+    width: 2.55rem;
+    height: 2.55rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .twincore-mobile-more-trigger {
+    transition: none;
+  }
+}
+
+
+/* Native iOS safe-area fallback.
+   Capacitor WKWebView currently reports env(safe-area-inset-top) as 0px. */
+.twincore-native-ios .twincore-home-content {
+  padding-top: 4.75rem;
+}
+
+/* Native iOS secondary-page safe-area fallback. */
+.twincore-native-ios .twincore-profile-shell {
+  padding-top: 4.75rem !important;
+}
+
+/* Native iOS Contact / Identity safe-area fallback. */
+.twincore-native-ios .twincore-contact-content {
+  padding-top: 4.75rem;
+}
+
+/* Native iOS Safety safe-area fallback. */
+.twincore-native-ios .twincore-safety-content {
+  padding-top: 4.75rem;
+}
+
+/* Native iOS Spots safe-area fallback. */
+.twincore-native-ios .twincore-spots-dashboard {
+  margin-top: 4.75rem;
+  margin-left: 1rem;
+}
+
+.twincore-native-ios .twincore-spots-content {
+  padding-top: 2rem;
+}
+
+/* Native iOS Crew safe-area fallback. */
+.twincore-native-ios .twincore-crew-content {
+  padding-top: 4.75rem;
+}
+
+/* Native iOS Party Dashboard safe-area fallback. */
+.twincore-native-ios .twincore-party-dashboard {
+  padding-top: 4.75rem;
+}
+
+/* Native iOS Join Crew safe-area fallback. */
+.twincore-native-ios .twincore-join-content {
+  padding-top: 4.75rem;
+}
+

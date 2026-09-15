@@ -13,9 +13,10 @@ import {
   UserRound,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import posthog from "posthog-js";
+import { getSharedProfile } from "@/lib/shared-profile";
 import {
   acceptLocalInvite,
   buildInviteLink,
@@ -26,6 +27,8 @@ import {
 } from "@/lib/invite-system";
 
 type RemoteInvite = InviteRecord & {
+  crewId?: string | null;
+  crewOwnerId?: string | null;
   maxUses?: number;
   useCount?: number;
   isActive?: boolean;
@@ -34,6 +37,20 @@ type RemoteInvite = InviteRecord & {
 
 type StoredProfile = {
   displayName?: string;
+};
+
+type PublicInviteLookupRow = {
+  code: string;
+  inviter_name: string | null;
+  inviter_avatar_url: string | null;
+  crew_name: string | null;
+  created_at: string | null;
+  accepted_at: string | null;
+  expires_at: string | null;
+  status: string | null;
+  max_uses: number | null;
+  use_count: number | null;
+  is_active: boolean | null;
 };
 
 type CrewMemberLookupRow = {
@@ -101,9 +118,13 @@ function toRemoteInvite(
 
 export default function InviteCodePage() {
   const params = useParams<{ code: string }>();
-  const rawCode = Array.isArray(params?.code)
+  const searchParams = useSearchParams();
+  const routeCode = Array.isArray(params?.code)
     ? params.code[0]
     : params?.code ?? "";
+  const rawCode = routeCode === "__native__"
+    ? searchParams.get("code") ?? ""
+    : routeCode;
   const code = useMemo(() => normalizeInviteCode(rawCode), [rawCode]);
 
   const [invite, setInvite] = useState<RemoteInvite | null>(null);
@@ -117,6 +138,39 @@ export default function InviteCodePage() {
    const [isTeaserPlaying, setIsTeaserPlaying] = useState(false);
 const [teaserProgress, setTeaserProgress] = useState(0);
   const [showWelcome, setShowWelcome] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [isSignedIn, setIsSignedIn] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadAuthState() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!active) return;
+
+      setIsSignedIn(Boolean(user));
+      setAuthChecked(true);
+    }
+
+    void loadAuthState();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!active) return;
+
+      setIsSignedIn(Boolean(session?.user));
+      setAuthChecked(true);
+    });
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -125,17 +179,12 @@ const [teaserProgress, setTeaserProgress] = useState(0);
       setLoading(true);
       setStatusMessage("");
 
-      const localInvite = getInviteByCode(code);
-      if (localInvite && active) {
-        setInvite(toRemoteInvite(localInvite));
-      }
-
       if (supabase) {
         const { data, error } = await supabase
-          .from("crew_invites")
-          .select("*")
-          .eq("code", code)
-          .maybeSingle();
+          .rpc("get_twincore_public_invite", {
+            p_code: code,
+          })
+          .maybeSingle<PublicInviteLookupRow>();
 
         if (error) {
           const readable = getReadableError(error);
@@ -148,7 +197,9 @@ const [teaserProgress, setTeaserProgress] = useState(0);
         if (!error && data && active) {
           const remoteInvite: RemoteInvite = {
             code: data.code,
-            inviterName: data.inviter_name ?? "Neo",
+            crewId: null,
+            crewOwnerId: null,
+            inviterName: data.inviter_name ?? "Crew Owner",
             inviterAvatarUrl: data.inviter_avatar_url ?? null,
             crewName: data.crew_name ?? "TwinCore Crew",
             createdAt: data.created_at ?? new Date().toISOString(),
@@ -197,17 +248,39 @@ useEffect(() => {
   generateQr();
 }, [code]);
 
-  function getDisplayName(userId: string) {
-  try {
-    const raw = localStorage.getItem(getProfileStorageKey(userId));
-    if (!raw) return "Guest";
+  async function getDisplayName(userId: string) {
+    const sharedProfile = await getSharedProfile(userId);
 
-    const parsed = JSON.parse(raw) as StoredProfile;
-    return parsed.displayName?.trim() || "Guest";
-  } catch {
-    return "Guest";
+    if (sharedProfile?.display_name?.trim()) {
+      return sharedProfile.display_name.trim();
+    }
+
+    try {
+      const raw = localStorage.getItem(
+        getProfileStorageKey(userId),
+      );
+
+      if (raw) {
+        const parsed = JSON.parse(raw) as StoredProfile;
+        const localName = parsed.displayName?.trim();
+
+        if (localName) return localName;
+      }
+    } catch {
+      // Continue to the account-name fallback.
+    }
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    const emailName = user?.email
+      ?.split("@")[0]
+      ?.replace(/[._-]+/g, " ")
+      ?.trim();
+
+    return emailName || "Crew Member";
   }
-}
 
   function isInviteUnavailable(currentInvite: RemoteInvite | null) {
     if (!currentInvite) return true;
@@ -218,6 +291,21 @@ useEffect(() => {
     const useCount = currentInvite.useCount ?? 0;
 
     return useCount >= maxUses;
+  }
+
+  function handleJoinAction() {
+    if (!authChecked) return;
+
+    if (!isSignedIn) {
+      const returnPath = window.location.pathname;
+
+      window.location.href =
+        `/auth?next=${encodeURIComponent(returnPath)}`;
+
+      return;
+    }
+
+    void handleJoin();
   }
 
   async function handleJoin() {
@@ -251,98 +339,61 @@ useEffect(() => {
 } = await supabase.auth.getUser();
 
 if (!user) {
-  setStatusMessage("Please sign in first.");
+  const returnPath = window.location.pathname;
+  window.location.href =
+    `/auth?next=${encodeURIComponent(returnPath)}`;
   setJoining(false);
   return;
 }
 
-const acceptedLocal = acceptLocalInvite(code, user.id);
-const displayName = getDisplayName(user.id);
+const displayName = await getDisplayName(user.id);
 
       if (supabase) {
-        const { data: existingMember, error: existingMemberError } =
-  await supabase
-    .from("crew_members")
-    .select("id")
-    .eq("user_id", user.id)
-    .eq("crew_owner", invite.inviterName)
-    .eq("member_name", displayName)
-    .maybeSingle<CrewMemberLookupRow>();
+        const { data: acceptance, error: acceptanceError } =
+          await supabase.rpc("accept_twincore_crew_invite", {
+            p_code: code,
+            p_member_name: displayName,
+          });
 
-        if (existingMemberError) {
-          const readable = getReadableError(existingMemberError);
+        if (acceptanceError) {
+          const readable = getReadableError(acceptanceError);
 
-          console.log("LOOKUP MESSAGE:", readable.message);
-          console.log("LOOKUP DETAILS:", readable.details);
-          console.log("LOOKUP HINT:", readable.hint);
-          console.log("LOOKUP CODE:", readable.code);
+          console.log("INVITE ACCEPT MESSAGE:", readable.message);
+          console.log("INVITE ACCEPT DETAILS:", readable.details);
+          console.log("INVITE ACCEPT HINT:", readable.hint);
+          console.log("INVITE ACCEPT CODE:", readable.code);
 
           setStatusMessage(
-            `Lookup error: ${readable.message || "Unable to check crew membership."}`
+            readable.message || "Unable to join crew.",
           );
           setJoining(false);
           return;
         }
 
-        let memberAlreadyExists = Boolean(existingMember);
+        const result = acceptance as {
+          joined?: boolean;
+          already_member?: boolean;
+          accepted_at?: string | null;
+          use_count?: number;
+          max_uses?: number;
+          is_active?: boolean;
+        } | null;
 
-        if (!memberAlreadyExists) {
-          const { error: memberInsertError } = await supabase
-            .from("crew_members")
-            .insert({
-        user_id: user.id,
-        crew_owner: invite.inviterName,
-        member_name: displayName,
-        });
-
-          if (memberInsertError) {
-            const readable = getReadableError(memberInsertError);
-
-            console.log("INSERT MESSAGE:", readable.message);
-            console.log("INSERT DETAILS:", readable.details);
-            console.log("INSERT HINT:", readable.hint);
-            console.log("INSERT CODE:", readable.code);
-
-            if (readable.code === "23505") {
-              memberAlreadyExists = true;
-            } else {
-              setStatusMessage(
-                `Join error: ${readable.message || "Unable to join crew."}`
-              );
-              setJoining(false);
-              return;
-            }
-          }
-        }
-
-        const nextUseCount = invite.status === "accepted" ? useCount : useCount + 1;
-        const nextIsActive = nextUseCount < maxUses;
-        const acceptedAt = new Date().toISOString();
-
-        const { error: inviteUpdateError } = await supabase
-  .from("crew_invites")
-  .update({
-    use_count: nextUseCount,
-    is_active: nextIsActive,
-    status: "accepted",
-    accepted_at: acceptedAt,
-  })
-  .eq("code", code);
-
-        if (inviteUpdateError) {
-          const readable = getReadableError(inviteUpdateError);
-
-          console.log("INVITE UPDATE MESSAGE:", readable.message);
-          console.log("INVITE UPDATE DETAILS:", readable.details);
-          console.log("INVITE UPDATE HINT:", readable.hint);
-          console.log("INVITE UPDATE CODE:", readable.code);
-
-          setStatusMessage(
-            `Invite update error: ${readable.message || "Unable to update invite."}`
-          );
-          setJoining(false);
-          return;
-        }
+        const memberAlreadyExists = Boolean(result?.already_member);
+        const nextUseCount =
+          typeof result?.use_count === "number"
+            ? result.use_count
+            : useCount;
+        const nextMaxUses =
+          typeof result?.max_uses === "number"
+            ? result.max_uses
+            : maxUses;
+        const nextIsActive =
+          typeof result?.is_active === "boolean"
+            ? result.is_active
+            : nextUseCount < nextMaxUses;
+        const acceptedAt =
+          result?.accepted_at ?? new Date().toISOString();
 
         setInvite((prev): RemoteInvite => {
           if (prev) {
@@ -350,19 +401,10 @@ const displayName = getDisplayName(user.id);
               ...prev,
               status: "accepted",
               acceptedAt,
+              maxUses: nextMaxUses,
               useCount: nextUseCount,
               isActive: nextIsActive,
             };
-          }
-
-          if (acceptedLocal) {
-            return toRemoteInvite(acceptedLocal, {
-              status: "accepted",
-              acceptedAt,
-              maxUses,
-              useCount: nextUseCount,
-              isActive: nextIsActive,
-            });
           }
 
           return {
@@ -373,7 +415,7 @@ const displayName = getDisplayName(user.id);
             expiresAt: invite.expiresAt,
             status: "accepted",
             acceptedAt,
-            maxUses,
+            maxUses: nextMaxUses,
             useCount: nextUseCount,
             isActive: nextIsActive,
           };
@@ -387,42 +429,12 @@ const displayName = getDisplayName(user.id);
         }
         setJoined(true);
         setShowWelcome(true);
-setTimeout(() => setShowWelcome(false), 3500);
+
         setStatusMessage(
           memberAlreadyExists
             ? "You’re already part of this crew."
             : "You joined successfully. Welcome to TwinCore."
         );
-      } else {
-        const acceptedAt = new Date().toISOString();
-
-        setInvite((prev): RemoteInvite | null => {
-          if (prev) {
-            return {
-              ...prev,
-              status: "accepted",
-              acceptedAt,
-            };
-          }
-
-          if (acceptedLocal) {
-            return toRemoteInvite(acceptedLocal, {
-              status: "accepted",
-              acceptedAt,
-            });
-          }
-
-          return null;
-        });
-
-        posthog.capture("crew_invite_accepted", {
-          crew_name: invite.crewName,
-          inviter_name: invite.inviterName,
-        });
-        setJoined(true);
-        setShowWelcome(true);
-setTimeout(() => setShowWelcome(false), 3500);
-        setStatusMessage("You joined successfully. Welcome to TwinCore.");
       }
     } catch (error) {
       const readable = getReadableError(error);
@@ -559,7 +571,11 @@ function formatCreatedTime(dateString: string) {
   const unavailable = isInviteUnavailable(invite);
   const maxUses = invite?.maxUses ?? 50;
   const useCount = invite?.useCount ?? 0;
-  const remainingSlots = Math.max(maxUses - useCount, 0);
+
+  // The crew owner is member #1. Invite useCount tracks
+  // additional accepted members.
+  const memberCount = Math.min(useCount + 1, maxUses);
+  const remainingSlots = Math.max(maxUses - memberCount, 0);
 
   return (
     <main className="min-h-screen bg-[#050816] text-white">
@@ -901,7 +917,7 @@ isTeaserPlaying
         <div className="mb-2 flex items-center justify-between text-sm">
           <span className="text-white/60">Members</span>
           <span className="text-white/80">
-            {useCount} of {maxUses} joined
+            {memberCount} of {maxUses} members
           </span>
         </div>
 
@@ -911,7 +927,7 @@ isTeaserPlaying
             className="h-full rounded-full bg-gradient-to-r from-fuchsia-400 to-cyan-400"
             style={{
               width: `${Math.min(
-                (useCount / Math.max(maxUses, 1)) * 100,
+                (memberCount / Math.max(maxUses, 1)) * 100,
                 100
               )}%`,
             }}
@@ -939,8 +955,8 @@ isTeaserPlaying
     ) : (
       <button
         type="button"
-        onClick={handleJoin}
-        disabled={joining}
+        onClick={handleJoinAction}
+        disabled={joining || !authChecked}
         className="relative overflow-hidden flex min-h-14 w-full items-center justify-center rounded-3xl bg-gradient-to-r from-fuchsia-500 via-violet-500 to-cyan-400 px-5 py-4 text-base font-bold text-white shadow-[0_0_28px_rgba(217,70,239,0.35)] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60"
       >
    {isTeaserPlaying && (
@@ -949,9 +965,13 @@ isTeaserPlaying
 
         <span className="relative z-10">
 
-{joining
-? "Joining..."
-: "Join TwinCore Crew"}
+{!authChecked
+  ? "Checking Account..."
+  : joining
+    ? "Joining..."
+    : isSignedIn
+      ? "Join TwinCore Crew"
+      : "Sign In to Join Crew"}
 
 </span>
 
@@ -1079,21 +1099,89 @@ isTeaserPlaying
 ) : null}
 
 {showWelcome ? (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4 backdrop-blur">
-    <div className="w-full max-w-sm rounded-3xl border border-fuchsia-400/30 bg-[#070A14] p-6 text-center shadow-[0_0_50px_rgba(217,70,239,0.35)]">
-      <div className="mx-auto mb-4 flex h-20 w-20 twin-heartbeat items-center justify-center rounded-full bg-fuchsia-500/20 text-4xl">
-        🎉
-      </div>
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 px-4 py-6 backdrop-blur-md">
+    <div className="relative w-full max-w-md overflow-hidden rounded-[2rem] border border-fuchsia-400/30 bg-[radial-gradient(circle_at_top,rgba(217,70,239,.18),transparent_34%),linear-gradient(180deg,#0b0714,#070a14)] p-6 text-center shadow-[0_0_70px_rgba(217,70,239,0.30)] sm:p-7">
+      <button
+        type="button"
+        onClick={() => setShowWelcome(false)}
+        aria-label="Close welcome"
+        className="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-white/5 text-sm text-white/55 transition hover:bg-white/10 hover:text-white"
+      >
+        ×
+      </button>
 
-      <h2 className="text-3xl font-black text-white">
-        Welcome to TwinCore
-      </h2>
+      <div className="pointer-events-none absolute left-1/2 top-[-6rem] h-48 w-48 -translate-x-1/2 rounded-full bg-fuchsia-500/20 blur-3xl" />
 
-      <div className="mt-5 space-y-3 text-sm text-white/75">
-        <div>🫀 Party Mode Ready</div>
-        <div>🩵 Crew Connected</div>
-        <div>📍 Spots Activated</div>
-        <div>🧠 TwinMe Ready</div>
+      <div className="relative">
+        <div className="mx-auto flex h-20 w-20 twin-heartbeat items-center justify-center rounded-full border border-fuchsia-300/25 bg-fuchsia-500/15 text-4xl shadow-[0_0_36px_rgba(217,70,239,.28)]">
+          🎉
+        </div>
+
+        <p className="mt-5 text-xs font-black uppercase tracking-[0.22em] text-fuchsia-200">
+          Crew Connected
+        </p>
+
+        <h2 className="mt-2 text-3xl font-black tracking-tight text-white">
+          Welcome to {invite?.crewName ?? "your TwinCore crew"}
+        </h2>
+
+        <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-white/55">
+          Your crew connection is active across Party Mode, Spots, TwinMe,
+          and live crew awareness.
+        </p>
+
+        <div className="mt-6 grid grid-cols-2 gap-3 text-left">
+          <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-3">
+            <div className="text-lg">🫀</div>
+            <div className="mt-2 text-sm font-bold text-white">
+              Party Ready
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-3">
+            <div className="text-lg">🩵</div>
+            <div className="mt-2 text-sm font-bold text-white">
+              Crew Connected
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-3">
+            <div className="text-lg">📍</div>
+            <div className="mt-2 text-sm font-bold text-white">
+              Spots Activated
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-3">
+            <div className="text-lg">🧠</div>
+            <div className="mt-2 text-sm font-bold text-white">
+              TwinMe Ready
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          <Link
+            href="/crew"
+            className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-fuchsia-500 px-4 py-3 text-sm font-black text-white transition hover:bg-fuchsia-400"
+          >
+            Open Crew
+          </Link>
+
+          <Link
+            href="/party"
+            className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-cyan-300/25 bg-cyan-300/10 px-4 py-3 text-sm font-black text-cyan-100 transition hover:bg-cyan-300/15"
+          >
+            Start Party Mode
+          </Link>
+        </div>
+
+        <Link
+          href="/"
+          className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold text-white/70 transition hover:bg-white/10 hover:text-white"
+        >
+          Go Home
+        </Link>
       </div>
     </div>
   </div>

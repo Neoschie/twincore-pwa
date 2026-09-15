@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
+import { getSharedProfile } from "@/lib/shared-profile";
 import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
@@ -18,13 +19,13 @@ import {
   Lock,
 } from "lucide-react";
 import { DashboardHero } from "@/components/dashboard/DashboardHero";
-import { DashboardOrb } from "@/components/dashboard/DashboardOrb";
 import { TwinPulseCard } from "@/components/dashboard/TwinPulseCard";
 import { QuickActions } from "@/components/dashboard/QuickActions";
-import { InsightCard } from "@/components/dashboard/InsightCard";
+import { FyiTodayCard } from "@/components/dashboard/FyiTodayCard";
 import { PredictiveAlertsCard } from "@/components/dashboard/PredictiveAlertsCard";
 import { ActivityCard } from "@/components/dashboard/ActivityCard";
-
+import { useLifeContextAwareness } from "@/hooks/twinme/useLifeContextAwareness";
+import { buildFyiTodaySnapshot } from "@/lib/twinme/fyi-today";
 
 /* =========================
    TYPES
@@ -37,6 +38,7 @@ type CrewRow = {
   latitude?: number | null;
   longitude?: number | null;
 };
+
 
 const featureCards = [
   {
@@ -145,7 +147,18 @@ function parseStoredBoolean(raw: string | null) {
    MAIN
 ========================= */
 export default function HomePage() {
-  const [name, setName] = useState("Neo");
+  // TWINCORE_CANONICAL_FYI_HOME_R16_2
+  const lifeContextAwareness = useLifeContextAwareness();
+
+  const fyiToday = useMemo(
+    () =>
+      buildFyiTodaySnapshot(
+        lifeContextAwareness.priority,
+      ),
+    [lifeContextAwareness.priority],
+  );
+
+  const [name, setName] = useState("TwinCore Member");
   const [status, setStatus] = useState<string | null>(null);
   const [location, setLocation] = useState(false);
   const [crewRows, setCrewRows] = useState<CrewRow[]>([]);
@@ -153,45 +166,51 @@ export default function HomePage() {
   const [ghostMode, setGhostMode] = useState(false);
   const [trustedOnly, setTrustedOnly] = useState(false);
 
- 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      const user = data.user;
+    async function loadIdentityAndPresence() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-      if (!user) return;
+      if (!user) {
+        setName("TwinCore Member");
+        return;
+      }
 
- const n = localStorage.getItem(`twincore_display_name_${user.id}`);
-const s = localStorage.getItem(`twincore_party_status_${user.id}`);
-const l = localStorage.getItem(`twincore_last_shared_location_${user.id}`);
+      const localDisplayName =
+        localStorage.getItem(`twincore_display_name_${user.id}`)?.trim() || "";
+      const s = localStorage.getItem(`twincore_party_status_${user.id}`);
+      const l = localStorage.getItem(`twincore_last_shared_location_${user.id}`);
 
-if (n) {
-  const lower = n.toLowerCase();
+      let authoritativeDisplayName = "";
 
-  const safeName =
-    lower.includes("account-a") ||
-    lower.includes("account-b") ||
-    lower.includes("final") ||
-    lower.includes("test")
-      ? "Neo"
-      : n;
+      try {
+        const sharedProfile = await getSharedProfile(user.id);
+        authoritativeDisplayName =
+          sharedProfile?.display_name?.trim() || "";
+      } catch (error) {
+        console.error("HOME SHARED PROFILE LOAD ERROR:", error);
+      }
 
-  setName(safeName);
-}
-if (s) {
-  if (s.toLowerCase() === "at club") {
-    setStatus("At Club");
-  } else {
-    setStatus(s);
-  }
-}
-if (s === "At club" || s === "at club") {
-  setStatus("At Club");
-} else {
-  setStatus(s);
-}
- if (l) setLocation(true);
+      setName(
+        authoritativeDisplayName ||
+          localDisplayName ||
+          "TwinCore Member",
+      );
 
-});
+      if (s) {
+        if (s.toLowerCase() === "at club") {
+          setStatus("At Club");
+        } else {
+          setStatus(s);
+        }
+      }
+
+      if (l) setLocation(true);
+    }
+
+    void loadIdentityAndPresence();
+
     const g =
       localStorage.getItem("twincore_ghost_mode") ||
       localStorage.getItem("ghost_mode");
@@ -203,32 +222,58 @@ if (s === "At club" || s === "at club") {
     setTrustedOnly(parseStoredBoolean(t));
 
     async function loadCrew() {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-  if (!user) {
-    setCrewRows([]);
-    return;
-  }
+      if (!user) {
+        setCrewRows([]);
+        return;
+      }
 
-  const { data } = await supabase
-    .from("crew_status")
-    .select("id,name,status,updated_at,latitude,longitude")
-    .eq("user_id", user.id)
-    .order("updated_at", { ascending: false })
-    .limit(8);
+      const { data } = await supabase
+        .from("crew_status")
+        .select("id,name,status,updated_at,latitude,longitude")
+        .eq("user_id", user.id)
+        .order("updated_at", { ascending: false })
+        .limit(8);
 
-  if (data) {
-    setCrewRows(data as CrewRow[]);
-  }
-}
+      if (data) {
+        setCrewRows(data as CrewRow[]);
+      }
+    }
 
     void loadCrew();
 
     const refreshInterval = window.setInterval(() => {
       void loadCrew();
     }, 8000);
+
+    const crewChannel = supabase
+      .channel("homepage-crew-live")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "crew_status",
+        },
+        () => {
+          void loadCrew();
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "crew_members",
+        },
+        () => {
+          void loadCrew();
+        },
+      )
+      .subscribe();
 
     const pulseInterval = window.setInterval(() => {
       setPulse((prev) => !prev);
@@ -237,6 +282,7 @@ if (s === "At club" || s === "at club") {
     return () => {
       window.clearInterval(refreshInterval);
       window.clearInterval(pulseInterval);
+      void supabase.removeChannel(crewChannel);
     };
   }, []);
 
@@ -375,6 +421,18 @@ const orbState = useMemo<
     return "bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.12),transparent_40%)]";
   }, [predictiveSignals, systemState]);
 
+  // TWINCORE_FYI_PRESENTATION_BRIDGE_R16_2
+  //
+  // Canonical FYI Today has presentation priority when
+  // verified context exists.
+  //
+  // The existing dashboard insight remains a fallback only.
+  const canonicalFyiInsight =
+    fyiToday.leadCandidate?.summary ?? null;
+
+  const homeInsight =
+    canonicalFyiInsight || dashboardInsight;
+
   const twinInsight = useMemo(() => {
     const highest = predictiveSignals[0];
 
@@ -424,51 +482,76 @@ const orbState = useMemo<
 }, [crewStats.connected]);
 
   return (
-    <main className="min-h-screen overflow-hidden bg-[#0A0A0B] text-white">
+    <main className="twincore-home min-h-screen overflow-hidden bg-[#05080f] text-white">
+      <div className="pointer-events-none fixed inset-0 twincore-home-grid" />
       <div className={`fixed inset-0 pointer-events-none ${ambient}`} />
+
+      <div className="pointer-events-none fixed -left-32 top-24 h-[30rem] w-[30rem] rounded-full bg-cyan-500/[0.055] blur-[120px]" />
+      <div className="pointer-events-none fixed -right-40 top-[18%] h-[34rem] w-[34rem] rounded-full bg-violet-600/[0.07] blur-[130px]" />
+      <div className="pointer-events-none fixed bottom-[-14rem] left-[30%] h-[30rem] w-[30rem] rounded-full bg-fuchsia-600/[0.045] blur-[130px]" />
+
       <div
-        className={`pointer-events-none fixed left-1/2 top-24 h-[22rem] w-[22rem] -translate-x-1/2 rounded-full blur-3xl transition-all duration-700 ${
+        className={`pointer-events-none fixed left-[42%] top-20 h-[22rem] w-[22rem] -translate-x-1/2 rounded-full blur-[110px] transition-all duration-700 ${
           predictiveSignals[0]?.level === "red"
-            ? "bg-red-500/10"
+            ? "bg-red-500/[0.08]"
             : predictiveSignals[0]?.level === "orange"
-            ? "bg-orange-500/10"
-            : "bg-blue-500/10"
-        } ${pulse ? "scale-110 opacity-100" : "scale-100 opacity-75"}`}
+            ? "bg-orange-500/[0.07]"
+            : "bg-blue-500/[0.08]"
+        } ${pulse ? "scale-110 opacity-100" : "scale-100 opacity-70"}`}
       />
 
-      <div className="relative mx-auto max-w-md px-4 py-8">
-        <div className="mb-8">
-  <DashboardHero name={name} status={status} />
-</div>
+      <div className="twincore-home-content relative mx-auto w-full max-w-7xl px-4 pb-16 pt-[calc(var(--safe-top)+1.25rem)] sm:px-6 sm:pt-7 lg:px-8 lg:pb-20">
+        <div className="mb-5 sm:mb-6">
+          <DashboardHero name={name} status={status} />
+        </div>
 
-<DashboardOrb state={orbState} />
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.55fr)_minmax(300px,0.65fr)] xl:grid-cols-[minmax(0,1.65fr)_360px]">
+          <div className="min-w-0">
+            {/* TWINCORE_FYI_TODAY_PRODUCT_SURFACE_R16_5 */}
+            <FyiTodayCard
+              summary={
+                fyiToday.leadCandidate
+                  ? fyiToday.leadCandidate.summary
+                  : homeInsight
+              }
+              category={
+                fyiToday.leadCandidate
+                  ? fyiToday.leadCandidate.category
+                  : "Today"
+              }
+              priority={
+                fyiToday.leadCandidate
+                  ? fyiToday.leadCandidate.priority
+                  : undefined
+              }
+            />
 
-<TwinPulseCard
-  name={name}
-  status={status}
-  location={location}
-  connected={crewStats.connected}
-  syncScore={syncScore}
-  statusIcon={getStatusIcon(status)}
-/>
+            <QuickActions
+              features={featureCards}
+              getToneClass={getToneClass}
+              spotsStatusText={spotsStatusText}
+              ghostMode={ghostMode}
+              trustedOnly={trustedOnly}
+            />
 
-<InsightCard
-  insight={dashboardInsight}
-  confidence={syncScore}
-/>
+            <PredictiveAlertsCard
+              predictiveSignals={predictiveSignals}
+            />
+          </div>
 
-<QuickActions
-  features={featureCards}
-  getToneClass={getToneClass}
-  spotsStatusText={spotsStatusText}
-  ghostMode={ghostMode}
-  trustedOnly={trustedOnly}
-/>
-
-<PredictiveAlertsCard
-  predictiveSignals={predictiveSignals}
-/>
+          <aside className="min-w-0 lg:sticky lg:top-6">
+            <TwinPulseCard
+              name={name}
+              status={status}
+              location={location}
+              connected={crewStats.connected}
+              syncScore={syncScore}
+              statusIcon={getStatusIcon(status)}
+            />
+          </aside>
+        </div>
       </div>
     </main>
   );
 }
+

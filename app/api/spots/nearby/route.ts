@@ -16,6 +16,7 @@ type NearbySpot = {
   rating: number | null;
   reviewCount: number | null;
   isOpen: boolean | null;
+  closingTime: string | null;
   photoUrl: string | null;
   latitude: number | null;
   longitude: number | null;
@@ -39,6 +40,7 @@ type GooglePlace = {
 
   currentOpeningHours?: {
     openNow?: boolean;
+    nextCloseTime?: string;
   };
   primaryType?: string;
   types?: string[];
@@ -105,6 +107,7 @@ function normalizeSpot(spot: NearbySpot): NearbySpot {
         ? Math.max(0, spot.reviewCount)
         : null,
     isOpen: spot.isOpen,
+    closingTime: spot.closingTime ?? null,
     photoUrl: spot.photoUrl,
     latitude: spot.latitude,
     longitude: spot.longitude,
@@ -261,7 +264,8 @@ async function getGooglePlacePhotoName(
  
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
+  const requestUrl = new URL(request.url);
+  const { searchParams } = requestUrl;
 
   const latitude = parseCoordinate(searchParams.get("lat"), -90, 90);
 
@@ -447,8 +451,13 @@ export async function GET(request: Request) {
 
         isOpen,
 
+        closingTime: place.currentOpeningHours?.nextCloseTime ?? null,
+
         photoUrl: photoName
-          ? `/api/spots/photo?name=${encodeURIComponent(photoName)}`
+          ? new URL(
+              `/api/spots/photo?name=${encodeURIComponent(photoName)}`,
+              requestUrl.origin,
+            ).toString()
           : null,
 
         latitude: placeLatitude,

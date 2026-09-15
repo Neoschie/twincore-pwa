@@ -1,3 +1,5 @@
+import { isPremiumAuthorityActive } from "./stripe-lifecycle";
+
 import type {
   TwinCoreAccessResult,
   TwinCoreFeatureKey,
@@ -10,7 +12,11 @@ function isExpired(state: TwinCoreSubscriptionState) {
 }
 
 function isPremium(state: TwinCoreSubscriptionState) {
-  return state.plan === "premium" && state.status === "active";
+  return isPremiumAuthorityActive({
+    plan: state.plan,
+    status: state.status,
+    expiresAt: state.expiresAt,
+  });
 }
 
 function isPartyPassActive(state: TwinCoreSubscriptionState) {

@@ -19,7 +19,12 @@ export default function AuthGuard({ children }: AuthGuardProps) {
       } = await supabase.auth.getSession();
 
       if (!session) {
-        router.replace("/auth");
+        const requestedPath =
+          typeof window !== "undefined"
+            ? `${window.location.pathname}${window.location.search}${window.location.hash}`
+            : "/";
+
+        router.replace(`/auth?next=${encodeURIComponent(requestedPath)}`);
         return;
       }
 

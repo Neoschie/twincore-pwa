@@ -1,9 +1,17 @@
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 
+const isNativeBuild = process.env.TWINCORE_NATIVE_BUILD === "1";
+
 const nextConfig: NextConfig = {
-  async rewrites() {
-    return [
+  ...(isNativeBuild
+    ? {
+        output: "export" as const,
+        images: { unoptimized: true },
+      }
+    : {
+        async rewrites() {
+          return [
       {
         source: "/ingest/static/:path*",
         destination: "https://us-assets.i.posthog.com/static/:path*",
@@ -16,8 +24,9 @@ const nextConfig: NextConfig = {
         source: "/ingest/:path*",
         destination: "https://us.i.posthog.com/:path*",
       },
-    ];
-  },
+          ];
+        },
+      }),
   skipTrailingSlashRedirect: true,
 };
 

@@ -144,3 +144,23 @@ crewCollapse?: {
   level?: "stable" | "weakening" | "collapsing";
  };
 };
+
+export interface TwinMeMemory {
+  id: string;
+  user_id: string;
+  crew_id: string | null;
+
+  memory_type:
+    | "checkin"
+    | "location"
+    | "routine"
+    | "recommendation"
+    | "crew";
+
+  title: string;
+  summary: string;
+  confidence: number;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+}
+

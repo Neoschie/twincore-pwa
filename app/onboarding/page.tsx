@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from "framer-motion";
 
 import { startSubscriptionPurchase } from "@/lib/subscription/purchase";
 import posthog from "posthog-js";
+import { markOnboardingComplete } from "@/lib/onboarding-authority";
 
 export default function OnboardingPage() {
   const [step, setStep] = useState(1);
@@ -21,7 +22,7 @@ const [selectedMood, setSelectedMood] = useState("");
 
   <div className="absolute top-[35%] left-[50%] h-[180px] w-[180px] -translate-x-1/2 rounded-full bg-white/[0.03] blur-2xl" />
 </div>
-<div className="relative z-10 w-full max-w-md pb-40">
+<div className="relative z-10 w-full max-w-xl pb-40">
   <div className="mb-4">
   <Link
     href="/"
@@ -34,8 +35,8 @@ const [selectedMood, setSelectedMood] = useState("");
   <div className="relative">
     <div className="absolute inset-0 rounded-full bg-cyan-400/20 blur-2xl animate-pulse" />
 
-    <div className="relative flex h-20 w-20 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] backdrop-blur-xl">
-      <div className="h-8 w-8 rounded-full bg-gradient-to-br from-cyan-300 to-violet-400 shadow-[0_0_40px_rgba(103,232,249,0.35)]" />
+    <div className="relative flex h-24 w-24 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] backdrop-blur-xl">
+      <div className="h-10 w-10 rounded-full bg-gradient-to-br from-cyan-300 to-violet-400 shadow-[0_0_40px_rgba(103,232,249,0.35)]" />
     </div>
   </div>
 </div>
@@ -66,15 +67,14 @@ const [selectedMood, setSelectedMood] = useState("");
   >
             <div className="mb-8">
               <div className="mb-4 inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/60">
-                TwinCore • TwinMe
+                TwinCore • Meet TwinMe
               </div>
 
-<h1 className="max-w-[12ch] text-4xl font-semibold leading-tight tracking-tight">                TwinMe notices patterns before things spiral.
+<h1 className="max-w-[12ch] text-4xl font-semibold leading-tight tracking-tight">                Meet the intelligence behind your day.
               </h1>
 
               <p className="mt-4 text-sm leading-6 text-white/60">
-                Adaptive support that responds to your movement, environment,
-                energy, and social state in real time.
+                TwinMe learns the context around your day and helps keep the next move relevant, calm, and useful.
               </p>
             </div>
 
@@ -87,7 +87,7 @@ const [selectedMood, setSelectedMood] = useState("");
                 }}
                 className="w-full h-14 rounded-2xl bg-white text-black font-semibold"
               >
-                Start Sync
+                Meet TwinMe
               </button>
 
               <Link
@@ -110,11 +110,11 @@ const [selectedMood, setSelectedMood] = useState("");
     className="rounded-[2rem] border border-white/10 bg-white/[0.05] backdrop-blur-3xl shadow-[0_0_40px_rgba(255,255,255,0.03)] p-6 mb-8"
   >
     <h2 className="text-2xl font-semibold">
-      How does tonight feel so far?
+      How do you feel right now?
     </h2>
 
     <p className="mt-2 text-sm text-white/55">
-      Pick the closest one. TwinMe will tune its first response.
+      Pick what feels closest. TwinMe will shape its first response around you.
     </p>
 
     <div className="mt-6 grid grid-cols-1 gap-3">
@@ -165,7 +165,7 @@ const [selectedMood, setSelectedMood] = useState("");
     </div>
 
     <h2 className="text-2xl font-semibold leading-tight">
-      TwinMe is syncing to your state.
+      TwinMe heard you.
     </h2>
 
     <div className="mt-6 rounded-3xl border border-white/10 bg-black/20 p-5">
@@ -221,43 +221,43 @@ const [selectedMood, setSelectedMood] = useState("");
     transition={{ duration: 0.28, ease: "easeOut" }}
   className="rounded-[2rem] border border-white/10 bg-white/[0.05] backdrop-blur-2xl shadow-[0_0_40px_rgba(255,255,255,0.03)] p-6 mb-8">
     <div className="mb-4 inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/60">
-      Live Awareness
+      Context Awareness
     </div>
 
     <h2 className="text-2xl font-semibold leading-tight">
-      TwinMe continuously adapts as things change.
+      Context helps TwinMe stay relevant.
     </h2>
 
     <p className="mt-3 text-sm leading-6 text-white/55">
-      Movement, support, pacing, uncertainty, and environmental shifts all shape how TwinMe responds.
+      TwinMe uses changing context to keep its guidance relevant as your situation shifts.
     </p>
 
     <div className="mt-8 grid grid-cols-2 gap-4">
       <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-        <div className="text-xs text-white/45">Awareness</div>
+        <div className="text-xs text-white/45">Your state</div>
         <div className="mt-2 text-xl font-semibold">
-          Stable
+          How things feel
         </div>
       </div>
 
       <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
         <div className="text-xs text-white/45">Movement</div>
         <div className="mt-2 text-xl font-semibold">
-          Controlled
+          Changes in pace
         </div>
       </div>
 
       <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
         <div className="text-xs text-white/45">Support</div>
         <div className="mt-2 text-xl font-semibold">
-          Available
+          Crew context
         </div>
       </div>
 
       <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
         <div className="text-xs text-white/45">Environment</div>
         <div className="mt-2 text-xl font-semibold">
-          Low Risk
+          Place context
         </div>
       </div>
     </div>
@@ -268,7 +268,7 @@ const [selectedMood, setSelectedMood] = useState("");
       </div>
 
       <p className="mt-3 text-sm leading-7 text-white/85">
-        TwinMe continuously adapts to movement, support, pacing, uncertainty, and environmental shifts in real time.
+        TwinMe can use the context you share across TwinCore to shape more relevant guidance as your situation changes.
       </p>
     </div>
 
@@ -304,11 +304,11 @@ const [selectedMood, setSelectedMood] = useState("");
     </div>
 
     <h2 className="text-2xl font-semibold leading-tight">
-      Unlock full adaptive awareness.
+      Choose how you want to use TwinCore.
     </h2>
 
     <p className="mt-3 text-sm leading-6 text-white/55">
-      Continuous guidance, predictive awareness, ecosystem syncing, hands-free support, and advanced TwinMe intelligence.
+      Start free, unlock Premium, or use Party Pass when you want the full going-out experience.
     </p>
 
     <div className="mt-7 space-y-4">
@@ -335,9 +335,19 @@ const [selectedMood, setSelectedMood] = useState("");
   const result = await startSubscriptionPurchase("premium");
 
   if (result.success && result.redirectTo) {
-    localStorage.setItem("twincore_onboarding_complete", "true");
+    try {
+      await markOnboardingComplete();
+    } catch (error) {
+      console.error("ONBOARDING AUTHORITY SAVE ERROR:", error);
+      window.alert("Unable to save onboarding progress. Please try again.");
+      return;
+    }
+
     window.location.href = result.redirectTo;
+    return;
   }
+
+  window.alert(result.message || "Unable to start Premium checkout.");
 }}
 
   className="mt-5 w-full h-12 rounded-2xl bg-white text-black text-sm font-semibold"
@@ -367,9 +377,19 @@ const [selectedMood, setSelectedMood] = useState("");
   const result = await startSubscriptionPurchase("party_pass");
 
   if (result.success && result.redirectTo) {
-    localStorage.setItem("twincore_onboarding_complete", "true");
+    try {
+      await markOnboardingComplete();
+    } catch (error) {
+      console.error("ONBOARDING AUTHORITY SAVE ERROR:", error);
+      window.alert("Unable to save onboarding progress. Please try again.");
+      return;
+    }
+
     window.location.href = result.redirectTo;
+    return;
   }
+
+  window.alert(result.message || "Unable to start Party Pass checkout.");
 }}
 
   className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/85"
@@ -383,9 +403,17 @@ const [selectedMood, setSelectedMood] = useState("");
     <div className="mt-6 grid grid-cols-1 gap-3">
      <button
   type="button"
-  onClick={() => {
+  onClick={async () => {
     posthog.capture("onboarding_completed_free");
-    localStorage.setItem("twincore_onboarding_complete", "true");
+
+    try {
+      await markOnboardingComplete();
+    } catch (error) {
+      console.error("ONBOARDING AUTHORITY SAVE ERROR:", error);
+      window.alert("Unable to save onboarding progress. Please try again.");
+      return;
+    }
+
     window.location.href = "/twinme";
   }}
   className="flex h-12 w-full items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-sm text-white/80"

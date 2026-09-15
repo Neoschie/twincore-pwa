@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">TwinCore</string>
+    <string name="title_activity_main">TwinCore</string>
+    <string name="package_name">co.twincore.app</string>
+    <string name="custom_url_scheme">co.twincore.app</string>
+</resources>

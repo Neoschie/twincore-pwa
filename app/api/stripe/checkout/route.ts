@@ -8,8 +8,18 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { plan, accessToken } = body;
 
-    if (!plan) {
-      return NextResponse.json({ error: "Missing plan." }, { status: 400 });
+    if (plan !== "premium" && plan !== "party_pass") {
+      return NextResponse.json(
+        { error: "Invalid subscription plan." },
+        { status: 400 }
+      );
+    }
+
+    if (!accessToken) {
+      return NextResponse.json(
+        { error: "Missing authentication token." },
+        { status: 401 }
+      );
     }
 
     const supabase = createClient(
@@ -47,6 +57,15 @@ const appUrl =
         user_id: user.id,
         plan,
       },
+
+      subscription_data: isPremium
+        ? {
+            metadata: {
+              user_id: user.id,
+              plan: "premium",
+            },
+          }
+        : undefined,
 
       line_items: [
         {

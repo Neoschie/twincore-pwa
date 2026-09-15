@@ -1,6 +1,9 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import PartyPulseHero from "./PartyPulseHero";
+import CrewArrivalPrediction from "./components/CrewArrivalPrediction";
+import VenueIntelligenceCard from "./components/VenueIntelligenceCard";
 import {
   Flame,
   Snowflake,
@@ -23,30 +26,38 @@ import {
   Volume2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
+import { getActiveCrew } from "@/lib/crew-system";
+import { getSharedProfile } from "@/lib/shared-profile";
 import AuthGuard from "@/components/auth/AuthGuard";
 import posthog from "posthog-js";
 import AnimatedCard from "../_components/animated-card";
-const getProfileStorageKey = (userId: string) =>
-  `twincore_profile_${userId}`;
+import { TwinSection } from "@/components/twincore/ui/TwinSection";
+import { TwinHero } from "@/components/twincore/ui/TwinHero";
+import { TwinOrb } from "@/components/twincore/ui/TwinOrb";
+import { TwinSituation } from "@/components/twincore/ui/TwinSituation";
+import { TwinPrimaryAction } from "@/components/twincore/ui/TwinPrimaryAction";
+import { TwinPage } from "@/components/twincore/ui/TwinPage";
+import { useCurrentVibe } from "@/hooks/twinme/useCurrentVibe";
+import { useTonightContext } from "@/hooks/twinme/useTonightContext";
+import { TwinVibePrompt } from "@/components/twincore/ui/TwinVibePrompt";
+import { PartyLaunchpad } from "@/components/twincore/ui/PartyLaunchpad";
+import { PartyFitIntelligence } from "@/components/twincore/ui/PartyFitIntelligence";
+const getProfileStorageKey = (userId: string) => `twincore_profile_${userId}`;
 const PARTY_AUDIO_SRC = "/party-mode.mp3";
 
 const getLastSharedLocationKey = (userId: string) =>
   `twincore_last_shared_location_${userId}`;
 
-const getPartyStatusKey = (userId: string) =>
-  `twincore_party_status_${userId}`;
+const getPartyStatusKey = (userId: string) => `twincore_party_status_${userId}`;
 
-const getPartyActiveKey = (userId: string) =>
-  `twincore_party_active_${userId}`;
+const getPartyActiveKey = (userId: string) => `twincore_party_active_${userId}`;
 
 const getPartyAutoTrackingKey = (userId: string) =>
   `twincore_party_auto_tracking_${userId}`;
 
-const getPartyLiveKey = (userId: string) =>
-  `twincore_party_live_${userId}`;
+const getPartyLiveKey = (userId: string) => `twincore_party_live_${userId}`;
 
-const getJoinedCrewKey = (userId: string) =>
-  `twincore_joined_crew_${userId}`;
+const getJoinedCrewKey = (userId: string) => `twincore_joined_crew_${userId}`;
 
 const getCrewStatusIdKey = (userId: string) =>
   `twincore_crew_status_id_${userId}`;
@@ -153,8 +164,7 @@ function getStatusVisual(status: PartyStatus | null): VisualMode {
         orbGlow:
           "bg-[radial-gradient(circle,rgba(249,115,22,0.35)_0%,rgba(239,68,68,0.18)_35%,rgba(0,0,0,0)_72%)]",
         ring: "shadow-[0_0_100px_rgba(249,115,22,0.30)]",
-        card:
-          "border border-orange-500/20 bg-[linear-gradient(180deg,#24150f,#110c08)]",
+        card: "border border-orange-500/20 bg-[linear-gradient(180deg,#24150f,#110c08)]",
         badge:
           "bg-orange-500/15 text-orange-100 shadow-[0_6px_20px_rgba(249,115,22,0.18)]",
         energyValue: 88,
@@ -175,8 +185,7 @@ function getStatusVisual(status: PartyStatus | null): VisualMode {
         orbGlow:
           "bg-[radial-gradient(circle,rgba(56,189,248,0.28)_0%,rgba(59,130,246,0.14)_35%,rgba(0,0,0,0)_72%)]",
         ring: "shadow-[0_0_100px_rgba(56,189,248,0.24)]",
-        card:
-          "border border-cyan-400/20 bg-[linear-gradient(180deg,#0f1b24,#081017)]",
+        card: "border border-cyan-400/20 bg-[linear-gradient(180deg,#0f1b24,#081017)]",
         badge:
           "bg-blue-500/15 text-blue-100 shadow-[0_6px_20px_rgba(59,130,246,0.18)]",
         energyValue: 34,
@@ -195,8 +204,7 @@ function getStatusVisual(status: PartyStatus | null): VisualMode {
         orbGlow:
           "bg-[radial-gradient(circle,rgba(168,85,247,0.24)_0%,rgba(59,130,246,0.12)_35%,rgba(0,0,0,0)_72%)]",
         ring: "shadow-[0_0_100px_rgba(168,85,247,0.22)]",
-        card:
-          "border border-fuchsia-500/20 bg-[linear-gradient(180deg,#1b1326,#0d0b16)]",
+        card: "border border-fuchsia-500/20 bg-[linear-gradient(180deg,#1b1326,#0d0b16)]",
         badge:
           "bg-fuchsia-500/15 text-fuchsia-100 shadow-[0_6px_20px_rgba(168,85,247,0.18)]",
         energyValue: 62,
@@ -216,8 +224,7 @@ function getStatusVisual(status: PartyStatus | null): VisualMode {
         orbGlow:
           "bg-[radial-gradient(circle,rgba(255,255,255,0.08)_0%,rgba(59,130,246,0.08)_35%,rgba(0,0,0,0)_72%)]",
         ring: "shadow-[0_0_70px_rgba(255,255,255,0.08)]",
-        card:
-          "border border-white/10 bg-[linear-gradient(180deg,#14141a,#0c0c10)]",
+        card: "border border-white/10 bg-[linear-gradient(180deg,#14141a,#0c0c10)]",
         badge:
           "bg-white/10 text-white/85 shadow-[0_6px_20px_rgba(255,255,255,0.05)]",
         energyValue: 50,
@@ -322,18 +329,13 @@ function getFriendlyLocationName(coords: Coordinates) {
   return `${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`;
 }
 function getCrewStatusId(userId: string) {
-  const existing = window.localStorage.getItem(
-    getCrewStatusIdKey(userId)
-  );
+  const existing = window.localStorage.getItem(getCrewStatusIdKey(userId));
 
   if (existing) return existing;
 
   const created = crypto.randomUUID();
 
-  window.localStorage.setItem(
-    getCrewStatusIdKey(userId),
-    created
-  );
+  window.localStorage.setItem(getCrewStatusIdKey(userId), created);
 
   return created;
 }
@@ -386,9 +388,7 @@ async function getPrivacySettings(): Promise<PrivacySettings> {
       ghostLabel: parsed.ghostLabel || "Low Visibility",
       blurPresence: parsed.blurPresence ?? true,
       trustedOnly: parsed.trustedOnly ?? false,
-      trustedList: Array.isArray(parsed.trustedList)
-        ? parsed.trustedList
-        : [],
+      trustedList: Array.isArray(parsed.trustedList) ? parsed.trustedList : [],
     };
   } catch {
     return defaultPrivacy;
@@ -422,7 +422,7 @@ async function getCurrentCoordinates(): Promise<Coordinates> {
         enableHighAccuracy: true,
         maximumAge: 15000,
         timeout: 12000,
-      }
+      },
     );
   });
 }
@@ -439,7 +439,7 @@ function isAwayFromCrewStatus(status: string | null | undefined) {
 }
 function getCrewDesyncState(
   selfStatus: PartyStatus | null,
-  crewRows: CrewStatusRow[]
+  crewRows: CrewStatusRow[],
 ): CrewDesyncState {
   if (!selfStatus || crewRows.length === 0) {
     return {
@@ -449,7 +449,9 @@ function getCrewDesyncState(
       differentCount: 0,
     };
   }
-  const crewHighEnergy = crewRows.filter((row) => isHighEnergyStatus(row.status));
+  const crewHighEnergy = crewRows.filter((row) =>
+    isHighEnergyStatus(row.status),
+  );
   const crewAway = crewRows.filter((row) => isAwayFromCrewStatus(row.status));
   if (crewHighEnergy.length >= 1 && isAwayFromCrewStatus(selfStatus)) {
     return {
@@ -526,7 +528,7 @@ function getPredictiveRisk(
   bpm: number,
   desync: CrewDesyncState,
   isolation: IsolationState,
-  stale: StaleState
+  stale: StaleState,
 ): PredictiveRisk {
   let score = 0;
   if (bpm >= 110) score += 2;
@@ -557,7 +559,7 @@ function getPredictiveRisk(
 function getIntervention(
   risk: PredictiveRisk,
   desync: CrewDesyncState,
-  isolation: IsolationState
+  isolation: IsolationState,
 ): Intervention {
   const actions: string[] = [];
   if (risk.level === "high") {
@@ -589,9 +591,23 @@ export default function PartyPage() {
   const trackingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoVoiceLastLabelRef = useRef("idle");
   const autoVoiceLastSpokenAtRef = useRef(0);
-  const [displayName, setDisplayName] = useState("Neo");
+  // TWINCORE_PARTY_CURRENT_VIBE_R11_1
+  const {
+    choices: partyVibeChoices,
+    selectedChoice: partyVibe,
+    hydrated: partyVibeHydrated,
+    selectVibe: selectPartyVibe,
+    clearVibe: clearPartyVibe,
+  } = useCurrentVibe("party");
+
+  // TWINCORE_TONIGHT_CONTEXT_R11_5
+  const { tonight, updateTonight } = useTonightContext();
+
+  const [displayName, setDisplayName] = useState("Crew Member");
   const [crewOwner, setCrewOwner] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState<PartyStatus | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<PartyStatus | null>(
+    null,
+  );
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioReady, setAudioReady] = useState(true);
   const [pulse, setPulse] = useState(false);
@@ -626,180 +642,170 @@ export default function PartyPage() {
     actions: [],
     level: "none",
   });
- useEffect(() => {
-  async function loadPartyPage() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) return;
-
-    const savedName = window.localStorage.getItem(
-      `twincore_display_name_${user.id}`
-    );
-
-    const savedStatus = window.localStorage.getItem(
-      getPartyStatusKey(user.id)
-    );
-
-    const savedLocation = window.localStorage.getItem(
-      getLastSharedLocationKey(user.id)
-    );
-
-    const savedAutoTracking =
-      window.localStorage.getItem(
-        getPartyAutoTrackingKey(user.id)
-      ) === "true";
-
-    const savedPartyActive =
-      window.localStorage.getItem(
-        getPartyActiveKey(user.id)
-      ) === "true";
-
-    if (savedName) {
-      setDisplayName(savedName);
-    }
-
-    const joinedCrew = getJoinedCrew(user.id);
-
-    if (joinedCrew.crewOwner?.trim()) {
-      setCrewOwner(joinedCrew.crewOwner.trim());
-    } else if (savedName) {
-      setCrewOwner(savedName);
-    }
-
-    if (
-      savedStatus &&
-      PARTY_STATUSES.includes(savedStatus as PartyStatus)
-    ) {
-      setSelectedStatus(savedStatus as PartyStatus);
-    } else {
-      setSelectedStatus("Listening to music");
-
-      window.localStorage.setItem(
-        getPartyStatusKey(user.id),
-        "Listening to music"
-      );
-    }
-
-    if (savedLocation) {
-      try {
-        const parsed = JSON.parse(savedLocation) as {
-          latitude?: number;
-          longitude?: number;
-        };
-
-        if (
-          typeof parsed.latitude === "number" &&
-          typeof parsed.longitude === "number"
-        ) {
-          setLastCoords({
-            latitude: parsed.latitude,
-            longitude: parsed.longitude,
-          });
-        }
-      } catch {
-        // Ignore invalid cached location data.
-      }
-    }
-
-    setAutoTracking(savedAutoTracking);
-    setPartyActive(savedPartyActive);
-
-    const privacySettings = await getPrivacySettings();
-    setPrivacy(privacySettings);
-  }
-
-  void loadPartyPage();
-
-  function onStorage() {
-    void supabase.auth.getUser().then(({ data }) => {
-      const user = data.user;
+  useEffect(() => {
+    async function loadPartyPage() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
       if (!user) return;
 
-      const nextName = window.localStorage.getItem(
-        `twincore_display_name_${user.id}`
+      const savedName = window.localStorage.getItem(
+        `twincore_display_name_${user.id}`,
       );
 
-      if (nextName) {
-        setDisplayName(nextName);
-      }
+      const sharedProfile = await getSharedProfile(user.id);
+      const authoritativeDisplayName =
+        sharedProfile?.display_name?.trim() ||
+        savedName?.trim() ||
+        "Crew Member";
 
-      const nextJoinedCrew = getJoinedCrew(user.id);
+      const activeCrew = await getActiveCrew(user.id);
 
-      if (nextJoinedCrew.crewOwner?.trim()) {
-        setCrewOwner(nextJoinedCrew.crewOwner.trim());
-      } else if (nextName) {
-        setCrewOwner(nextName);
-      }
-
-      const nextStatus = window.localStorage.getItem(
-        getPartyStatusKey(user.id)
+      setDisplayName(authoritativeDisplayName);
+      setCrewOwner(
+        activeCrew?.ownerName?.trim() ||
+          authoritativeDisplayName,
       );
 
-      if (
-        nextStatus &&
-        PARTY_STATUSES.includes(nextStatus as PartyStatus)
-      ) {
-        setSelectedStatus(nextStatus as PartyStatus);
+      const savedStatus = window.localStorage.getItem(
+        getPartyStatusKey(user.id),
+      );
+
+      const savedLocation = window.localStorage.getItem(
+        getLastSharedLocationKey(user.id),
+      );
+
+      const savedAutoTracking =
+        window.localStorage.getItem(getPartyAutoTrackingKey(user.id)) ===
+        "true";
+
+      const savedPartyActive =
+        window.localStorage.getItem(getPartyActiveKey(user.id)) === "true";
+
+      if (savedStatus && PARTY_STATUSES.includes(savedStatus as PartyStatus)) {
+        setSelectedStatus(savedStatus as PartyStatus);
+      } else {
+        setSelectedStatus("Listening to music");
+
+        window.localStorage.setItem(
+          getPartyStatusKey(user.id),
+          "Listening to music",
+        );
       }
 
-      const nextPartyActive =
-        window.localStorage.getItem(
-          getPartyActiveKey(user.id)
-        ) === "true";
+      if (savedLocation) {
+        try {
+          const parsed = JSON.parse(savedLocation) as {
+            latitude?: number;
+            longitude?: number;
+          };
 
-      setPartyActive(nextPartyActive);
+          if (
+            typeof parsed.latitude === "number" &&
+            typeof parsed.longitude === "number"
+          ) {
+            setLastCoords({
+              latitude: parsed.latitude,
+              longitude: parsed.longitude,
+            });
+          }
+        } catch {
+          // Ignore invalid cached location data.
+        }
+      }
+
+      setAutoTracking(savedAutoTracking);
+      setPartyActive(savedPartyActive);
+
+      const privacySettings = await getPrivacySettings();
+      setPrivacy(privacySettings);
+    }
+
+    void loadPartyPage();
+
+    function onStorage() {
+      void supabase.auth.getUser().then(async ({ data }) => {
+        const user = data.user;
+
+        if (!user) return;
+
+        const nextCachedName = window.localStorage.getItem(
+          `twincore_display_name_${user.id}`,
+        );
+
+        const sharedProfile = await getSharedProfile(user.id);
+        const authoritativeDisplayName =
+          sharedProfile?.display_name?.trim() ||
+          nextCachedName?.trim() ||
+          "Crew Member";
+
+        const activeCrew = await getActiveCrew(user.id);
+
+        setDisplayName(authoritativeDisplayName);
+        setCrewOwner(
+          activeCrew?.ownerName?.trim() ||
+            authoritativeDisplayName,
+        );
+
+        const nextStatus = window.localStorage.getItem(
+          getPartyStatusKey(user.id),
+        );
+
+        if (nextStatus && PARTY_STATUSES.includes(nextStatus as PartyStatus)) {
+          setSelectedStatus(nextStatus as PartyStatus);
+        }
+
+        const nextPartyActive =
+          window.localStorage.getItem(getPartyActiveKey(user.id)) === "true";
+
+        setPartyActive(nextPartyActive);
+      });
+    }
+
+    window.addEventListener("storage", onStorage);
+
+    return () => {
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedStatus) return;
+
+    supabase.auth.getUser().then(({ data }) => {
+      const user = data.user;
+      if (!user) return;
+
+      window.localStorage.setItem(getPartyStatusKey(user.id), selectedStatus);
     });
-  }
-
-  window.addEventListener("storage", onStorage);
-
-  return () => {
-    window.removeEventListener("storage", onStorage);
-  };
-}, []);
+  }, [selectedStatus]);
 
   useEffect(() => {
-  if (!selectedStatus) return;
+    supabase.auth.getUser().then(({ data }) => {
+      const user = data.user;
+      if (!user) return;
 
-  supabase.auth.getUser().then(({ data }) => {
-    const user = data.user;
-    if (!user) return;
-
-    window.localStorage.setItem(
-      getPartyStatusKey(user.id),
-      selectedStatus
-    );
-  });
-}, [selectedStatus]);
+      window.localStorage.setItem(
+        getPartyAutoTrackingKey(user.id),
+        autoTracking ? "true" : "false",
+      );
+    });
+  }, [autoTracking]);
 
   useEffect(() => {
-  supabase.auth.getUser().then(({ data }) => {
-    const user = data.user;
-    if (!user) return;
+    supabase.auth.getUser().then(({ data }) => {
+      const user = data.user;
+      if (!user) return;
 
-    window.localStorage.setItem(
-      getPartyAutoTrackingKey(user.id),
-      autoTracking ? "true" : "false"
-    );
-  });
-}, [autoTracking]);
+      window.localStorage.setItem(
+        getPartyActiveKey(user.id),
+        partyActive ? "true" : "false",
+      );
+    });
+  }, [partyActive]);
 
-useEffect(() => {
-  supabase.auth.getUser().then(({ data }) => {
-    const user = data.user;
-    if (!user) return;
-
-    window.localStorage.setItem(
-      getPartyActiveKey(user.id),
-      partyActive ? "true" : "false"
-    );
-  });
-}, [partyActive]);
- 
-useEffect(() => {
+  useEffect(() => {
     if (!isPlaying) {
       setPulse(false);
       return;
@@ -811,62 +817,62 @@ useEffect(() => {
       window.clearInterval(interval);
     };
   }, [isPlaying]);
-  
-function writePartyLiveState(
-  userId: string,
-  status: PartyStatus,
-  coords: Coordinates | null,
-  source: "status" | "checkin" | "tracking" | "toggle" | "bootstrap",
-  activeOverride?: boolean
-) {
-  const active = activeOverride ?? partyActive;
 
-  const liveState = {
-    active,
-    status,
-    source,
-    timestamp: new Date().toISOString(),
-    autoTracking,
-    ghostMode: privacy.ghostMode,
-    trustedOnly: privacy.trustedOnly,
-    vibeLabel: privacy.ghostMode
-      ? privacy.ghostLabel || "Low Visibility"
-      : getVibeLabelForStatus(status),
-    mood: privacy.ghostMode ? "ghost" : getMoodForStatus(status),
-    heartbeatBpm: getHeartbeatForStatus(status),
-    latitude: coords?.latitude ?? null,
-    longitude: coords?.longitude ?? null,
-  };
+  function writePartyLiveState(
+    userId: string,
+    status: PartyStatus,
+    coords: Coordinates | null,
+    source: "status" | "checkin" | "tracking" | "toggle" | "bootstrap",
+    activeOverride?: boolean,
+  ) {
+    const active = activeOverride ?? partyActive;
 
-  window.localStorage.setItem(
-    getPartyLiveKey(userId),
-    JSON.stringify(liveState)
-  );
+    const liveState = {
+      active,
+      status,
+      source,
+      timestamp: new Date().toISOString(),
+      autoTracking,
+      ghostMode: privacy.ghostMode,
+      trustedOnly: privacy.trustedOnly,
+      vibeLabel: privacy.ghostMode
+        ? privacy.ghostLabel || "Low Visibility"
+        : getVibeLabelForStatus(status),
+      mood: privacy.ghostMode ? "ghost" : getMoodForStatus(status),
+      heartbeatBpm: getHeartbeatForStatus(status),
+      latitude: coords?.latitude ?? null,
+      longitude: coords?.longitude ?? null,
+    };
 
-  window.localStorage.setItem(getPartyStatusKey(userId), status);
-
-  window.localStorage.setItem(
-    getPartyActiveKey(userId),
-    active ? "true" : "false"
-  );
-
-  if (coords) {
     window.localStorage.setItem(
-      getLastSharedLocationKey(userId),
-      JSON.stringify({
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-        timestamp: new Date().toISOString(),
-        mapsUrl: `https://maps.google.com/?q=${coords.latitude},${coords.longitude}`,
-      })
+      getPartyLiveKey(userId),
+      JSON.stringify(liveState),
     );
+
+    window.localStorage.setItem(getPartyStatusKey(userId), status);
+
+    window.localStorage.setItem(
+      getPartyActiveKey(userId),
+      active ? "true" : "false",
+    );
+
+    if (coords) {
+      window.localStorage.setItem(
+        getLastSharedLocationKey(userId),
+        JSON.stringify({
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          timestamp: new Date().toISOString(),
+          mapsUrl: `https://maps.google.com/?q=${coords.latitude},${coords.longitude}`,
+        }),
+      );
+    }
   }
-}
 
   async function syncCrewStatus(
     status: PartyStatus,
     trigger: "status" | "checkin" | "tracking" | "toggle",
-    activeOverride?: boolean
+    activeOverride?: boolean,
   ) {
     const active = activeOverride ?? partyActive;
     try {
@@ -880,11 +886,11 @@ function writePartyLiveState(
               ? active
                 ? "Turning Party Mode on..."
                 : "Turning Party Mode off..."
-              : "Syncing live status..."
+              : "Syncing live status...",
       );
       const coords = await getCurrentCoordinates();
       setLastCoords(coords);
-      
+
       const exactMapsUrl = `https://maps.google.com/?q=${coords.latitude},${coords.longitude}`;
       const exactLocationName = getFriendlyLocationName(coords);
 
@@ -907,39 +913,43 @@ function writePartyLiveState(
           longitude: coords.longitude,
           timestamp: new Date().toISOString(),
           mapsUrl: exactMapsUrl,
-        })
+        }),
       );
 
       writePartyLiveState(user.id, status, coords, trigger, active);
-      const rowIdFromStorage = getCrewStatusId(user.id);
 
-      const { data: existingByName, error: lookupError } = await supabase
+      const activeCrew = await getActiveCrew(user.id);
+
+      if (!activeCrew) {
+        throw new Error(
+          "Create or join a Crew before syncing live Party status.",
+        );
+      }
+
+      const authoritativeProfile = await getSharedProfile(user.id);
+      const authoritativeDisplayName =
+        authoritativeProfile?.display_name?.trim() ||
+        displayName.trim() ||
+        "Crew Member";
+
+      const { data: existingRows, error: lookupError } = await supabase
         .from("crew_status")
-        .select(`
-  id,
-  name,
-  status,
-  updated_at,
-  latitude,
-  longitude,
-  location_name,
-  heartbeat_bpm,
-  vibe_label
-`)
+        .select("id")
         .eq("user_id", user.id)
-        .eq("name", displayName)
-        .maybeSingle();
+        .eq("crew_id", activeCrew.id)
+        .limit(1);
+
       if (lookupError) {
-        throw new Error(lookupError.message || "Could not look up crew row.");
+        throw new Error(
+          lookupError.message || "Could not look up Crew status.",
+        );
       }
-      const rowId =
-        ((existingByName as { id?: string } | null)?.id as string | undefined) ||
-        rowIdFromStorage;
-      if (rowId !== rowIdFromStorage) {
-      if (user) {
-  window.localStorage.setItem(getCrewStatusIdKey(user.id), rowId);
-}
-      }
+
+      const existingStatusId =
+        Array.isArray(existingRows) && existingRows.length > 0
+          ? (existingRows[0] as { id?: string }).id
+          : undefined;
+
       const payloadLatitude =
         privacy.ghostMode && privacy.blurPresence
           ? roundCoordinate(coords.latitude, 2)
@@ -956,11 +966,13 @@ function writePartyLiveState(
       const payloadVibe = privacy.ghostMode
         ? privacy.ghostLabel || "Low Visibility"
         : getVibeLabelForStatus(status);
-      const payloadMood = privacy.ghostMode ? "ghost" : getMoodForStatus(status);
+      const payloadMood = privacy.ghostMode
+        ? "ghost"
+        : getMoodForStatus(status);
       const payload = {
-  id: rowId,
-  user_id: user.id,
-  name: displayName,
+        user_id: user.id,
+        crew_id: activeCrew.id,
+        name: authoritativeDisplayName,
         status: active ? status : "Safe",
         latitude: payloadLatitude,
         longitude: payloadLongitude,
@@ -969,11 +981,19 @@ function writePartyLiveState(
         vibe_label: active ? payloadVibe : "Party off",
         mood: active ? payloadMood : "safe",
       };
-      const { error } = await supabase
-        .from("crew_status")
-        .upsert(payload, { onConflict: "id" });
-      if (error) {
-        throw new Error(error.message || "Supabase write failed.");
+      const statusWrite = existingStatusId
+        ? await supabase
+            .from("crew_status")
+            .update(payload)
+            .eq("id", existingStatusId)
+        : await supabase
+            .from("crew_status")
+            .insert(payload);
+
+      if (statusWrite.error) {
+        throw new Error(
+          statusWrite.error.message || "Supabase write failed.",
+        );
       }
       const checkInPayload = {
         active,
@@ -986,7 +1006,7 @@ function writePartyLiveState(
       };
       window.localStorage.setItem(
         "twincore_party_checkin",
-        JSON.stringify(checkInPayload)
+        JSON.stringify(checkInPayload),
       );
       setSyncState("synced");
       setSyncMessage(
@@ -998,7 +1018,7 @@ function writePartyLiveState(
               ? active
                 ? "Party Mode is live"
                 : "Party Mode powered down"
-              : "Party status synced live"
+              : "Party status synced live",
       );
       window.setTimeout(() => {
         setSyncState("idle");
@@ -1010,49 +1030,28 @@ function writePartyLiveState(
     }
   }
   async function loadCrewRowsForAwareness() {
-  if (!supabase || !displayName) {
-    return [] as CrewStatusRow[];
-  }
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return [] as CrewStatusRow[];
-  }
-
-  const joined = getJoinedCrew(user.id);
-    const owner = joined.crewOwner?.trim() || crewOwner || displayName;
-
-    const memberNames = new Set<string>();
-    memberNames.add(owner);
-
-    const { data: memberRows, error: memberError } = await supabase
-  .from("crew_members")
-  .select("crew_owner, member_name")
-  .eq("user_id", user.id)
-  .eq("crew_owner", owner);
-
-    if (memberError) {
-      throw new Error(memberError.message || "Unable to load crew members.");
+    if (!supabase) {
+      return [] as CrewStatusRow[];
     }
 
-    (Array.isArray(memberRows) ? (memberRows as CrewMemberRow[]) : []).forEach((row) => {
-      if (row.member_name?.trim()) {
-        memberNames.add(row.member_name.trim());
-      }
-    });
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-    const namesToLoad = Array.from(memberNames).filter((name) => name !== displayName);
+    if (!user) {
+      return [] as CrewStatusRow[];
+    }
 
-    if (!namesToLoad.length) {
-      return [];
+    const activeCrew = await getActiveCrew(user.id);
+
+    if (!activeCrew) {
+      return [] as CrewStatusRow[];
     }
 
     const { data: statusRows, error: statusError } = await supabase
-  .from("crew_status")
-  .select(`
+      .from("crew_status")
+      .select(
+        `
   id,
   name,
   status,
@@ -1062,15 +1061,20 @@ function writePartyLiveState(
   location_name,
   heartbeat_bpm,
   vibe_label
-`)
-  .eq("user_id", user.id)
-  .in("name", namesToLoad);
+`,
+      )
+      .eq("crew_id", activeCrew.id)
+      .neq("user_id", user.id);
 
     if (statusError) {
-      throw new Error(statusError.message || "Unable to load crew status.");
+      throw new Error(
+        statusError.message || "Unable to load Crew status.",
+      );
     }
 
-    return (Array.isArray(statusRows) ? statusRows : []) as CrewStatusRow[];
+    return (
+      Array.isArray(statusRows) ? statusRows : []
+    ) as CrewStatusRow[];
   }
 
   async function refreshCrewAwareness() {
@@ -1087,12 +1091,12 @@ function writePartyLiveState(
         getHeartbeatForStatus(selectedStatus),
         nextDesync,
         nextIsolation,
-        nextStale
+        nextStale,
       );
       const nextIntervention = getIntervention(
         nextRisk,
         nextDesync,
-        nextIsolation
+        nextIsolation,
       );
 
       setCrewRows(rows);
@@ -1131,60 +1135,71 @@ function writePartyLiveState(
     }, 12000);
   }
 
-useEffect(() => {
-  if (!selectedStatus) return;
+  useEffect(() => {
+    if (!selectedStatus) return;
 
-  supabase.auth.getUser().then(({ data }) => {
-    const user = data.user;
-    if (!user) return;
+    supabase.auth.getUser().then(({ data }) => {
+      const user = data.user;
+      if (!user) return;
 
-    writePartyLiveState(
-      user.id,
-      selectedStatus,
-      lastCoords,
-      firstSyncSkippedRef.current ? "status" : "bootstrap",
-      partyActive
-    );
-  });
+      writePartyLiveState(
+        user.id,
+        selectedStatus,
+        lastCoords,
+        firstSyncSkippedRef.current ? "status" : "bootstrap",
+        partyActive,
+      );
+    });
 
-  if (!firstSyncSkippedRef.current) {
-    firstSyncSkippedRef.current = true;
-    return;
-  }
+    if (!firstSyncSkippedRef.current) {
+      firstSyncSkippedRef.current = true;
+      return;
+    }
 
-  if (!partyActive) return;
-  void syncCrewStatus(selectedStatus, "status", true);
-}, [selectedStatus]);
+    if (!partyActive) return;
+    void syncCrewStatus(selectedStatus, "status", true);
+  }, [selectedStatus]);
 
-useEffect(() => {
-  if (!selectedStatus) return;
+  useEffect(() => {
+    if (!selectedStatus) return;
 
-  supabase.auth.getUser().then(({ data }) => {
-    const user = data.user;
-    if (!user) return;
+    supabase.auth.getUser().then(({ data }) => {
+      const user = data.user;
+      if (!user) return;
 
-    writePartyLiveState(user.id, selectedStatus, lastCoords, "toggle", partyActive);
-  });
+      writePartyLiveState(
+        user.id,
+        selectedStatus,
+        lastCoords,
+        "toggle",
+        partyActive,
+      );
+    });
 
-  if (!partyActive) {
-    stopAutoTracking();
-    return;
-  }
+    if (!partyActive) {
+      stopAutoTracking();
+      return;
+    }
 
-  void syncCrewStatus(selectedStatus, "toggle", true);
-}, [partyActive]);
+    void syncCrewStatus(selectedStatus, "toggle", true);
+  }, [partyActive]);
 
-useEffect(() => {
-  if (!selectedStatus) return;
+  useEffect(() => {
+    if (!selectedStatus) return;
 
-  supabase.auth.getUser().then(({ data }) => {
-    const user = data.user;
-    if (!user) return;
+    supabase.auth.getUser().then(({ data }) => {
+      const user = data.user;
+      if (!user) return;
 
-    writePartyLiveState(user.id, selectedStatus, lastCoords, "bootstrap", partyActive);
-  });
-}, [privacy, autoTracking, lastCoords, selectedStatus, partyActive]);
-
+      writePartyLiveState(
+        user.id,
+        selectedStatus,
+        lastCoords,
+        "bootstrap",
+        partyActive,
+      );
+    });
+  }, [privacy, autoTracking, lastCoords, selectedStatus, partyActive]);
 
   useEffect(() => {
     if (!selectedStatus) return;
@@ -1216,29 +1231,58 @@ useEffect(() => {
   }, []);
   useEffect(() => {
     void refreshCrewAwareness();
+
     const interval = window.setInterval(() => {
       void refreshCrewAwareness();
     }, 6000);
-    return () => window.clearInterval(interval);
+
+    const channel = supabase
+      .channel("party-crew-awareness-live")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "crew_status",
+        },
+        () => {
+          void refreshCrewAwareness();
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "crew_members",
+        },
+        () => {
+          void refreshCrewAwareness();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      window.clearInterval(interval);
+      void supabase.removeChannel(channel);
+    };
   }, [displayName, crewOwner, selectedStatus, partyActive]);
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!("speechSynthesis" in window)) return;
     if (!autoVoiceEnabled) return;
-   
+
     const interval = setInterval(async () => {
-  try {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
-    if (!user) return;
+        if (!user) return;
 
-    const raw = window.localStorage.getItem(
-      getPartyLiveKey(user.id)
-    );
+        const raw = window.localStorage.getItem(getPartyLiveKey(user.id));
 
-    if (!raw) return;
+        if (!raw) return;
         const live = JSON.parse(raw) as {
           active?: boolean;
           heartbeatBpm?: number;
@@ -1252,18 +1296,21 @@ useEffect(() => {
         }
         const nextStale = getStaleState(nextCrewRows);
         const nextIsolation = getIsolationState(nextCrewRows);
-        const nextDesync = getCrewDesyncState(live.status ?? null, nextCrewRows);
+        const nextDesync = getCrewDesyncState(
+          live.status ?? null,
+          nextCrewRows,
+        );
         const bpm = live.heartbeatBpm || 0;
         const nextRisk = getPredictiveRisk(
           bpm,
           nextDesync,
           nextIsolation,
-          nextStale
+          nextStale,
         );
         const nextIntervention = getIntervention(
           nextRisk,
           nextDesync,
-          nextIsolation
+          nextIsolation,
         );
         setStale(nextStale);
         setIsolation(nextIsolation);
@@ -1282,12 +1329,10 @@ useEffect(() => {
             "TwinMe check. Your crew signals are outdated. Do not rely on them.";
         } else if (nextIsolation.level === "isolated") {
           label = "isolated";
-          message =
-            "TwinMe check. You are currently isolated. Stay aware.";
+          message = "TwinMe check. You are currently isolated. Stay aware.";
         } else if (nextDesync.level === "separated") {
           label = "crew_separated";
-          message =
-            "TwinMe check. You are no longer aligned with your crew.";
+          message = "TwinMe check. You are no longer aligned with your crew.";
         } else if (nextDesync.level === "watch") {
           label = "crew_watch";
           message =
@@ -1302,15 +1347,14 @@ useEffect(() => {
             "TwinMe check. Your pace is rising. Stay intentional and slow your next move.";
         } else if (bpm >= 100) {
           label = "guarded";
-          message =
-            "TwinMe check. Stay aware. Keep your next move simple.";
+          message = "TwinMe check. Stay aware. Keep your next move simple.";
         }
         if (!message) {
           autoVoiceLastLabelRef.current = label;
           return;
         }
         const now = Date.now();
-        
+
         const cooldown =
           label === "critical" ||
           label === "crew_separated" ||
@@ -1319,14 +1363,14 @@ useEffect(() => {
           label === "risk_high"
             ? 12000
             : 20000;
-        
-            const labelChanged = label !== autoVoiceLastLabelRef.current;
-        
+
+        const labelChanged = label !== autoVoiceLastLabelRef.current;
+
         const cooldownPassed =
           now - autoVoiceLastSpokenAtRef.current > cooldown;
         if (!labelChanged && !cooldownPassed) return;
         window.speechSynthesis.cancel();
-       
+
         const utterance = new SpeechSynthesisUtterance(message);
         utterance.rate = 1;
         utterance.pitch = 0.95;
@@ -1339,10 +1383,181 @@ useEffect(() => {
     }, 4000);
     return () => clearInterval(interval);
   }, [autoVoiceEnabled, crewRows, displayName, crewOwner]);
- 
-  const visual = useMemo(() => getStatusVisual(selectedStatus), [selectedStatus]);
+
+  const visual = useMemo(
+    () => getStatusVisual(selectedStatus),
+    [selectedStatus],
+  );
+
+  const partyIntelligence = useMemo(() => {
+    if (!partyActive) {
+      return {
+        score: 18,
+        label: "Standby",
+        message: "Activate Party Mode to begin collecting live intelligence.",
+        momentum: "Standby" as const,
+        recommendation: {
+          title: "Activate Party Mode",
+          message:
+            "Turn Party Mode on to start monitoring crew presence, movement, risk, and live party signals.",
+          action: "Start Party Mode",
+        },
+      };
+    }
+
+    let score = 45;
+
+    if (selectedStatus) {
+      score += 10;
+    }
+
+    if (autoTracking) {
+      score += 12;
+    }
+
+    const freshCrewCount = crewRows.filter((row) => {
+      if (!row.updated_at) {
+        return false;
+      }
+
+      const minutesAgo = Math.max(
+        0,
+        Math.floor((Date.now() - new Date(row.updated_at).getTime()) / 60000),
+      );
+
+      return minutesAgo <= 30;
+    }).length;
+
+    score += Math.min(15, freshCrewCount * 3);
+
+    if (crewDesync.level === "aligned") {
+      score += 8;
+    } else if (crewDesync.level === "watch") {
+      score -= 5;
+    } else if (crewDesync.level === "separated") {
+      score -= 15;
+    }
+
+    if (isolation.level === "isolated") {
+      score -= 15;
+    }
+
+    if (stale.level !== "fresh") {
+      score -= 10;
+    }
+
+    if (risk.level === "rising") {
+      score -= 12;
+    } else if (risk.level === "high") {
+      score -= 25;
+    }
+
+    score = Math.max(0, Math.min(100, Math.round(score)));
+
+    const label =
+      score >= 85
+        ? "Strong"
+        : score >= 65
+          ? "Active"
+          : score >= 40
+            ? "Watch"
+            : "Low signal";
+
+    const momentum: "Peak" | "Building" | "Cooling" | "Stable" | "Standby" =
+      !partyActive
+        ? "Standby"
+        : score >= 85
+          ? "Peak"
+          : score >= 65 && freshCrewCount >= 2
+            ? "Building"
+            : risk.level === "high" ||
+                crewDesync.level === "separated" ||
+                isolation.level === "isolated"
+              ? "Cooling"
+              : "Stable";
+
+    const recommendation =
+      risk.level === "high"
+        ? {
+            title: "Slow down and reconnect",
+            message:
+              "Risk is elevated. Move toward your crew, reduce pace, and prepare a safe exit.",
+            action: "Safety check",
+          }
+        : crewDesync.level === "separated"
+          ? {
+              title: "Regroup your crew",
+              message:
+                "Your crew appears split. Reconnect before moving to another venue.",
+              action: "Regroup",
+            }
+          : isolation.level === "isolated"
+            ? {
+                title: "Share your position",
+                message:
+                  "You appear isolated from your crew. Send a check-in or refresh your location.",
+                action: "Check in",
+              }
+            : stale.level !== "fresh"
+              ? {
+                  title: "Refresh live signals",
+                  message:
+                    "Some crew signals are stale. Update tracking before relying on the current picture.",
+                  action: "Refresh",
+                }
+              : momentum === "Peak"
+                ? {
+                    title: "Stay aware",
+                    message:
+                      "Party energy is near peak. Keep exits clear and monitor your crew closely.",
+                    action: "Monitor",
+                  }
+                : momentum === "Building"
+                  ? {
+                      title: "Good time to move",
+                      message:
+                        "Activity is building and your signals look healthy. This may be a good time to continue.",
+                      action: "Continue",
+                    }
+                  : {
+                      title: "Keep the crew connected",
+                      message:
+                        "Party conditions look stable. Maintain fresh check-ins and location awareness.",
+                      action: "Check in",
+                    };
+
+    const message =
+      risk.level === "high"
+        ? "Party intelligence detects elevated risk. Slow down and reconnect with your crew."
+        : crewDesync.level === "separated"
+          ? "Your crew appears separated. Consider regrouping before continuing."
+          : isolation.level === "isolated"
+            ? "You appear isolated from your crew. Share your location or check in."
+            : stale.level !== "fresh"
+              ? "Some party signals are stale. Refresh tracking before relying on the current picture."
+              : autoTracking
+                ? "TwinMe is actively monitoring crew presence, movement, and live party signals."
+                : "Party Mode is active. Enable auto tracking for stronger live intelligence.";
+
+    return {
+      score,
+      label,
+      message,
+      momentum,
+      recommendation,
+    };
+  }, [
+    partyActive,
+    selectedStatus,
+    autoTracking,
+    crewRows,
+    crewDesync.level,
+    isolation.level,
+    stale.level,
+    risk.level,
+  ]);
+
   async function handleToggleAudio() {
-   
     const audio = audioRef.current;
     if (!audio) return;
     try {
@@ -1365,30 +1580,101 @@ useEffect(() => {
   }
 
   async function handleSendCheckIn() {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-  if (!user) return;
+    if (!user) return;
 
-  const currentStatus = selectedStatus ?? "Listening to music";
+    const currentStatus = selectedStatus ?? "Listening to music";
 
-  posthog.capture("party_checkin_sent", { status: currentStatus });
-  setCheckInSent(true);
+    posthog.capture("party_checkin_sent", { status: currentStatus });
+    setCheckInSent(true);
 
-  if (!partyActive) {
-    setPartyActive(true);
-    writePartyLiveState(user.id, currentStatus, lastCoords, "checkin", true);
-    await syncCrewStatus(currentStatus, "checkin", true);
-  } else {
-    writePartyLiveState(user.id, currentStatus, lastCoords, "checkin", true);
+    if (!partyActive) {
+      setPartyActive(true);
+      writePartyLiveState(user.id, currentStatus, lastCoords, "checkin", true);
+      await syncCrewStatus(currentStatus, "checkin", true);
+    } else {
+      writePartyLiveState(user.id, currentStatus, lastCoords, "checkin", true);
+      await syncCrewStatus(currentStatus, "checkin", true);
+    }
+
+    window.setTimeout(() => {
+      setCheckInSent(false);
+    }, 2200);
+  }
+
+  async function persistPrivacySettings(nextPrivacy: PrivacySettings) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      setSyncMessage("Sign in to save privacy settings.");
+      return;
+    }
+
+    const storageKey = getProfileStorageKey(user.id);
+    const currentRaw = window.localStorage.getItem(storageKey);
+
+    let currentProfile: Record<string, unknown> = {};
+
+    if (currentRaw) {
+      try {
+        currentProfile = JSON.parse(currentRaw) as Record<string, unknown>;
+      } catch {
+        currentProfile = {};
+      }
+    }
+
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        ...currentProfile,
+        ghostMode: nextPrivacy.ghostMode,
+        ghostLabel: nextPrivacy.ghostLabel,
+        blurPresence: nextPrivacy.blurPresence,
+        trustedOnly: nextPrivacy.trustedOnly,
+        trustedList: nextPrivacy.trustedList,
+      }),
+    );
+
+    setSyncMessage("Privacy settings saved.");
+  }
+
+  function updatePrivacySettings(nextPrivacy: PrivacySettings) {
+    setPrivacy(nextPrivacy);
+    void persistPrivacySettings(nextPrivacy);
+
+    posthog.capture("party_privacy_updated", {
+      ghostMode: nextPrivacy.ghostMode,
+      blurPresence: nextPrivacy.blurPresence,
+      trustedOnly: nextPrivacy.trustedOnly,
+    });
+  }
+
+  async function handleShareLocation() {
+    const currentStatus: PartyStatus = selectedStatus ?? "Listening to music";
+
+    posthog.capture("party_location_shared", {
+      status: currentStatus,
+    });
+
+    if (!partyActive) {
+      setPartyActive(true);
+    }
+
     await syncCrewStatus(currentStatus, "checkin", true);
   }
 
-  window.setTimeout(() => {
-    setCheckInSent(false);
-  }, 2200);
-}
+  function handleOpenSharedLocation() {
+    if (!lastCoords) return;
+
+    const mapsUrl = `https://maps.google.com/?q=${lastCoords.latitude},${lastCoords.longitude}`;
+
+    window.open(mapsUrl, "_blank", "noopener,noreferrer");
+  }
 
   async function handleTogglePartyMode() {
     if (!selectedStatus) return;
@@ -1396,29 +1682,97 @@ useEffect(() => {
     posthog.capture("party_mode_toggled", { active: nextActive });
     setPartyActive(nextActive);
     const {
-  data: { user },
-} = await supabase.auth.getUser();
+      data: { user },
+    } = await supabase.auth.getUser();
 
-if (!user) return;
+    if (!user) return;
 
-writePartyLiveState(user.id, selectedStatus, lastCoords, "toggle", nextActive);
+    writePartyLiveState(
+      user.id,
+      selectedStatus,
+      lastCoords,
+      "toggle",
+      nextActive,
+    );
   }
   function handleInterventionAction(action: string) {
-    if (action.includes("Reconnect")) {
+    const normalizedAction = action.toLowerCase();
+
+    posthog.capture("party_intervention_selected", {
+      action,
+      riskLevel: risk.level,
+    });
+
+    if (
+      normalizedAction.includes("reconnect") ||
+      normalizedAction.includes("regroup")
+    ) {
       window.location.href = "/crew";
       return;
     }
-    if (action.includes("safer environment")) {
+
+    if (
+      normalizedAction.includes("safer environment") ||
+      normalizedAction.includes("safety check")
+    ) {
       window.location.href = "/spots";
       return;
     }
-    if (action.includes("check in")) {
+
+    if (
+      normalizedAction.includes("share your location") ||
+      normalizedAction.includes("share location")
+    ) {
+      void handleShareLocation();
+      return;
+    }
+
+    if (normalizedAction.includes("check in")) {
       void handleSendCheckIn();
       return;
     }
-    if (action.includes("ride")) {
-      window.open("https://maps.google.com", "_blank", "noopener,noreferrer");
+
+    if (
+      normalizedAction.includes("refresh") ||
+      normalizedAction.includes("tracking")
+    ) {
+      if (partyActive && selectedStatus) {
+        startAutoTracking();
+      } else {
+        setSyncMessage(
+          "Choose a status and turn Party Mode on before refreshing tracking.",
+        );
+      }
+      return;
     }
+
+    if (
+      normalizedAction.includes("ride") ||
+      normalizedAction.includes("maps")
+    ) {
+      if (lastCoords) {
+        handleOpenSharedLocation();
+      } else {
+        window.open("https://maps.google.com", "_blank", "noopener,noreferrer");
+      }
+      return;
+    }
+
+    if (normalizedAction.includes("start party mode")) {
+      void handleTogglePartyMode();
+      return;
+    }
+
+    if (
+      normalizedAction.includes("slow down") ||
+      normalizedAction.includes("monitor") ||
+      normalizedAction.includes("continue")
+    ) {
+      setSyncMessage(`${action} acknowledged.`);
+      return;
+    }
+
+    setSyncMessage(`Recommended action: ${action}`);
   }
   const liveSystemLabel = useMemo(() => {
     if (!partyActive) return "Party Mode off";
@@ -1444,16 +1798,135 @@ writePartyLiveState(user.id, selectedStatus, lastCoords, "toggle", nextActive);
     if (!lastCoords) return "No live location yet";
     return getFriendlyLocationName(lastCoords);
   }, [lastCoords]);
+  // TWINCORE_PARTY_LAUNCHPAD_HANDLER_R11_2
+  const handlePartyLaunchAction = (
+    action: "fit" | "move" | "crew" | "start",
+  ) => {
+    if (action === "fit") {
+      window.dispatchEvent(
+        new CustomEvent("twincore:party-fit-request", {
+          detail: {
+            vibe: partyVibe ?? null,
+          },
+        }),
+      );
+
+      document.getElementById("party-fit-launch")?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+
+      return;
+    }
+
+    if (action === "move") {
+      document.getElementById("venue-intelligence")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+
+      return;
+    }
+
+    if (action === "crew") {
+      document.getElementById("crew-arrival")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+
+      return;
+    }
+
+    if (action === "start") {
+      if (!partyActive) {
+        void handleTogglePartyMode();
+      }
+
+      return;
+    }
+  };
+
+  // TWINCORE_PARTY_VIBE_LANGUAGE_R11_1
+  const partyVibeTitle = (() => {
+    if (!partyVibe) return "Ready when you are.";
+
+    switch (partyVibe.id) {
+      case "we-outside":
+        return "We outside. 🔥";
+      case "sexy-grown":
+        return "Sexy. Grown. Intentional.";
+      case "dance":
+        return "Find me the music.";
+      case "chill":
+        return "Keep tonight easy.";
+      case "different":
+        return "Let's switch it up.";
+      case "surprise":
+        return "TwinMe's got the move.";
+      default:
+        return "Ready when you are.";
+    }
+  })();
+
+  const partyVibeSubtitle = (() => {
+    if (!partyVibe) {
+      return "Tell TwinMe what kind of night you're feeling.";
+    }
+
+    switch (partyVibe.id) {
+      case "we-outside":
+        return "High energy tonight. TwinMe will build the night around movement, people and momentum.";
+      case "sexy-grown":
+        return "Elevated energy tonight. Think fit, atmosphere, cocktails and the right crowd.";
+      case "dance":
+        return "Music comes first tonight. TwinMe will prioritize places and moves that keep you moving.";
+      case "chill":
+        return "No chaos required. TwinMe will keep the night social, comfortable and low-pressure.";
+      case "different":
+        return "Your usual isn't the assignment tonight. TwinMe can stretch your normal without losing your swag.";
+      case "surprise":
+        return "You gave TwinMe the wheel. Your history matters, but tonight can still surprise you.";
+      default:
+        return "TwinMe is reading tonight through your current vibe.";
+    }
+  })();
+
+  const partyVibeIsHighEnergy =
+    partyVibe?.id === "we-outside" || partyVibe?.id === "dance";
+
+  // TWINCORE_TONIGHT_VIBE_SYNC_R11_5
+  // TWINCORE_PARTY_VIBE_HYDRATION_GUARD_R14_6F5
+  useEffect(() => {
+    // Never publish the hook's pre-hydration null into canonical
+    // Tonight Context. Once hydrated, null remains authoritative
+    // and correctly represents an explicitly absent/cleared vibe.
+    if (!partyVibeHydrated) return;
+
+    updateTonight({
+      vibeId: partyVibe?.id ?? null,
+      vibeLabel: partyVibe?.label ?? null,
+      crew: {
+        count: crewRows.length,
+      },
+    });
+  }, [
+    partyVibeHydrated,
+    partyVibe?.id,
+    partyVibe?.label,
+    crewRows.length,
+    updateTonight,
+  ]);
+
   return (
-    <main className="min-h-screen overflow-hidden bg-[#0A0A0B] text-white">
-      <div className="relative z-20 px-5 pt-5">
-  <Link
-    href="/"
-    className="inline-flex rounded-xl border border-white/15 px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/10"
-  >
-    ← Dashboard
-  </Link>
-</div>
+    <main className="min-h-screen overflow-hidden bg-[#06050a] text-white">
+      <div className="twincore-party-dashboard relative z-20 px-5 pt-5">
+        <Link
+          href="/"
+          className="inline-flex rounded-xl border border-white/15 px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/10"
+        >
+          ← Dashboard
+        </Link>
+      </div>
       <audio
         ref={audioRef}
         src={PARTY_AUDIO_SRC}
@@ -1486,281 +1959,898 @@ writePartyLiveState(user.id, selectedStatus, lastCoords, "toggle", nextActive);
         />
         <div className="absolute inset-0 opacity-[0.08] [background-image:linear-gradient(rgba(255,255,255,0.5)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.5)_1px,transparent_1px)] [background-size:26px_26px]" />
       </div>
-      <div className="relative mx-auto w-full max-w-md px-4 py-8">
-        <header className="mb-8 flex items-start justify-between gap-4">
-          <div>
-            <div className="mb-2 text-xs tracking-[0.3em] text-white/50">
-              TwinCore
-            </div>
-            <h1 className="text-4xl font-semibold tracking-tight text-white">
-              Party Mode
-            </h1>
-            <p className="mt-2 text-sm text-white/60">
-              Live awareness for nights, movement, exits, crew desync,
-              isolation, stale signals, predictive risk, intervention,
-              and action execution.
-            </p>
-          </div>
-          <Link
-            href="/profile"
-            className="rounded-2xl bg-[linear-gradient(180deg,#1A1A1F,#141419)] px-4 py-3 text-sm font-medium text-white shadow-[0_8px_24px_rgba(0,0,0,0.35)] transition duration-200 hover:scale-[1.02] active:scale-[0.97]"
-          >
-            Profile
-          </Link>
-        </header>
-        <section
-          className={`relative mb-6 overflow-hidden rounded-3xl p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)] ${visual.card}`}
+      <div className="relative mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+        <TwinPage
+          eyebrow="TwinCore • Party"
+          title="Tonight starts here."
+          subtitle="Set the energy. Stay connected. Let TwinMe read the night with you."
         >
-          <div className="absolute right-0 top-0 h-28 w-28 rounded-full bg-white/5 blur-3xl" />
-          <div className="relative">
-            <div className="mb-2 text-4xl leading-none">
-              {getModeIcon(selectedStatus)}
-            </div>
-            <div className="mb-3 text-4xl font-semibold tracking-tight text-white">
-              Tonight
-            </div>
-            <div className="text-2xl font-semibold text-white">{displayName}</div>
-            <div className="mt-3 text-lg text-white/80">
-              Current status:{" "}
-              <span className="font-medium text-white">
-                {selectedStatus || "Not set"}
-              </span>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <span
-                className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold tracking-wide ${visual.badge}`}
-              >
-                {visual.title}
-              </span>
-              <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold tracking-wide text-white/85">
-                <Sparkles className="mr-1 h-3 w-3" />
-                {liveSystemLabel.toUpperCase()}
-              </span>
-              {privacy.ghostMode ? (
-                <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold tracking-wide text-white/85">
-                  <Ghost className="mr-1 h-3 w-3" />
-                  GHOST MODE
-                </span>
-              ) : null}
-              {privacy.trustedOnly ? (
-                <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold tracking-wide text-white/85">
-                  <EyeOff className="mr-1 h-3 w-3" />
-                  TRUSTED ONLY
-                </span>
-              ) : null}
-              {autoTracking ? (
-                <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold tracking-wide text-white/85">
-                  <Radar className="mr-1 h-3 w-3" />
-                  AUTO TRACKING
-                </span>
-              ) : null}
-              {autoVoiceEnabled ? (
-                <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold tracking-wide text-white/85">
-                  <Volume2 className="mr-1 h-3 w-3" />
-                  AUTO VOICE
-                </span>
-              ) : null}
-            </div>
-            <p className="mt-4 text-sm leading-6 text-white/70">
-              {visual.subtitle}
-            </p>
-            <div className="mt-5 grid grid-cols-3 gap-3">
-              <Meter label="Energy" value={visual.energyValue} />
-              <Meter label="Risk" value={visual.riskValue} />
-              <Meter label="Awareness" value={visual.awarenessValue} />
-            </div>
-          </div>
-        </section>
+          {/* TWINCORE_PARTY_LIVING_OS_R10_2 */}
+          <div className="mb-6 space-y-4">
+            {/* TWINCORE_PARTY_VIBE_PROMPT_R11_1 */}
+            {!partyActive ? (
+              <TwinVibePrompt
+                domain="party"
+                choices={partyVibeChoices}
+                selectedId={partyVibe?.id ?? null}
+                eyebrow="TwinMe • Right Now"
+                title="What's the energy tonight?"
+                body={
+                  partyVibe
+                    ? `Tonight: ${partyVibe.label}. TwinMe is shaping Party Mode around how you feel right now.`
+                    : "Your usual matters. But tonight gets a vote too."
+                }
+                compact
+                onSelect={selectPartyVibe}
+                onClear={clearPartyVibe}
+              />
+            ) : null}
 
-        <section className="mb-6 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
-          <div className="mb-4 flex items-start justify-between gap-3">
-            <div>
-              <h2 className="text-2xl font-semibold text-white">Status Layer</h2>
-              <p className="mt-1 text-sm text-white/60">
-                Choose the state that best matches your current phase.
-              </p>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            {PARTY_STATUSES.map((status) => {
-              const active = selectedStatus === status;
-              return (
-                <button
-                  key={status}
-                  type="button"
-                  onClick={() => handleStatusClick(status)}
-                  className={`rounded-2xl px-4 py-4 text-left text-sm font-semibold transition duration-200 active:scale-[0.97] ${
-                    active
-                      ? "border border-white/80 bg-[linear-gradient(180deg,#24242b,#17171d)] text-white shadow-[0_12px_28px_rgba(255,255,255,0.06)]"
-                      : "bg-[linear-gradient(180deg,#17171d,#121218)] text-white/80 shadow-[0_8px_24px_rgba(0,0,0,0.32)] hover:scale-[1.02]"
-                  }`}
-                >
-                  {status}
-                </button>
-              );
-            })}
-          </div>
-        </section>
-        
-   <section className="mb-6 rounded-[2rem] border border-cyan-400/20 bg-[linear-gradient(135deg,rgba(15,23,42,0.95),rgba(10,15,25,0.92))] p-5 shadow-[0_0_50px_rgba(34,211,238,0.10)]">
-  <div className="flex items-start justify-between gap-4">
-    <div>
-      <p className="text-xs font-black uppercase tracking-[0.22em] text-cyan-200">
-        TwinMe Intelligence
-      </p>
-
-      <p className="mt-2 text-sm leading-6 text-white/60">
-        Adaptive awareness based on crew alignment, signal freshness,
-        isolation, and predictive risk.
-      </p>
-    </div>
-
-    <span className="rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-cyan-200">
-      Active
-    </span>
-  </div>
-
-  <div className="mt-5 grid grid-cols-2 gap-3">
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-      <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/45">
-        Crew
-      </div>
-
-      <div className="mt-1 text-sm font-semibold text-white">
-        {crewDesync.level}
-      </div>
-    </div>
-
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-      <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/45">
-        Isolation
-      </div>
-
-      <div className="mt-1 text-sm font-semibold text-white">
-        {isolation.level}
-      </div>
-    </div>
-
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-      <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/45">
-        Freshness
-      </div>
-
-      <div className="mt-1 text-sm font-semibold text-white">
-        {stale.level}
-      </div>
-    </div>
-
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-      <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/45">
-        Risk
-      </div>
-
-      <div className="mt-1 text-sm font-semibold text-white">
-        {risk.level}
-      </div>
-    </div>
-  </div>
-
-  <div className="mt-5 rounded-2xl border border-cyan-400/15 bg-cyan-400/[0.06] p-4">
-    <div className="text-xs font-black uppercase tracking-[0.18em] text-cyan-200">
-      Recommendation
-    </div>
-
-    <p className="mt-2 text-sm leading-6 text-white/80">
-      {intervention.actions.length > 0
-        ? intervention.actions[0]
-        : risk.message}
-    </p>
-  </div>
-</section>        
-          
-<section className="mb-6 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
-          <div className="mb-4 flex items-start justify-between gap-3">
-            <div>
-              <h2 className="text-2xl font-semibold text-white">Live Crew Sync</h2>
-              <p className="mt-1 text-sm text-white/60">
-                Privacy settings affect what gets written to the live layer.
-              </p>
-            </div>
-          </div>
-          <div className="grid gap-3">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <div className="inline-flex items-center gap-2 text-sm font-medium text-white/85">
-                  <Users className="h-4 w-4" />
-                  Sync status
-                </div>
+            <TwinHero
+              eyebrow={
+                partyActive ? "TwinMe • Party Live" : "TwinMe • Party Standby"
+              }
+              title={
+                risk.level === "high"
+                  ? "Stay connected tonight."
+                  : partyActive
+                    ? partyIntelligence.score >= 85
+                      ? "The night is alive."
+                      : partyVibe
+                        ? partyVibeTitle
+                        : "Party Mode is live."
+                    : partyVibeTitle
+              }
+              subtitle={
+                risk.level === "high"
+                  ? partyIntelligence.message
+                  : partyActive
+                    ? partyVibe
+                      ? partyVibeSubtitle
+                      : partyIntelligence.message
+                    : partyVibeSubtitle
+              }
+              body={
+                partyActive
+                  ? autoTracking
+                    ? "Live crew awareness and automatic movement tracking are active."
+                    : "Party intelligence is active. Turn on tracking when you want continuous movement awareness."
+                  : partyVibe && selectedStatus
+                    ? `${partyVibe.label} locked. Status ready: ${selectedStatus}.`
+                    : partyVibe
+                      ? `${partyVibe.label} locked. TwinMe has tonight's energy — choose your Party Status when you're ready.`
+                      : selectedStatus
+                        ? `Status ready: ${selectedStatus}. Tell TwinMe the energy tonight.`
+                        : "Tell TwinMe the energy tonight, then choose your Party Status."
+              }
+              tone={
+                risk.level === "high"
+                  ? "red"
+                  : risk.level === "rising"
+                    ? "amber"
+                    : partyActive
+                      ? "fuchsia"
+                      : "cyan"
+              }
+              presence={
                 <span
-                  className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${
-                    syncState === "synced"
-                      ? "bg-emerald-500/15 text-emerald-100"
-                      : syncState === "syncing"
-                        ? "bg-white/10 text-white"
-                        : syncState === "error"
-                          ? "bg-red-500/15 text-red-100"
-                          : "bg-white/10 text-white/80"
+                  className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.18em] ${
+                    partyActive
+                      ? "border-fuchsia-300/20 bg-fuchsia-300/10 text-fuchsia-100"
+                      : "border-white/10 bg-white/[0.04] text-white/40"
                   }`}
                 >
-                  {syncState === "syncing" ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : syncState === "synced" ? (
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                  ) : syncState === "error" ? (
-                    <AlertTriangle className="h-3.5 w-3.5" />
-                  ) : (
-                    <LocateFixed className="h-3.5 w-3.5" />
-                  )}
-                  {syncState}
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      partyActive
+                        ? "animate-pulse bg-fuchsia-300 shadow-[0_0_12px_rgba(240,171,252,0.95)]"
+                        : "bg-white/30"
+                    }`}
+                  />
+                  {partyActive ? "Live" : "Standby"}
                 </span>
+              }
+              orb={
+                <TwinOrb
+                  state={
+                    risk.level === "high"
+                      ? "warning"
+                      : risk.level === "rising"
+                        ? "guardian"
+                        : partyActive && partyIntelligence.score >= 85
+                          ? "celebrating"
+                          : partyVibeIsHighEnergy
+                            ? "celebrating"
+                            : partyVibe
+                              ? "thinking"
+                              : partyActive
+                                ? "thinking"
+                                : "idle"
+                  }
+                  size="lg"
+                  pulse={partyActive || Boolean(partyVibe)}
+                  rotate={partyActive}
+                  glow
+                  showRings
+                  showParticles={partyActive || partyVibeIsHighEnergy}
+                />
+              }
+              badges={[
+                {
+                  label: partyActive ? "Party Live" : "Party Off",
+                  tone: partyActive ? "fuchsia" : "neutral",
+                },
+                {
+                  label: autoTracking ? "Tracking Live" : "Tracking Off",
+                  tone: autoTracking ? "cyan" : "neutral",
+                },
+                {
+                  label: partyVibe?.label ?? selectedStatus ?? "Vibe Needed",
+                  tone: partyVibe
+                    ? "fuchsia"
+                    : selectedStatus
+                      ? "cyan"
+                      : "amber",
+                },
+              ]}
+              metrics={[
+                {
+                  label: "Energy",
+                  value: `${partyIntelligence.score}%`,
+                  tone:
+                    partyIntelligence.score >= 85
+                      ? "emerald"
+                      : partyIntelligence.score >= 65
+                        ? "fuchsia"
+                        : partyIntelligence.score >= 40
+                          ? "amber"
+                          : "neutral",
+                },
+                {
+                  label: "Crew",
+                  value: crewRows.length,
+                  tone: crewRows.length > 0 ? "cyan" : "neutral",
+                },
+                {
+                  label: "Risk",
+                  value: risk.level.toUpperCase(),
+                  tone:
+                    risk.level === "high"
+                      ? "red"
+                      : risk.level === "rising"
+                        ? "amber"
+                        : "emerald",
+                },
+              ]}
+              primaryAction={
+                <TwinPrimaryAction
+                  eyebrow={partyActive ? "Party control" : "Start the night"}
+                  label={
+                    partyActive
+                      ? "End Party Mode"
+                      : selectedStatus
+                        ? "Start Party Mode"
+                        : "Choose a status first"
+                  }
+                  description={
+                    partyActive
+                      ? "End live Party Mode awareness for tonight."
+                      : selectedStatus
+                        ? "Bring TwinMe, crew awareness and Party intelligence online."
+                        : "Open Party Status below and tell TwinMe what phase of the night you're in."
+                  }
+                  tone={partyActive ? "fuchsia" : "cyan"}
+                  disabled={!partyActive && !selectedStatus}
+                  onClick={() => void handleTogglePartyMode()}
+                  trailing={
+                    <span className="text-lg text-white/45">
+                      {partyActive ? "■" : "→"}
+                    </span>
+                  }
+                />
+              }
+              footer={
+                <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[9px] font-bold uppercase tracking-[0.16em] text-white/30">
+                  <span>{partyIntelligence.label}</span>
+                  <span>•</span>
+                  <span>{partyIntelligence.momentum}</span>
+                  <span>•</span>
+                  <span>
+                    {autoTracking ? "Movement live" : "Manual awareness"}
+                  </span>
+                </div>
+              }
+            />
+          </div>
+
+          {/* R10.2 COMPARISON — existing PartyPulseHero intentionally preserved */}
+          {/* TWINCORE_PARTY_LAUNCHPAD_R11_2 */}
+          <div className="mb-6">
+            <PartyLaunchpad
+              vibe={partyVibe}
+              partyActive={partyActive}
+              crewCount={crewRows.length}
+              onAction={handlePartyLaunchAction}
+            />
+          </div>
+
+          {/* TWINCORE_PARTY_FIT_INTELLIGENCE_R11_3 */}
+          <div className="mb-6">
+            <PartyFitIntelligence currentPartyVibe={partyVibe?.label ?? null} />
+          </div>
+
+          {/* TWINCORE_PARTY_LEGACY_PULSE_R11_2
+              Legacy PartyPulseHero preserved in source.
+              Hidden from the primary pre-party journey while the
+              new consumer Party experience is validated.
+          */}
+          <div className="hidden">
+            <PartyPulseHero
+              score={partyIntelligence.score}
+              label={partyIntelligence.label}
+              momentum={partyIntelligence.momentum}
+              message={partyIntelligence.message}
+              partyActive={partyActive}
+              selectedStatus={selectedStatus}
+              displayName={displayName}
+              autoTracking={autoTracking}
+              crewCount={crewRows.length}
+              crewMembers={crewRows.map((row) => ({
+                id: row.id,
+                name: row.name || "Crew Member",
+              }))}
+              isPlaying={isPlaying}
+              audioReady={audioReady}
+              onTogglePartyMode={() => void handleTogglePartyMode()}
+              onToggleAudio={() => void handleToggleAudio()}
+            />
+          </div>
+
+          <div id="party-arrival" className="scroll-mt-6">
+            <TwinSection
+              title="Your People"
+              subtitle="See how your crew is coming together tonight"
+              tone="cyan"
+              defaultOpen={false}
+            >
+              <CrewArrivalPrediction
+                destination={lastCoords}
+                destinationLabel={locationLabel}
+                crewMembers={crewRows.map((row) => ({
+                  id: row.id,
+                  name: row.name || "Crew Member",
+                  status: row.status,
+                  latitude: row.latitude,
+                  longitude: row.longitude,
+                  locationName: row.location_name,
+                  updatedAt: row.updated_at,
+                }))}
+              />
+            </TwinSection>
+          </div>
+
+          <div id="party-venue-intelligence" className="scroll-mt-6">
+            <TwinSection
+              title="Where Tonight Happens"
+              subtitle="Live context for the places shaping your night"
+              tone="fuchsia"
+              defaultOpen={false}
+            >
+              <div id="venue-intelligence" className="scroll-mt-6">
+                <VenueIntelligenceCard />
               </div>
-              <p className="text-sm leading-6 text-white/75">{syncMessage}</p>
+            </TwinSection>
+          </div>
+
+          <div id="party-auto-tracking" className="scroll-mt-6">
+            <TwinSection
+              title="Stay Connected"
+              subtitle="Keep trusted crew awareness current while Party Mode is live"
+              tone="fuchsia"
+              defaultOpen={partyActive && autoTracking}
+            >
+              <section className="mb-6 rounded-[2rem] border border-violet-400/20 bg-[linear-gradient(135deg,rgba(27,13,48,0.95),rgba(7,10,22,0.96))] p-5 shadow-[0_0_42px_rgba(139,92,246,0.09)]">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-violet-300/25 bg-violet-300/10 text-violet-200">
+                      <LocateFixed className="h-5 w-5" />
+                    </span>
+
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-[0.2em] text-violet-200">
+                        Auto Tracking
+                      </p>
+
+                      <p className="mt-1 text-sm leading-6 text-white/65">
+                        Keep your trusted crew updated with your live Party Mode
+                        location.
+                      </p>
+                    </div>
+                  </div>
+
+                  <span
+                    className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.15em] ${
+                      autoTracking
+                        ? "border-emerald-300/25 bg-emerald-300/10 text-emerald-100"
+                        : "border-white/10 bg-white/5 text-white/40"
+                    }`}
+                  >
+                    {autoTracking ? "On" : "Off"}
+                  </span>
+                </div>
+
+                <div className="mt-4 rounded-2xl border border-white/10 bg-black/25 p-4">
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div>
+                      <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/40">
+                        Party Mode
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-white/85">
+                        {partyActive ? "Active" : "Off"}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/40">
+                        Tracking
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-white/85">
+                        {autoTracking ? "Live every 12 seconds" : "Not running"}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/40">
+                        Current status
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-white/85">
+                        {selectedStatus || "Choose a status"}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={startAutoTracking}
+                    disabled={
+                      autoTracking ||
+                      !partyActive ||
+                      !selectedStatus ||
+                      syncState === "syncing"
+                    }
+                    className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-emerald-300/30 bg-emerald-300/10 px-4 py-3 text-sm font-black text-emerald-100 transition hover:bg-emerald-300/15 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-35"
+                  >
+                    {autoTracking ? "Tracking Active" : "Start Auto Tracking"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={stopAutoTracking}
+                    disabled={!autoTracking}
+                    className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-red-300/25 bg-red-300/10 px-4 py-3 text-sm font-black text-red-100 transition hover:bg-red-300/15 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-35"
+                  >
+                    Stop Tracking
+                  </button>
+                </div>
+
+                {!partyActive || !selectedStatus ? (
+                  <p className="mt-3 text-xs text-amber-200/70">
+                    Choose a status and turn Party Mode on before starting auto
+                    tracking.
+                  </p>
+                ) : (
+                  <p className="mt-3 text-xs text-white/45">
+                    Privacy settings are applied to every automatic location
+                    update.
+                  </p>
+                )}
+              </section>
+            </TwinSection>
+          </div>
+
+          <div id="party-live-location" className="scroll-mt-6">
+            <TwinSection
+              title="Your Location"
+              subtitle="Share where you are when you want your crew to know"
+              tone="cyan"
+              defaultOpen={false}
+            >
+              <section className="mb-6 rounded-[2rem] border border-cyan-400/20 bg-[linear-gradient(135deg,rgba(8,23,34,0.94),rgba(10,9,22,0.96))] p-5 shadow-[0_0_42px_rgba(34,211,238,0.08)]">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-cyan-300/25 bg-cyan-300/10 text-cyan-200">
+                      <MapPin className="h-5 w-5" />
+                    </span>
+
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-[0.2em] text-cyan-200">
+                        Live Location
+                      </p>
+
+                      <p className="mt-1 text-sm leading-6 text-white/65">
+                        Share your current location with your trusted TwinCore
+                        crew.
+                      </p>
+                    </div>
+                  </div>
+
+                  <span
+                    className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.15em] ${
+                      lastCoords
+                        ? "border-emerald-300/25 bg-emerald-300/10 text-emerald-100"
+                        : "border-white/10 bg-white/5 text-white/40"
+                    }`}
+                  >
+                    {lastCoords ? "Location Ready" : "Not Shared"}
+                  </span>
+                </div>
+
+                <div className="mt-4 rounded-2xl border border-white/10 bg-black/25 p-4">
+                  <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/40">
+                    Current location
+                  </div>
+
+                  <p className="mt-2 text-sm font-semibold text-white/85">
+                    {locationLabel}
+                  </p>
+
+                  <p className="mt-1 text-xs text-white/40">
+                    Privacy controls are applied before location is written to
+                    the live crew layer.
+                  </p>
+                </div>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleShareLocation()}
+                    disabled={syncState === "syncing"}
+                    className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-fuchsia-300/30 bg-fuchsia-300/10 px-4 py-3 text-sm font-black text-fuchsia-100 transition hover:bg-fuchsia-300/15 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {syncState === "syncing"
+                      ? "Sharing Location..."
+                      : lastCoords
+                        ? "Refresh & Share Location"
+                        : "Share Location"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleOpenSharedLocation}
+                    disabled={!lastCoords}
+                    className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-cyan-300/25 bg-cyan-300/10 px-4 py-3 text-sm font-black text-cyan-100 transition hover:bg-cyan-300/15 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-35"
+                  >
+                    Open in Maps
+                  </button>
+                </div>
+
+                {syncMessage ? (
+                  <p className="mt-3 text-xs text-white/50">{syncMessage}</p>
+                ) : null}
+              </section>
+            </TwinSection>
+          </div>
+
+          <div id="party-status" className="scroll-mt-6">
+            <TwinSection
+              title="Your Night Right Now"
+              subtitle="Choose the state that best matches where the night is now"
+              tone="fuchsia"
+              defaultOpen={!selectedStatus}
+            >
+              <section className="mb-6 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
+                <div className="mb-4 flex items-start justify-between gap-3">
+                  <div>
+                    <h2 className="text-2xl font-semibold text-white">
+                      Status Layer
+                    </h2>
+                    <p className="mt-1 text-sm text-white/60">
+                      Choose the state that best matches your current phase.
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {PARTY_STATUSES.map((status) => {
+                    const active = selectedStatus === status;
+                    return (
+                      <button
+                        key={status}
+                        type="button"
+                        onClick={() => handleStatusClick(status)}
+                        className={`rounded-2xl px-4 py-4 text-left text-sm font-semibold transition duration-200 active:scale-[0.97] ${
+                          active
+                            ? "border border-white/80 bg-[linear-gradient(180deg,#24242b,#17171d)] text-white shadow-[0_12px_28px_rgba(255,255,255,0.06)]"
+                            : "bg-[linear-gradient(180deg,#17171d,#121218)] text-white/80 shadow-[0_8px_24px_rgba(0,0,0,0.32)] hover:scale-[1.02]"
+                        }`}
+                      >
+                        {status}
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            </TwinSection>
+          </div>
+
+          <section className="mb-6 rounded-[2rem] border border-cyan-400/20 bg-[linear-gradient(135deg,rgba(15,23,42,0.95),rgba(10,15,25,0.92))] p-5 shadow-[0_0_50px_rgba(34,211,238,0.10)]">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.22em] text-cyan-200">
+                  TwinMe • Next Move
+                </p>
+
+                <p className="mt-2 text-sm leading-6 text-white/60">
+                  Adaptive awareness based on crew alignment, signal freshness,
+                  isolation, and predictive risk.
+                </p>
+              </div>
+
+              <span className="rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-cyan-200">
+                Active
+              </span>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <div className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-white/55">
-                Last live location
+
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/45">
+                  Crew
+                </div>
+
+                <div className="mt-1 text-sm font-semibold text-white">
+                  {crewDesync.level}
+                </div>
               </div>
-              <p className="text-sm leading-6 text-white/80">{locationLabel}</p>
+
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/45">
+                  Isolation
+                </div>
+
+                <div className="mt-1 text-sm font-semibold text-white">
+                  {isolation.level}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/45">
+                  Freshness
+                </div>
+
+                <div className="mt-1 text-sm font-semibold text-white">
+                  {stale.level}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/45">
+                  Risk
+                </div>
+
+                <div className="mt-1 text-sm font-semibold text-white">
+                  {risk.level}
+                </div>
+              </div>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <div className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-white/55">
-                Privacy layer
+
+            <div
+              className={`mt-5 rounded-2xl border p-4 ${
+                risk.level === "high"
+                  ? "border-red-400/25 bg-red-400/[0.07]"
+                  : risk.level === "rising"
+                    ? "border-amber-400/25 bg-amber-400/[0.07]"
+                    : "border-cyan-400/15 bg-cyan-400/[0.06]"
+              }`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div
+                    className={`text-xs font-black uppercase tracking-[0.18em] ${
+                      risk.level === "high"
+                        ? "text-red-200"
+                        : risk.level === "rising"
+                          ? "text-amber-200"
+                          : "text-cyan-200"
+                    }`}
+                  >
+                    Recommendation
+                  </div>
+
+                  <p className="mt-2 text-sm leading-6 text-white/80">
+                    {intervention.actions.length > 0
+                      ? intervention.actions[0]
+                      : risk.message}
+                  </p>
+                </div>
+
+                <span
+                  className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${
+                    risk.level === "high"
+                      ? "border-red-300/25 bg-red-300/10 text-red-100"
+                      : risk.level === "rising"
+                        ? "border-amber-300/25 bg-amber-300/10 text-amber-100"
+                        : "border-emerald-300/25 bg-emerald-300/10 text-emerald-100"
+                  }`}
+                >
+                  {risk.level}
+                </span>
               </div>
-              <p className="text-sm leading-6 text-white/80">
-                Ghost mode:{" "}
-                <span className="font-semibold">
-                  {privacy.ghostMode ? "On" : "Off"}
-                </span>
-                {" · "}
-                Blur:{" "}
-                <span className="font-semibold">
-                  {privacy.blurPresence ? "On" : "Off"}
-                </span>
-                {" · "}
-                Trusted only:{" "}
-                <span className="font-semibold">
-                  {privacy.trustedOnly ? "On" : "Off"}
-                </span>
+
+              {intervention.actions.length > 0 ? (
+                <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                  {intervention.actions.map((action) => (
+                    <button
+                      key={action}
+                      type="button"
+                      onClick={() => handleInterventionAction(action)}
+                      className={`inline-flex min-h-11 items-center justify-center rounded-2xl border px-4 py-2 text-sm font-bold transition active:scale-[0.98] ${
+                        action.toLowerCase().includes("slow down") ||
+                        action.toLowerCase().includes("safer environment")
+                          ? "border-red-300/25 bg-red-300/10 text-red-100 hover:bg-red-300/15"
+                          : action.toLowerCase().includes("reconnect")
+                            ? "border-fuchsia-300/25 bg-fuchsia-300/10 text-fuchsia-100 hover:bg-fuchsia-300/15"
+                            : action.toLowerCase().includes("location") ||
+                                action.toLowerCase().includes("check in")
+                              ? "border-cyan-300/25 bg-cyan-300/10 text-cyan-100 hover:bg-cyan-300/15"
+                              : "border-white/15 bg-white/5 text-white/80 hover:bg-white/10"
+                      }`}
+                    >
+                      {action}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => void handleSendCheckIn()}
+                  className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-cyan-300/25 bg-cyan-300/10 px-4 py-2 text-sm font-bold text-cyan-100 transition hover:bg-cyan-300/15 active:scale-[0.98]"
+                >
+                  Send Check-In
+                </button>
+              )}
+
+              <p className="mt-3 text-xs leading-5 text-white/40">
+                TwinMe recommendations respond to risk, crew alignment,
+                isolation, heartbeat, and signal freshness.
               </p>
             </div>
+          </section>
+
+          <section className="mb-6 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#111113,#0c0c0f)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-2xl font-semibold text-white">
+                  Live Party Controls
+                </h2>
+                <p className="mt-1 text-sm text-white/60">
+                  Privacy settings affect what gets written to the live layer.
+                </p>
+              </div>
+            </div>
+            <div className="grid gap-3">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <div className="inline-flex items-center gap-2 text-sm font-medium text-white/85">
+                    <Users className="h-4 w-4" />
+                    Sync status
+                  </div>
+                  <span
+                    className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${
+                      syncState === "synced"
+                        ? "bg-emerald-500/15 text-emerald-100"
+                        : syncState === "syncing"
+                          ? "bg-white/10 text-white"
+                          : syncState === "error"
+                            ? "bg-red-500/15 text-red-100"
+                            : "bg-white/10 text-white/80"
+                    }`}
+                  >
+                    {syncState === "syncing" ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : syncState === "synced" ? (
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                    ) : syncState === "error" ? (
+                      <AlertTriangle className="h-3.5 w-3.5" />
+                    ) : (
+                      <LocateFixed className="h-3.5 w-3.5" />
+                    )}
+                    {syncState}
+                  </span>
+                </div>
+                <p className="text-sm leading-6 text-white/75">{syncMessage}</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-white/55">
+                  Last live location
+                </div>
+                <p className="text-sm leading-6 text-white/80">
+                  {locationLabel}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-fuchsia-400/15 bg-[linear-gradient(135deg,rgba(35,14,44,0.72),rgba(7,13,24,0.78))] p-4">
+                <div className="mb-4 flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-[0.22em] text-fuchsia-200">
+                      Privacy Layer
+                    </div>
+
+                    <p className="mt-1 text-xs leading-5 text-white/45">
+                      Control how your location and Party Mode presence appear
+                      to your crew.
+                    </p>
+                  </div>
+
+                  <Shield className="h-5 w-5 text-fuchsia-200/70" />
+                </div>
+
+                <div className="grid gap-3">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updatePrivacySettings({
+                        ...privacy,
+                        ghostMode: !privacy.ghostMode,
+                      })
+                    }
+                    className="flex min-h-14 items-center justify-between gap-4 rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-left transition hover:border-fuchsia-300/25 hover:bg-white/[0.06] active:scale-[0.99]"
+                  >
+                    <span>
+                      <span className="block text-sm font-bold text-white">
+                        Ghost Mode
+                      </span>
+                      <span className="mt-1 block text-xs text-white/45">
+                        Replace exact presence details with a low-visibility
+                        label.
+                      </span>
+                    </span>
+
+                    <span
+                      className={`relative h-7 w-12 shrink-0 rounded-full transition ${
+                        privacy.ghostMode ? "bg-fuchsia-400" : "bg-white/15"
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition ${
+                          privacy.ghostMode ? "left-6" : "left-1"
+                        }`}
+                      />
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updatePrivacySettings({
+                        ...privacy,
+                        blurPresence: !privacy.blurPresence,
+                      })
+                    }
+                    className="flex min-h-14 items-center justify-between gap-4 rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-left transition hover:border-cyan-300/25 hover:bg-white/[0.06] active:scale-[0.99]"
+                  >
+                    <span>
+                      <span className="block text-sm font-bold text-white">
+                        Blur Presence
+                      </span>
+                      <span className="mt-1 block text-xs text-white/45">
+                        Round shared coordinates to reduce location precision.
+                      </span>
+                    </span>
+
+                    <span
+                      className={`relative h-7 w-12 shrink-0 rounded-full transition ${
+                        privacy.blurPresence ? "bg-cyan-400" : "bg-white/15"
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition ${
+                          privacy.blurPresence ? "left-6" : "left-1"
+                        }`}
+                      />
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updatePrivacySettings({
+                        ...privacy,
+                        trustedOnly: !privacy.trustedOnly,
+                      })
+                    }
+                    className="flex min-h-14 items-center justify-between gap-4 rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-left transition hover:border-emerald-300/25 hover:bg-white/[0.06] active:scale-[0.99]"
+                  >
+                    <span>
+                      <span className="block text-sm font-bold text-white">
+                        Trusted Only
+                      </span>
+                      <span className="mt-1 block text-xs text-white/45">
+                        Restrict live location visibility to your trusted crew
+                        layer.
+                      </span>
+                    </span>
+
+                    <span
+                      className={`relative h-7 w-12 shrink-0 rounded-full transition ${
+                        privacy.trustedOnly ? "bg-emerald-400" : "bg-white/15"
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition ${
+                          privacy.trustedOnly ? "left-6" : "left-1"
+                        }`}
+                      />
+                    </span>
+                  </button>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2 text-[10px] font-black uppercase tracking-[0.14em]">
+                  <span
+                    className={`rounded-full border px-3 py-1 ${
+                      privacy.ghostMode
+                        ? "border-fuchsia-300/25 bg-fuchsia-300/10 text-fuchsia-100"
+                        : "border-white/10 bg-white/5 text-white/35"
+                    }`}
+                  >
+                    Ghost {privacy.ghostMode ? "On" : "Off"}
+                  </span>
+
+                  <span
+                    className={`rounded-full border px-3 py-1 ${
+                      privacy.blurPresence
+                        ? "border-cyan-300/25 bg-cyan-300/10 text-cyan-100"
+                        : "border-white/10 bg-white/5 text-white/35"
+                    }`}
+                  >
+                    Blur {privacy.blurPresence ? "On" : "Off"}
+                  </span>
+
+                  <span
+                    className={`rounded-full border px-3 py-1 ${
+                      privacy.trustedOnly
+                        ? "border-emerald-300/25 bg-emerald-300/10 text-emerald-100"
+                        : "border-white/10 bg-white/5 text-white/35"
+                    }`}
+                  >
+                    Trusted {privacy.trustedOnly ? "On" : "Off"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <div className="mt-8 mb-8 grid grid-cols-2 gap-3">
+            <Link
+              href="/crew"
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-cyan-300/25 bg-cyan-300/10 px-4 py-2 text-sm font-bold text-cyan-100 transition hover:bg-cyan-300/15 active:scale-[0.98]"
+            >
+              Crew Dashboard
+            </Link>
+
+            <Link
+              href="/party/join"
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-fuchsia-300/25 bg-fuchsia-300/10 px-4 py-2 text-sm font-bold text-fuchsia-100 transition hover:bg-fuchsia-300/15 active:scale-[0.98]"
+            >
+              Join Crew
+            </Link>
           </div>
-        </section>
-        
-        <div className="mt-6 flex items-center justify-between text-xs text-white/45">
-          <Link href="/" className="transition hover:text-white/75">
-            Dashboard
-          </Link>
-          <Link href="/crew" className="transition hover:text-white/75">
-            Crew
-          </Link>
-          <Link href="/spots" className="transition hover:text-white/75">
-            Spots
-          </Link>
-          <Link href="/twinme" className="transition hover:text-white/75">
-            TwinMe
-          </Link>
-        </div>
+
+          <div className="mt-6 flex items-center justify-between text-xs text-white/45">
+            <Link href="/" className="transition hover:text-white/75">
+              Dashboard
+            </Link>
+            <Link href="/crew" className="transition hover:text-white/75">
+              Crew
+            </Link>
+            <Link href="/spots" className="transition hover:text-white/75">
+              Spots
+            </Link>
+            <Link href="/twinme" className="transition hover:text-white/75">
+              TwinMe
+            </Link>
+          </div>
+        </TwinPage>
       </div>
     </main>
-    );
-  }
+  );
+}

@@ -1,0 +1,837 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: #000;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pm-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: start center;
+  padding: 0;
+  background: #000;
+}
+
+.pm-phone {
+  position: relative;
+  width: min(100vw, 438px);
+  aspect-ratio: 438 / 756;
+  overflow: hidden;
+  background: #03030a;
+}
+
+.pm-reference {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  display: block;
+  user-select: none;
+  pointer-events: none;
+}
+
+.pm-flame {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  filter: blur(.45px) drop-shadow(0 0 8px currentColor);
+  -webkit-mask: radial-gradient(circle, transparent 54%, #000 58%, #000 68%, transparent 72%);
+  mask: radial-gradient(circle, transparent 54%, #000 58%, #000 68%, transparent 72%);
+}
+
+.pm-flame::before,
+.pm-flame::after {
+  content: "";
+  position: absolute;
+  inset: -12%;
+  border-radius: 46% 54% 50% 50% / 58% 43% 57% 42%;
+  background:
+    conic-gradient(
+      from 0deg,
+      transparent 0 5%,
+      currentColor 6% 10%,
+      transparent 11% 17%,
+      currentColor 18% 23%,
+      transparent 24% 31%,
+      currentColor 32% 36%,
+      transparent 37% 44%,
+      currentColor 45% 50%,
+      transparent 51% 59%,
+      currentColor 60% 65%,
+      transparent 66% 73%,
+      currentColor 74% 80%,
+      transparent 81% 89%,
+      currentColor 90% 95%,
+      transparent 96% 100%
+    );
+  filter: blur(4px);
+  animation:
+    pmSpin 5.8s linear infinite,
+    pmBurn 1.15s ease-in-out infinite alternate;
+}
+
+.pm-flame::after {
+  inset: -4%;
+  opacity: .72;
+  filter: blur(2px);
+  animation-duration: 3.8s, .82s;
+  animation-direction: reverse, alternate;
+}
+
+.pm-flame-main {
+  left: 28.4%;
+  top: 7.3%;
+  width: 37.2%;
+  aspect-ratio: 1;
+}
+
+.pm-flame-mini {
+  left: 6.7%;
+  top: 50.4%;
+  width: 23.2%;
+  aspect-ratio: 1;
+}
+
+.pm-pink {
+  color: #ff22d7;
+}
+
+.pm-blue {
+  color: #008cff;
+  transform: rotate(28deg) scale(1.03);
+}
+
+.pm-white {
+  color: #fff;
+  opacity: .22;
+  transform: rotate(-17deg) scale(.96);
+}
+
+.pm-sparks {
+  position: absolute;
+  pointer-events: none;
+}
+
+.pm-sparks-main {
+  left: 25.4%;
+  top: 5.1%;
+  width: 43.5%;
+  aspect-ratio: 1;
+  animation: pmSpin 15s linear infinite;
+}
+
+.pm-sparks i {
+  --angle: calc(var(--i) * 10deg);
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1.4px;
+  height: 7%;
+  transform-origin: 50% 680%;
+  transform: rotate(var(--angle)) translateY(-670%);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255,255,255,.95), rgba(255,33,214,.1));
+  box-shadow: 0 0 7px #ff32dc;
+  animation: pmFlicker .9s calc(var(--i) * -35ms) ease-in-out infinite alternate;
+}
+
+.pm-pulse {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  border: 1px solid rgba(255, 75, 237, .8);
+  box-shadow: 0 0 11px rgba(247, 61, 255, .72);
+  animation: pmPulse 1.8s ease-in-out infinite;
+}
+
+.pm-pulse-main {
+  left: 34.7%;
+  top: 13.8%;
+  width: 24.5%;
+  aspect-ratio: 1;
+}
+
+.pm-pulse-mini {
+  left: 10.8%;
+  top: 54.4%;
+  width: 15.3%;
+  aspect-ratio: 1;
+  animation-delay: .45s;
+}
+
+.pm-party-toggle {
+  position: absolute;
+  left: 6.3%;
+  top: 42.2%;
+  width: 87.7%;
+  height: 8.6%;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.pm-hotspot {
+  position: absolute;
+  bottom: 0;
+  width: 20%;
+  height: 7.3%;
+}
+
+.pm-dashboard { left: 0; }
+.pm-crew { left: 20%; }
+.pm-party { left: 40%; }
+.pm-spots { left: 60%; }
+.pm-twinme { left: 80%; }
+
+.pm-idle .pm-flame,
+.pm-idle .pm-sparks,
+.pm-idle .pm-pulse {
+  animation-play-state: paused;
+  opacity: .1;
+}
+
+.pm-idle .pm-reference {
+  filter: saturate(.58) brightness(.72);
+}
+
+@keyframes pmSpin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pmBurn {
+  0% {
+    opacity: .56;
+    filter: blur(5px) brightness(.88) drop-shadow(0 0 7px currentColor);
+    transform: scale(.96);
+  }
+  100% {
+    opacity: 1;
+    filter: blur(1.7px) brightness(1.65) drop-shadow(0 0 14px currentColor);
+    transform: scale(1.06);
+  }
+}
+
+@keyframes pmPulse {
+  0%, 100% {
+    transform: scale(.96);
+    opacity: .35;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+}
+
+@keyframes pmFlicker {
+  from {
+    opacity: .18;
+    transform: rotate(var(--angle)) translateY(-650%) scaleY(.65);
+  }
+  to {
+    opacity: .95;
+    transform: rotate(var(--angle)) translateY(-700%) scaleY(1.42);
+  }
+}
+
+@media (min-width: 439px) {
+  .pm-page {
+    padding: 12px 0;
+  }
+
+  .pm-phone {
+    border-radius: 30px;
+    box-shadow: 0 20px 70px rgba(0,0,0,.7);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pm-flame::before,
+  .pm-flame::after,
+  .pm-sparks-main,
+  .pm-sparks i,
+  .pm-pulse {
+    animation: none !important;
+  }
+}
+
+/* Remove the thick artificial rings around both Party Mode orbs */
+.pm-flame {
+  display: none !important;
+}
+
+/* Keep the remaining pulse subtle instead of forming another heavy ring */
+.pm-pulse {
+  border-width: 1px;
+  opacity: 0.35;
+  box-shadow:
+    0 0 5px rgba(247, 61, 255, 0.45),
+    0 0 10px rgba(0, 140, 255, 0.22);
+}
+
+/* Keep sparks alive around the main orb */
+.pm-sparks {
+  opacity: 0.55;
+}
+
+/* Remove the thick artificial rings around both Party Mode orbs */
+.pm-flame {
+  display: none !important;
+}
+
+/* Keep the remaining pulse subtle instead of forming another heavy ring */
+.pm-pulse {
+  border-width: 1px;
+  opacity: 0.35;
+  box-shadow:
+    0 0 5px rgba(247, 61, 255, 0.45),
+    0 0 10px rgba(0, 140, 255, 0.22);
+}
+
+/* Keep sparks alive around the main orb */
+.pm-sparks {
+  opacity: 0.55;
+}
+
+/* Living flame upgrade — append this to app/party-mode/party-mode.css */
+
+.living-flame-orb {
+  position: absolute;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.living-flame-orb__svg,
+.living-flame-orb__embers {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.living-flame-orb__svg {
+  overflow: visible;
+  mix-blend-mode: screen;
+}
+
+.living-flame-orb__plasma {
+  transform-origin: 120px 120px;
+  animation:
+    livingFlameRotate 8s linear infinite,
+    livingFlameBreathe 1.5s ease-in-out infinite alternate;
+}
+
+.living-flame-orb__plasma path:last-child {
+  animation: livingFlameWobble 2.2s ease-in-out infinite alternate;
+  transform-origin: 120px 120px;
+}
+
+.living-flame-orb__pulse-ring {
+  fill: none;
+  stroke: rgba(255, 78, 238, 0.42);
+  stroke-width: 1.2;
+  filter: drop-shadow(0 0 8px rgba(255, 78, 238, 0.55));
+  animation: livingPulse 1.8s ease-in-out infinite;
+}
+
+.living-flame-orb__embers {
+  animation: livingFlameRotate 16s linear infinite reverse;
+}
+
+.living-flame-orb__embers i {
+  --angle: calc((360deg / var(--ember-count)) * var(--ember-index));
+  --distance: 47%;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 2px;
+  height: 10px;
+  border-radius: 999px;
+  transform-origin: 50% calc(var(--distance) * 2);
+  transform:
+    translate(-50%, -50%)
+    rotate(var(--angle))
+    translateY(calc(var(--distance) * -1));
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.95),
+    rgba(255, 44, 214, 0.12)
+  );
+  box-shadow: 0 0 8px rgba(255, 48, 219, 0.9);
+  animation:
+    livingEmberFlicker 0.95s
+    calc(var(--ember-index) * -45ms)
+    ease-in-out infinite alternate;
+}
+
+.living-flame-orb.is-paused .living-flame-orb__plasma,
+.living-flame-orb.is-paused .living-flame-orb__pulse-ring,
+.living-flame-orb.is-paused .living-flame-orb__embers,
+.living-flame-orb.is-paused .living-flame-orb__embers i {
+  animation-play-state: paused;
+  opacity: 0.12;
+}
+
+@keyframes livingFlameRotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes livingFlameBreathe {
+  0% {
+    opacity: 0.6;
+    filter: brightness(0.9);
+  }
+
+  100% {
+    opacity: 1;
+    filter: brightness(1.55);
+  }
+}
+
+@keyframes livingFlameWobble {
+  0% {
+    transform: scale(0.97) rotate(-3deg);
+  }
+
+  100% {
+    transform: scale(1.05) rotate(4deg);
+  }
+}
+
+@keyframes livingPulse {
+  0%,
+  100% {
+    transform: scale(0.95);
+    opacity: 0.25;
+  }
+
+  50% {
+    transform: scale(1.08);
+    opacity: 0.95;
+  }
+}
+
+@keyframes livingEmberFlicker {
+  0% {
+    opacity: 0.12;
+    transform:
+      translate(-50%, -50%)
+      rotate(var(--angle))
+      translateY(calc(var(--distance) * -0.92))
+      scaleY(0.55);
+  }
+
+  100% {
+    opacity: 1;
+    transform:
+      translate(-50%, -50%)
+      rotate(var(--angle))
+      translateY(calc(var(--distance) * -1.08))
+      scaleY(1.45);
+
+      .pm-living-flame-main {
+  left: 27.8%;
+  top: 6.9%;
+  width: 39.2%;
+  aspect-ratio: 1;
+}
+
+.pm-living-flame-mini {
+  left: 6.2%;
+  top: 49.8%;
+  width: 24.6%;
+  aspect-ratio: 1;
+}
+
+/* Keep the thick rings removed */
+.pm-flame {
+  display: none !important;
+}
+  }
+}
+/* =========================================================
+   TwinCore Party Mode — living effects upgrade
+   Append to app/party-mode/party-mode.css
+   ========================================================= */
+
+.party-orb-effects {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  isolation: isolate;
+}
+
+.party-orb-effects__glow,
+.party-orb-effects__tongues,
+.party-orb-effects__arcs,
+.party-orb-effects__embers {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.party-orb-effects__glow {
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, transparent 48%, rgba(255, 34, 214, .12) 58%, transparent 72%),
+    radial-gradient(circle at 70% 32%, rgba(0, 149, 255, .24), transparent 38%),
+    radial-gradient(circle at 28% 68%, rgba(255, 39, 217, .22), transparent 40%);
+  filter: blur(12px);
+  mix-blend-mode: screen;
+  animation: partyOrbGlow 2.4s ease-in-out infinite;
+}
+
+.party-orb-effects__tongues {
+  animation: partyOrbRotate 13s linear infinite;
+}
+
+.party-orb-effects__tongues i {
+  --angle: calc((360deg / var(--flame-count)) * var(--flame-index));
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--flame-width);
+  height: var(--flame-height);
+  border-radius: 55% 45% 65% 35% / 72% 44% 56% 28%;
+  transform-origin: 50% 52%;
+  transform:
+    translate(-50%, -50%)
+    rotate(var(--angle))
+    translateY(-48%)
+    skewX(-8deg);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255,255,255,.98) 0%,
+      rgba(255,75,231,.94) 28%,
+      rgba(167,46,255,.78) 58%,
+      rgba(0,144,255,.18) 100%
+    );
+  box-shadow:
+    0 0 5px rgba(255,255,255,.55),
+    0 0 12px rgba(255,46,219,.9),
+    0 0 18px rgba(0,143,255,.35);
+  mix-blend-mode: screen;
+  animation:
+    partyFlameTongue 1.15s var(--flame-delay) ease-in-out infinite alternate,
+    partyFlameFlicker .42s var(--flame-delay) steps(2, end) infinite;
+}
+
+.party-orb-effects__tongues i:nth-child(3n) {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255,255,255,.98),
+      rgba(62,194,255,.92) 34%,
+      rgba(0,124,255,.65) 68%,
+      rgba(0,106,255,.08)
+    );
+}
+
+.party-orb-effects__tongues i:nth-child(4n) {
+  transform:
+    translate(-50%, -50%)
+    rotate(var(--angle))
+    translateY(-45%)
+    skewX(12deg);
+}
+
+.party-orb-effects__arcs {
+  overflow: visible;
+  mix-blend-mode: screen;
+}
+
+.party-orb-effects__arc {
+  fill: none;
+  stroke: url(#arcGradient);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 10 120;
+  opacity: 0;
+}
+
+.party-orb-effects--compact .party-orb-effects__arc {
+  stroke: url(#arcGradientCompact);
+  stroke-width: 2;
+}
+
+.party-orb-effects__arc-group {
+  transform-origin: 120px 120px;
+  animation: partyArcRotate 11s linear infinite;
+}
+
+.party-orb-effects__arc.arc-a {
+  animation: partyArcTravel 3.8s .2s ease-in-out infinite;
+}
+
+.party-orb-effects__arc.arc-b {
+  animation: partyArcTravel 4.6s 1.7s ease-in-out infinite;
+}
+
+.party-orb-effects__arc.arc-c {
+  animation: partyArcTravel 5.2s 3.1s ease-in-out infinite;
+}
+
+.party-orb-effects__embers {
+  animation: partyOrbRotate 18s linear infinite reverse;
+}
+
+.party-orb-effects__embers i {
+  --angle: calc((360deg / var(--ember-count)) * var(--ember-index));
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  transform:
+    translate(-50%, -50%)
+    rotate(var(--angle))
+    translateY(calc(var(--ember-distance) * -1));
+  background: #fff;
+  box-shadow:
+    0 0 5px #fff,
+    0 0 10px #ff35dd,
+    0 0 15px rgba(0,155,255,.75);
+  opacity: 0;
+  animation:
+    partyEmberDrift var(--ember-duration) var(--ember-delay) ease-out infinite;
+}
+
+/* subtle light spill onto the approved surrounding areas */
+.pm-live .pm-phone::before,
+.pm-live .pm-phone::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  border-radius: 50%;
+  mix-blend-mode: screen;
+}
+
+.pm-live .pm-phone::before {
+  left: 22%;
+  top: 4%;
+  width: 54%;
+  aspect-ratio: 1;
+  background:
+    radial-gradient(circle, rgba(255,45,220,.14), transparent 54%),
+    radial-gradient(circle at 72% 35%, rgba(0,142,255,.11), transparent 48%);
+  filter: blur(22px);
+  animation: partyLightSpill 2.6s ease-in-out infinite;
+}
+
+.pm-live .pm-phone::after {
+  left: 2%;
+  top: 46%;
+  width: 36%;
+  aspect-ratio: 1;
+  background:
+    radial-gradient(circle, rgba(255,45,220,.11), transparent 58%),
+    radial-gradient(circle at 72% 36%, rgba(0,142,255,.08), transparent 50%);
+  filter: blur(18px);
+  animation: partyLightSpill 2.9s .6s ease-in-out infinite;
+}
+
+/* natural animated wave overlay for the Party Mode banner */
+.pm-party-toggle::before {
+  content: "";
+  position: absolute;
+  right: 12%;
+  top: 22%;
+  width: 42%;
+  height: 56%;
+  pointer-events: none;
+  opacity: .52;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(239,62,255,.8) 0 1px,
+      transparent 1px 4px
+    );
+  -webkit-mask:
+    linear-gradient(
+      180deg,
+      transparent 0%,
+      #000 18%,
+      #000 82%,
+      transparent 100%
+    );
+  mask:
+    linear-gradient(
+      180deg,
+      transparent 0%,
+      #000 18%,
+      #000 82%,
+      transparent 100%
+    );
+  transform-origin: center;
+  animation: partyWaveFlow 1.15s ease-in-out infinite alternate;
+  mix-blend-mode: screen;
+}
+
+/* keep previous thick ring overlays disabled */
+.pm-flame {
+  display: none !important;
+}
+
+.party-orb-effects.is-paused *,
+.pm-idle .party-orb-effects * {
+  animation-play-state: paused !important;
+}
+
+.party-orb-effects.is-paused,
+.pm-idle .party-orb-effects {
+  opacity: .12;
+}
+
+@keyframes partyOrbRotate {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes partyArcRotate {
+  to { transform: rotate(-360deg); }
+}
+
+@keyframes partyFlameTongue {
+  0% {
+    height: calc(var(--flame-height) * .62);
+    opacity: .52;
+    filter: brightness(.88);
+  }
+  55% {
+    height: calc(var(--flame-height) * 1.12);
+    opacity: 1;
+    filter: brightness(1.55);
+  }
+  100% {
+    height: calc(var(--flame-height) * .82);
+    opacity: .76;
+    filter: brightness(1.18);
+  }
+}
+
+@keyframes partyFlameFlicker {
+  0%, 100% { margin-left: -1px; }
+  50% { margin-left: 2px; }
+}
+
+@keyframes partyArcTravel {
+  0%, 68%, 100% {
+    opacity: 0;
+    stroke-dashoffset: 140;
+  }
+  72% {
+    opacity: .95;
+  }
+  86% {
+    opacity: .78;
+    stroke-dashoffset: 0;
+  }
+  94% {
+    opacity: 0;
+    stroke-dashoffset: -100;
+  }
+}
+
+@keyframes partyEmberDrift {
+  0% {
+    opacity: 0;
+    transform:
+      translate(-50%, -50%)
+      rotate(var(--angle))
+      translateY(calc(var(--ember-distance) * -.72))
+      scale(.65);
+  }
+  16% { opacity: .92; }
+  72% { opacity: .54; }
+  100% {
+    opacity: 0;
+    transform:
+      translate(-50%, -50%)
+      rotate(calc(var(--angle) + 16deg))
+      translateY(calc(var(--ember-distance) * -1.34))
+      translateX(8px)
+      scale(.12);
+  }
+}
+
+@keyframes partyOrbGlow {
+  0%, 100% {
+    opacity: .42;
+    transform: scale(.96);
+  }
+  50% {
+    opacity: .95;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes partyLightSpill {
+  0%, 100% {
+    opacity: .28;
+    transform: scale(.96);
+  }
+  50% {
+    opacity: .72;
+    transform: scale(1.06);
+  }
+}
+
+@keyframes partyWaveFlow {
+  0% {
+    transform: translateX(-8px) scaleY(.35) skewX(-8deg);
+    filter: brightness(.8);
+  }
+  50% {
+    transform: translateX(0) scaleY(1.1) skewX(4deg);
+    filter: brightness(1.5);
+  }
+  100% {
+    transform: translateX(8px) scaleY(.55) skewX(-3deg);
+    filter: brightness(1.05);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .party-orb-effects *,
+  .pm-live .pm-phone::before,
+  .pm-live .pm-phone::after,
+  .pm-party-toggle::before {
+    animation: none !important;
+
+    .pm-orb-effects-main {
+  left: 27.7%;
+  top: 6.7%;
+  width: 39.5%;
+  aspect-ratio: 1;
+}
+
+.pm-orb-effects-mini {
+  left: 6.1%;
+  top: 49.6%;
+  width: 24.8%;
+  aspect-ratio: 1;
+}
+  }
+}

@@ -43,3 +43,13 @@ next-env.d.ts
 # Sentry Config File
 .env.sentry-build-plugin
 .env.local
+
+# TwinCore local development artifacts
+*.bak
+.twincore-*
+/ios/build/
+/....
+/=
+/PY
+/next
+/twincore-pwa@0.1.0

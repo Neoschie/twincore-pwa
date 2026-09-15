@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "co.twincore.app",
+      "sha256_cert_fingerprints": [
+        "30:06:04:65:18:A6:C5:FD:57:D9:E3:13:29:5B:37:1F:9F:20:08:30:6D:EC:5C:5B:F7:F1:CD:26:62:B7:5E:C7"
+      ]
+    }
+  }
+]

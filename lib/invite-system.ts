@@ -1,3 +1,7 @@
+import { Capacitor } from "@capacitor/core";
+
+const APP_ORIGIN = (process.env.NEXT_PUBLIC_APP_URL || "https://twincore.co").replace(/\/$/, "");
+
 export type InviteStatus = "pending" | "accepted" | "expired";
 
 export type InviteRecord = {
@@ -66,7 +70,7 @@ export function saveInviteLocally(invite: InviteRecord) {
 export function createLocalInvite(inviterName: string, crewName: string) {
   const invite: InviteRecord = {
     code: generateInviteCode("TC"),
-    inviterName: inviterName.trim() || "Neo",
+    inviterName: inviterName.trim() || "Crew Owner",
     crewName: crewName.trim() || "TwinCore Crew",
     createdAt: new Date().toISOString(),
     status: "pending",
@@ -129,5 +133,9 @@ export function isInviteExpired(expiresAt?: string) {
 }
 
 export function buildInviteLink(origin: string, code: string) {
-  return `${origin.replace(/\/$/, "")}/invite/${normalizeInviteCode(code)}`;
+  const inviteOrigin = Capacitor.isNativePlatform()
+    ? APP_ORIGIN
+    : origin.replace(/\/$/, "");
+
+  return `${inviteOrigin}/invite/${normalizeInviteCode(code)}`;
 }

@@ -1,21 +1,20 @@
+import { isPremiumAuthorityActive } from "./stripe-lifecycle";
 import type { TwinCoreSubscriptionState } from "./types";
 
 export function hasPremiumAccess(
   subscription: TwinCoreSubscriptionState
 ) {
-  return (
-    subscription.plan === "premium" &&
-    subscription.status === "active"
-  );
+  return isPremiumAuthorityActive({
+    plan: subscription.plan,
+    status: subscription.status,
+    expiresAt: subscription.expiresAt,
+  });
 }
 
 export function hasPartyAccess(
   subscription: TwinCoreSubscriptionState
 ) {
-  if (
-    subscription.plan === "premium" &&
-    subscription.status === "active"
-  ) {
+  if (hasPremiumAccess(subscription)) {
     return true;
   }
 
@@ -51,5 +50,5 @@ export function hasPassiveAwarenessAccess(
 export function hasUnlimitedPartyAccess(
   subscription: TwinCoreSubscriptionState
 ) {
-  return hasPartyAccess(subscription);
+  return hasPremiumAccess(subscription);
 }

@@ -64,81 +64,211 @@ export default function CarClient({ flow, stage }: { flow: string; stage: string
   }, [flow, stage]);
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center px-6">
-      <div className="w-full max-w-xl space-y-6">
-        {stage === "menu" ? (
-          <>
-            <h1 className="text-4xl font-semibold">Car Mode</h1>
-            <p className="opacity-70 leading-7">
-              Big controls. Hands-free friendly. Audio will route through Bluetooth / in-car speakers when connected.
-            </p>
+    <main className="relative min-h-screen overflow-hidden bg-[#050b14] px-5 py-10 text-white sm:px-8">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(circle at 50% 38%, rgba(34,211,238,0.11), transparent 30%), radial-gradient(circle at 78% 74%, rgba(59,130,246,0.08), transparent 34%)",
+        }}
+      />
 
-            <div className="space-y-3 pt-2">
+      <div className="relative mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-4xl items-center justify-center">
+        {stage === "menu" ? (
+          <section className="w-full rounded-[2rem] border border-cyan-300/15 bg-white/[0.035] p-7 shadow-2xl shadow-cyan-950/20 backdrop-blur-xl sm:p-10">
+            <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/[0.07] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-100">
+              TwinCore • Car Mode
+            </div>
+
+            <div className="mt-8 max-w-2xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-200/60">
+                Hands-free support
+              </p>
+
+              <h1 className="mt-3 text-4xl font-semibold tracking-[-0.04em] sm:text-5xl">
+                Take TwinCore with you.
+              </h1>
+
+              <p className="mt-5 text-sm leading-7 text-white/55">
+                Big controls. Hands-free friendly. Audio will route through Bluetooth / in-car speakers when connected.
+              </p>
+            </div>
+
+            <div className="mt-9 grid gap-3 lg:grid-cols-3">
               <Link
                 href="/car?flow=party&stage=before"
-                className="block text-center rounded-2xl px-6 py-4 text-base border border-white/15 hover:border-white/35 transition"
+                className="group rounded-[1.5rem] border border-cyan-300/25 bg-cyan-300/[0.08] p-6 transition hover:border-cyan-200/45 hover:bg-cyan-300/[0.13]"
               >
-                Before I go
+                <span className="block text-[10px] font-semibold uppercase tracking-[0.28em] text-cyan-100/60">
+                  Before
+                </span>
+
+                <span className="mt-4 block text-xl font-semibold">
+                  Before I go
+                </span>
+
+                <span className="mt-2 block text-sm leading-6 text-white/40">
+                  Arrive before the night begins.
+                </span>
+
+                <span className="mt-6 block text-right text-cyan-100/50 transition group-hover:translate-x-1">
+                  →
+                </span>
               </Link>
 
               <Link
                 href="/car?flow=party&stage=in"
-                className="block text-center rounded-2xl px-6 py-4 text-base border border-white/15 hover:border-white/35 transition"
+                className="group rounded-[1.5rem] border border-white/10 bg-white/[0.025] p-6 transition hover:border-cyan-300/30 hover:bg-white/[0.045]"
               >
-                I’m in it
+                <span className="block text-[10px] font-semibold uppercase tracking-[0.28em] text-white/35">
+                  Present
+                </span>
+
+                <span className="mt-4 block text-xl font-semibold">
+                  I&apos;m in it
+                </span>
+
+                <span className="mt-2 block text-sm leading-6 text-white/40">
+                  Take a pause while you&apos;re there.
+                </span>
+
+                <span className="mt-6 block text-right text-white/35 transition group-hover:translate-x-1">
+                  →
+                </span>
               </Link>
 
               <Link
                 href="/car?flow=party&stage=out"
-                className="block text-center rounded-2xl px-6 py-4 text-base border border-white/15 hover:border-white/35 transition"
+                className="group rounded-[1.5rem] border border-white/10 bg-white/[0.025] p-6 transition hover:border-cyan-300/30 hover:bg-white/[0.045]"
               >
-                I’m heading out
+                <span className="block text-[10px] font-semibold uppercase tracking-[0.28em] text-white/35">
+                  Leave
+                </span>
+
+                <span className="mt-4 block text-xl font-semibold">
+                  I&apos;m heading out
+                </span>
+
+                <span className="mt-2 block text-sm leading-6 text-white/40">
+                  Let the night begin to settle.
+                </span>
+
+                <span className="mt-6 block text-right text-white/35 transition group-hover:translate-x-1">
+                  →
+                </span>
               </Link>
             </div>
 
-            <Link href="/" className="inline-block pt-6 text-sm opacity-70 hover:opacity-100">
-              Back home
-            </Link>
-          </>
-        ) : (
-          <>
-            <h1 className="text-3xl font-semibold">Car Mode</h1>
-
-            <pre className="whitespace-pre-wrap text-base leading-7 opacity-95">{text}</pre>
-
-            <div className="grid grid-cols-2 gap-3 pt-2">
-              <button
-                type="button"
-                disabled={!isSupported}
-                onClick={() => {
-                  lastSpokenRef.current = text;
-                  speak(text);
-                }}
-                className="rounded-2xl px-6 py-4 text-base border border-white/15 hover:border-white/35 transition disabled:opacity-40"
-              >
-                🔊 Play
-              </button>
-
-              <button
-                type="button"
-                onClick={() => window.speechSynthesis.cancel()}
-                className="rounded-2xl px-6 py-4 text-base border border-white/15 hover:border-white/35 transition"
-              >
-                ⏸ Stop
-              </button>
-
+            <div className="mt-8 border-t border-white/10 pt-6">
               <Link
-                href="/car"
-                className="col-span-2 text-center rounded-2xl px-6 py-4 text-base border border-white/15 hover:border-white/35 transition"
+                href="/"
+                className="inline-flex rounded-2xl border border-white/10 px-5 py-3 text-sm text-white/55 transition hover:border-white/25 hover:text-white"
               >
-                Back
+                FYI Today
               </Link>
             </div>
+          </section>
+        ) : (
+          <section className="w-full overflow-hidden rounded-[2rem] border border-cyan-300/15 bg-white/[0.035] shadow-2xl shadow-cyan-950/20 backdrop-blur-xl">
+            <div className="grid lg:grid-cols-[0.72fr_1.28fr]">
+              <div className="border-b border-white/10 p-7 sm:p-10 lg:border-b-0 lg:border-r">
+                <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/[0.07] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-100">
+                  TwinCore • Car Mode
+                </div>
 
-            <p className="text-xs opacity-50">
-              Connect to Bluetooth/in-car audio, then press Play.
-            </p>
-          </>
+                <p className="mt-8 text-xs font-semibold uppercase tracking-[0.3em] text-cyan-200/60">
+                  {stage === "before"
+                    ? "Before"
+                    : stage === "in"
+                      ? "Present"
+                      : "Leave"}
+                </p>
+
+                <h1 className="mt-3 text-4xl font-semibold tracking-[-0.04em]">
+                  {stage === "before"
+                    ? "Before I go"
+                    : stage === "in"
+                      ? "I'm in it"
+                      : "I'm heading out"}
+                </h1>
+
+                <p className="mt-5 text-sm leading-7 text-white/50">
+                  Let TwinCore guide the pause while your attention stays where it needs to be.
+                </p>
+
+                <div className="mt-9 rounded-[1.4rem] border border-white/10 bg-black/10 p-5">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-white/30">
+                    Audio
+                  </p>
+
+                  <p className="mt-2 text-sm leading-6 text-white/55">
+                    Connect to Bluetooth/in-car audio, then press Play.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-7 sm:p-10">
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-cyan-200/60">
+                  Listen
+                </p>
+
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight">
+                  A moment with TwinCore
+                </h2>
+
+                <div className="mt-6 rounded-[1.5rem] border border-white/10 bg-black/15 p-5 sm:p-6">
+                  <pre className="whitespace-pre-wrap font-sans text-[15px] leading-7 text-white/70">
+                    {text}
+                  </pre>
+                </div>
+
+                <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    disabled={!isSupported}
+                    onClick={() => {
+                      lastSpokenRef.current = text;
+                      speak(text);
+                    }}
+                    className="rounded-2xl border border-cyan-300/25 bg-cyan-300/[0.09] px-5 py-4 text-left transition hover:border-cyan-200/45 hover:bg-cyan-300/[0.13] disabled:opacity-40"
+                  >
+                    <span className="block text-lg">🔊</span>
+                    <span className="mt-2 block text-sm font-semibold">
+                      Play guidance
+                    </span>
+                    <span className="mt-1 block text-xs text-white/40">
+                      Listen hands-free
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => window.speechSynthesis.cancel()}
+                    className="rounded-2xl border border-white/10 bg-white/[0.025] px-5 py-4 text-left transition hover:border-white/25"
+                  >
+                    <span className="block text-lg">⏸</span>
+                    <span className="mt-2 block text-sm font-semibold">
+                      Stop audio
+                    </span>
+                    <span className="mt-1 block text-xs text-white/40">
+                      Return to quiet
+                    </span>
+                  </button>
+                </div>
+
+                <div className="mt-7 border-t border-white/10 pt-6">
+                  <Link
+                    href="/car"
+                    className="flex w-full items-center justify-between rounded-2xl border border-white/10 px-5 py-4 text-sm text-white/60 transition hover:border-white/25 hover:text-white"
+                  >
+                    <span>Back to Car Mode</span>
+                    <span aria-hidden="true">←</span>
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </section>
         )}
       </div>
     </main>

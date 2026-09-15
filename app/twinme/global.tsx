@@ -1,5 +1,6 @@
 "use client";
 import { usePathname } from "next/navigation";
+import { useTwinCorePresence } from "@/components/twincore/PresenceProvider";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -324,14 +325,13 @@ function AmbientLayer({ tone }: { tone: TwinMeSurface["tone"] }) {
 export default function TwinMeGlobal() {
   
   const pathname = usePathname();
+  const globalPresence = useTwinCorePresence();
 
 const hideDashboard =
   pathname === "/onboarding" ||
   pathname === "/auth";
 
-if (hideDashboard) return null;
-
-  const [expanded, setExpanded] = useState(false);
+const [expanded, setExpanded] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [signals, setSignals] = useState<LocalSignals>({
     partyStatus: null,
@@ -360,15 +360,56 @@ if (hideDashboard) return null;
 
   const surface = useMemo(() => getTwinMeSurface(pathname, signals), [pathname, signals]);
 
+
+  const presenceTone: TwinMeSurface["tone"] =
+    globalPresence.mode === "guardian"
+      ? "red"
+      : globalPresence.mode === "thinking"
+      ? "blue"
+      : globalPresence.mode === "listening"
+      ? "blue"
+      : globalPresence.mode === "speaking"
+      ? "emerald"
+      : globalPresence.mode === "memory"
+      ? "blue"
+      : surface.tone;
+
+  const presenceLabel =
+    globalPresence.mode === "guardian"
+      ? "Guardian"
+      : globalPresence.mode === "thinking"
+      ? "Thinking"
+      : globalPresence.mode === "listening"
+      ? "Listening"
+      : globalPresence.mode === "speaking"
+      ? "Speaking"
+      : globalPresence.mode === "memory"
+      ? "Remembering"
+      : surface.label;
+
+  const presenceInsight =
+    globalPresence.message ??
+    surface.insight;
+
+  const presenceSecondary =
+    globalPresence.secondaryMessage ?? null;
+
+  const presenceChips = [
+    globalPresence.mode.toUpperCase(),
+    ...surface.chips,
+  ].slice(0, 2);
+
   if (!mounted) {
     return null;
   }
 
+  if (hideDashboard) return null;
+
   return (
     <>
-      <AmbientLayer tone={surface.tone} />
+      <AmbientLayer tone={presenceTone} />
 
-      <div className="pointer-events-none fixed inset-x-0 bottom-4 z-50 px-4">
+      <div className="twincore-global-twinme-dock pointer-events-none fixed inset-x-0 z-50 px-4">
         <div className="pointer-events-auto mx-auto max-w-md">
           {!expanded && (
             <button
@@ -377,7 +418,7 @@ if (hideDashboard) return null;
                 surface.tone
               )} px-4 py-3 backdrop-blur-xl transition-all duration-300 ${toneCardBg(
                 surface.tone
-              )} ${toneGlow(surface.tone)}`}
+              )} ${toneGlow(presenceTone)}`}
             >
               <div className="absolute inset-0 opacity-60">
                 <div className="absolute -left-8 top-1/2 h-20 w-20 -translate-y-1/2 rounded-full bg-white/10 blur-2xl" />
@@ -390,12 +431,12 @@ if (hideDashboard) return null;
                     <div className="relative">
                       <span className="absolute inset-0 rounded-full bg-white/15 blur-md" />
                       <span className="relative flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-white/10">
-                        <ToneIcon tone={surface.tone} />
+                        <ToneIcon tone={presenceTone} />
                       </span>
                     </div>
 
                     <span className="truncate text-sm font-medium text-white">
-                      TwinMe • {surface.label}
+                      TwinMe • {presenceLabel}
                     </span>
 
                     <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-medium text-white/85">
@@ -405,7 +446,7 @@ if (hideDashboard) return null;
                   </div>
 
                   <div className="mt-1.5 flex flex-wrap gap-1.5">
-                    {surface.chips.slice(0, 2).map((chip) => (
+                    {presenceChips.map((chip) => (
                       <span
                         key={chip}
                         className="inline-flex items-center rounded-full bg-white/8 px-2 py-0.5 text-[10px] font-medium text-white/70"
@@ -429,7 +470,7 @@ if (hideDashboard) return null;
                 surface.tone
               )} p-4 backdrop-blur-xl transition-all duration-300 ${toneCardBg(
                 surface.tone
-              )} ${toneGlow(surface.tone)}`}
+              )} ${toneGlow(presenceTone)}`}
             >
               <div className="absolute inset-0 opacity-60">
                 <div className="absolute -left-12 top-8 h-28 w-28 rounded-full bg-white/10 blur-3xl" />
@@ -443,12 +484,12 @@ if (hideDashboard) return null;
                     <div className="relative">
                       <span className="absolute inset-0 rounded-full bg-white/15 blur-md" />
                       <span className="relative flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/10">
-                        <ToneIcon tone={surface.tone} />
+                        <ToneIcon tone={presenceTone} />
                       </span>
                     </div>
 
                     <span className="truncate text-sm font-semibold text-white">
-                      TwinMe • {surface.label}
+                      TwinMe • {presenceLabel}
                     </span>
 
                     <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-medium text-white/85">
@@ -465,7 +506,7 @@ if (hideDashboard) return null;
                   </button>
                 </div>
 
-                <p className="mb-3 text-sm leading-6 text-white/80">{surface.insight}</p>
+                <p className="mb-3 text-sm leading-6 text-white/80">{presenceInsight}</p>
 
                 <div className="mb-3 flex flex-wrap gap-2">
                   {surface.chips.map((chip) => (

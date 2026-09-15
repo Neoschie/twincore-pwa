@@ -9,6 +9,7 @@ type Props = {
   voiceOutputEnabled: boolean;
 
   handsFreeEnabled: boolean;
+  onVoiceAction: () => void;
 
 };
 
@@ -24,7 +25,9 @@ isListening,
 
 voiceOutputEnabled,
 
-handsFreeEnabled
+handsFreeEnabled,
+
+onVoiceAction
 
 }:Props){
 
@@ -44,7 +47,7 @@ return(
 placeholder="Talk to TwinMe..."
 className="
 w-full
-rounded-2xl
+rounded-[1.5rem]
 border
 border-white/10
 bg-black/20
@@ -63,7 +66,7 @@ placeholder:text-white/40
   disabled={!value.trim()}
 className="
 flex-1
-rounded-2xl
+rounded-[1.5rem]
 bg-cyan-500/20
 py-3
 font-semibold
@@ -78,8 +81,10 @@ Send
 </button>
 
 <button
+  type="button"
+  onClick={onVoiceAction}
 className="
-rounded-2xl
+rounded-[1.5rem]
 border
 border-white/10
 px-4

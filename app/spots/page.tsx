@@ -1,4 +1,27 @@
 "use client";
+import {
+  publishVenueRecommendation,
+  readVenueRecommendation,
+} from "@/lib/twinme/venue-recommendation-bridge";
+import { useTonightContext } from "@/hooks/twinme/useTonightContext";
+import { decideMoveCandidate } from "@/lib/twinme/move-candidate-engine";
+import {
+  publishMoveCandidate,
+  readMoveCandidate,
+} from "@/lib/twinme/move-candidate-bridge";
+import { explainVenueFit } from "@/lib/twinme/venue-fit-engine";
+import { publishVenueFit, readVenueFit } from "@/lib/twinme/venue-fit-bridge";
+import { orchestrateTwinMeRecommendation } from "@/lib/twinme/recommendation-engine";
+import {
+  publishTwinMeRecommendation,
+  readTwinMeRecommendation,
+} from "@/lib/twinme/recommendation-bridge";
+import { decideRecommendationFreshness } from "@/lib/twinme/recommendation-freshness-engine";
+import {
+  createRecommendationOutcomeRecord,
+  publishRecommendationOutcome,
+} from "@/lib/twinme/recommendation-outcome-bridge";
+import { publishRecommendationFreshness } from "@/lib/twinme/recommendation-freshness-bridge";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -18,115 +41,21 @@ import {
   Zap,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
+import { apiUrl } from "@/lib/api-url";
+import { Capacitor } from "@capacitor/core";
 
 import AuthGuard from "@/components/auth/AuthGuard";
+import { getSharedProfile } from "@/lib/shared-profile";
+import { getActiveCrew } from "@/lib/crew-system";
+
+import type { NearbySpot } from "./nearbySpotsData";
 
 type SpotTone = "lit" | "safe" | "risk" | "chill";
 
 type SpotsView = "crew" | "nearby" | "live";
 
-type NearbySpot = {
-  id: string;
-  name: string;
-  category: "Food" | "Nightlife" | "Events" | "Sports" | "Outdoor" | "Stay In";
-  distanceKm: number;
-  vibe: string;
-  status: string;
-  note: string;
-  address?: string | null;
-  rating?: number | null;
-  reviewCount?: number | null;
-  isOpen?: boolean | null;
-  photoUrl?: string | null;
-  latitude?: number | null;
-  longitude?: number | null;
-};
-
 type LivePostType =
   "Great vibe" | "Busy here" | "Getting packed" | "Calm spot" | "Avoid area";
-
-const nearbySpots: NearbySpot[] = [
-  {
-    id: "spot-1",
-    name: "Harbour Social",
-    category: "Nightlife",
-    distanceKm: 1.2,
-    vibe: "High energy",
-    status: "Open",
-    note: "Busy social atmosphere with strong late-night activity.",
-  },
-  {
-    id: "spot-2",
-    name: "North Shore Kitchen",
-    category: "Food",
-    distanceKm: 0.8,
-    vibe: "Relaxed",
-    status: "Open",
-    note: "Good option for food and a lower-energy reset.",
-  },
-  {
-    id: "spot-3",
-    name: "Community Arena",
-    category: "Sports",
-    distanceKm: 2.4,
-    vibe: "Active",
-    status: "Event tonight",
-    note: "Local sports activity with moderate crowd energy.",
-  },
-  {
-    id: "spot-4",
-    name: "Waterfront Walk",
-    category: "Outdoor",
-    distanceKm: 1.6,
-    vibe: "Calm",
-    status: "Open",
-    note: "Lower-energy outdoor option for a quieter evening.",
-  },
-  {
-    id: "spot-5",
-    name: "Stay In",
-    category: "Stay In",
-    distanceKm: 0,
-    vibe: "Private",
-    status: "Always available",
-    note: "Best fallback when weather, fatigue, or safety makes staying in the better move.",
-  },
-];
-
-const liveActivities: LiveActivity[] = [
-  {
-    id: "live-1",
-    title: "Crowd building at Harbour Social",
-    area: "Downtown",
-    vibe: "High energy",
-    crowd: "Busy",
-    minutesAgo: 3,
-  },
-  {
-    id: "live-2",
-    title: "Late-night food rush",
-    area: "North Shore Kitchen",
-    vibe: "Relaxed",
-    crowd: "Moderate",
-    minutesAgo: 8,
-  },
-  {
-    id: "live-3",
-    title: "Local game ending soon",
-    area: "Community Arena",
-    vibe: "Active",
-    crowd: "Busy",
-    minutesAgo: 12,
-  },
-  {
-    id: "live-4",
-    title: "Waterfront is quiet",
-    area: "Waterfront Walk",
-    vibe: "Calm",
-    crowd: "Low",
-    minutesAgo: 5,
-  },
-];
 
 type CrewStatusRow = {
   id?: string;
@@ -331,33 +260,34 @@ type LiveActivity = {
 type LivePostRow = {
   id: string;
   user_id: string | null;
+  display_name: string | null;
   title: string;
   area: string;
+  activity_type: LiveActivity["activityType"] | null;
   vibe: string;
-  crowd: string;
+  crowd_level: LiveActivity["crowdLevel"] | null;
+  note: string | null;
   created_at: string;
   latitude: number | null;
   longitude: number | null;
+  trusted: boolean | null;
 };
 
 function convertLivePostRow(row: LivePostRow): LiveActivity {
   const createdTime = new Date(row.created_at).getTime();
-  const now = Date.now();
+  const minutesAgo = Math.max(
+    0,
+    Math.floor((Date.now() - createdTime) / 60000),
+  );
 
-  const minutesAgo = Math.max(0, Math.floor((now - createdTime) / 60000));
-
-  // activity_type and crowd_level are not present on the DB row shape
-  // map from available fields when possible
   const validActivityTypes: LiveActivity["activityType"][] = [
     "Nightlife",
     "Food",
     "Event",
     "Sports",
     "Outdoor",
+    "Stay In",
   ];
-
-  // No activity_type on LivePostRow; default to Event
-  const activityType: LiveActivity["activityType"] = "Event";
 
   const validCrowdLevels: LiveActivity["crowdLevel"][] = [
     "Low",
@@ -366,11 +296,15 @@ function convertLivePostRow(row: LivePostRow): LiveActivity {
     "Packed",
   ];
 
-  const crowdLevel: LiveActivity["crowdLevel"] = validCrowdLevels.includes(
-    row.crowd as LiveActivity["crowdLevel"],
-  )
-    ? (row.crowd as LiveActivity["crowdLevel"])
-    : "Moderate";
+  const activityType =
+    row.activity_type && validActivityTypes.includes(row.activity_type)
+      ? row.activity_type
+      : "Event";
+
+  const crowdLevel =
+    row.crowd_level && validCrowdLevels.includes(row.crowd_level)
+      ? row.crowd_level
+      : "Moderate";
 
   return {
     id: row.id,
@@ -379,11 +313,11 @@ function convertLivePostRow(row: LivePostRow): LiveActivity {
     area: row.area,
     activityType,
     vibe: row.vibe,
-    crowd: row.crowd,
+    crowd: crowdLevel,
     crowdLevel,
     minutesAgo,
-    trusted: false,
-    note: row.title || "Live update shared from the area.",
+    trusted: row.trusted ?? false,
+    note: row.note || "Live update shared from the area.",
     latitude: row.latitude,
     longitude: row.longitude,
   };
@@ -618,6 +552,83 @@ function getVenueMomentum(
   return "stable";
 }
 
+function getCrowdOccupancyPercent(crowdLevel?: string, liveReportCount = 0) {
+  const normalizedCrowdLevel = crowdLevel?.trim().toLowerCase();
+
+  switch (normalizedCrowdLevel) {
+    case "quiet":
+    case "calm":
+    case "low":
+      return 25;
+
+    case "moderate":
+    case "active":
+      return 50;
+
+    case "busy":
+      return 75;
+
+    case "packed":
+    case "very busy":
+      return 100;
+  }
+
+  if (liveReportCount >= 8) return 100;
+  if (liveReportCount >= 5) return 80;
+  if (liveReportCount >= 3) return 60;
+  if (liveReportCount >= 2) return 45;
+  if (liveReportCount === 1) return 25;
+
+  return 15;
+}
+
+function getTwinMePrediction(spot: {
+  occupancyPercent: number;
+  momentum?: string;
+  crowdTrend?: string;
+  heatScore?: number;
+}) {
+  const momentum = spot.momentum?.trim().toLowerCase();
+
+  const crowdTrend = spot.crowdTrend?.trim().toLowerCase();
+
+  if (momentum === "peak" || spot.occupancyPercent >= 90) {
+    return {
+      icon: "🔥",
+      title: "Peak activity",
+      message: "Expect longer waits and a lively atmosphere.",
+      confidence: 95,
+    };
+  }
+
+  if (momentum === "building" || crowdTrend === "rising") {
+    return {
+      icon: "📈",
+      title: "Getting busier",
+      message:
+        "Activity is increasing. Arriving within the next 20–30 minutes is recommended.",
+      confidence: 88,
+    };
+  }
+
+  if (momentum === "cooling" || crowdTrend === "falling") {
+    return {
+      icon: "🌙",
+      title: "Calming down",
+      message:
+        "Crowds are easing. A quieter experience is likely if you wait a little longer.",
+      confidence: 84,
+    };
+  }
+
+  return {
+    icon: "🤖",
+    title: "Steady conditions",
+    message: "No significant changes detected. Conditions appear stable.",
+    confidence: 75,
+  };
+}
+
 function getTimeOfDayLabel() {
   const hour = new Date().getHours();
 
@@ -700,11 +711,41 @@ function getArrivalRecommendation(
   };
 }
 
+function getCrowdLevelScore(crowdLevel?: string) {
+  switch (crowdLevel?.trim().toLowerCase()) {
+    case "quiet":
+    case "calm":
+    case "low":
+      return 1;
+
+    case "moderate":
+    case "active":
+      return 2;
+
+    case "busy":
+      return 3;
+
+    case "packed":
+    case "very busy":
+      return 4;
+
+    default:
+      return 0;
+  }
+}
+
 export default function SpotsPage() {
+  const { tonight } = useTonightContext();
+
   const [activeView, setActiveView] = useState<SpotsView>("crew");
+
   const [nearbyCategory, setNearbyCategory] = useState<
     NearbySpot["category"] | "All"
   >("All");
+
+  const [heatFilter, setHeatFilter] = useState<"All" | "Hot" | "Busy" | "Calm">(
+    "All",
+  );
 
   const [realNearbySpots, setRealNearbySpots] = useState<NearbySpot[]>([]);
 
@@ -729,8 +770,7 @@ export default function SpotsPage() {
     "current",
   );
 
-  const [localLivePosts, setLocalLivePosts] = useState<LiveActivity[]>([]);
-  const [displayName, setDisplayName] = useState("Neo");
+  const [displayName, setDisplayName] = useState("Crew Member");
   const [partyStatus, setPartyStatus] = useState<string | null>(null);
   const [hasSharedLocation, setHasSharedLocation] = useState(false);
   const [selectedSpotId, setSelectedSpotId] = useState<string>("");
@@ -782,7 +822,16 @@ export default function SpotsPage() {
         window.localStorage.getItem("trusted_crew_names") ||
         window.localStorage.getItem("twincore_trusted_crew");
 
-      if (savedName) setDisplayName(savedName);
+      if (user) {
+        const sharedProfile = await getSharedProfile(user.id);
+        const authoritativeDisplayName =
+          sharedProfile?.display_name?.trim() ||
+          savedName?.trim() ||
+          "Crew Member";
+
+        setDisplayName(authoritativeDisplayName);
+      }
+
       if (savedStatus) setPartyStatus(savedStatus);
       if (savedLocation) setHasSharedLocation(true);
 
@@ -828,7 +877,10 @@ export default function SpotsPage() {
         setLocationError(null);
       },
       (error) => {
-        console.error("Geolocation error:", error);
+        console.warn(
+              "Geolocation unavailable; Spots will continue without live location.",
+              error
+            );
         setLocationError("Unable to get your location.");
       },
       {
@@ -841,15 +893,38 @@ export default function SpotsPage() {
 
   useEffect(() => {
     async function loadCrewStatus() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        setCrewRows([]);
+        return;
+      }
+
+      const activeCrew = await getActiveCrew(user.id);
+
+      if (!activeCrew) {
+        setCrewRows([]);
+        return;
+      }
+
       const { data, error } = await supabase
         .from("crew_status")
         .select(
           "id,name,status,latitude,longitude,location_name,vibe_label,heartbeat_bpm,updated_at",
         )
+        .eq("crew_id", activeCrew.id)
         .order("updated_at", { ascending: false })
         .limit(50);
 
-      if (!error && Array.isArray(data)) {
+      if (error) {
+        console.error("Unable to load active Crew status:", error);
+        setCrewRows([]);
+        return;
+      }
+
+      if (Array.isArray(data)) {
         setCrewRows(data as CrewStatusRow[]);
       }
     }
@@ -863,6 +938,55 @@ export default function SpotsPage() {
         { event: "*", schema: "public", table: "crew_status" },
         async () => {
           await loadCrewStatus();
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "crew_members" },
+        async () => {
+          await loadCrewStatus();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, []);
+
+  useEffect(() => {
+    async function loadLivePosts() {
+      const { data, error } = await supabase
+        .from("spots_live_posts")
+        .select(
+          "id,user_id,display_name,title,area,activity_type,vibe,crowd_level,note,created_at,latitude,longitude,trusted",
+        )
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      if (error) {
+        console.error("Unable to load live reports:", error);
+        return;
+      }
+
+      if (Array.isArray(data)) {
+        setDatabaseLivePosts((data as LivePostRow[]).map(convertLivePostRow));
+      }
+    }
+
+    void loadLivePosts();
+
+    const channel = supabase
+      .channel("spots-live-posts")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "spots_live_posts",
+        },
+        async () => {
+          await loadLivePosts();
         },
       )
       .subscribe();
@@ -1248,7 +1372,7 @@ export default function SpotsPage() {
   ]);
 
   const availableNearbySpots = useMemo(() => {
-    return realNearbySpots.length > 0 ? realNearbySpots : nearbySpots;
+    return realNearbySpots;
   }, [realNearbySpots]);
 
   const filteredNearbySpots = useMemo(() => {
@@ -1264,8 +1388,6 @@ export default function SpotsPage() {
   const filteredLiveActivities = useMemo(() => {
     const allLiveActivities = [
       ...databaseLivePosts,
-      ...localLivePosts,
-      ...liveActivities,
     ];
 
     const uniqueActivities = allLiveActivities.filter(
@@ -1292,65 +1414,189 @@ export default function SpotsPage() {
     return nearbyActivities.filter(
       (activity) => activity.activityType === liveFilter,
     );
-  }, [liveFilter, databaseLivePosts, localLivePosts, userCoords]);
+  }, [liveFilter, databaseLivePosts, userCoords]);
 
   const nearbySpotsWithLiveActivity = useMemo(() => {
-    return filteredNearbySpots.map((spot) => {
-      const matchingLiveReports = filteredLiveActivities.filter(
-        (activity) =>
-          isLiveReportFresh(activity) &&
-          activity.area.trim().toLowerCase() === spot.name.trim().toLowerCase(),
-      );
+    return filteredNearbySpots
+      .map((spot) => {
+        const matchingLiveReports = filteredLiveActivities.filter(
+          (activity) =>
+            isLiveReportFresh(activity) &&
+            activity.area.trim().toLowerCase() ===
+              spot.name.trim().toLowerCase(),
+        );
 
-      const recentTimeline = matchingLiveReports
-        .sort((a, b) => a.minutesAgo - b.minutesAgo)
-        .slice(0, 3);
+        const recentTimeline = [...matchingLiveReports]
+          .sort((a, b) => a.minutesAgo - b.minutesAgo)
+          .slice(0, 3);
 
-      const latestReport = matchingLiveReports[0] ?? null;
+        const latestReport = recentTimeline[0] ?? null;
 
-      const crowdTrend = getCrowdTrend(matchingLiveReports);
+        const crowdTrend = getCrowdTrend(recentTimeline);
 
-      const momentum = getVenueMomentum(
-        crowdTrend,
-        latestReport?.crowdLevel ?? "",
-        getTimeOfDayLabel(),
-      );
+        const uniqueReporterIds = new Set(
+          matchingLiveReports
+            .map((report) => report.userId)
+            .filter((userId): userId is string => Boolean(userId)),
+        );
 
-      const uniqueReporterIds = new Set(
-        matchingLiveReports
-          .map((report) => report.userId)
-          .filter((userId): userId is string => Boolean(userId)),
-      );
+        const uniqueReporterCount = uniqueReporterIds.size;
 
-      const uniqueReporterCount = uniqueReporterIds.size;
+        const liveSignalStrength = matchingLiveReports.reduce(
+          (total, report) => total + getLiveReportWeight(report.minutesAgo),
+          0,
+        );
 
-      const liveSignalStrength = matchingLiveReports.reduce(
-        (total, report) => total + getLiveReportWeight(report.minutesAgo),
-        0,
-      );
+        const corroborationLevel =
+          uniqueReporterCount >= 3
+            ? "strong"
+            : uniqueReporterCount >= 2
+              ? "moderate"
+              : matchingLiveReports.length >= 1
+                ? "single"
+                : "none";
 
-      const corroborationLevel =
-        uniqueReporterCount >= 3
-          ? "strong"
-          : uniqueReporterCount >= 2
-            ? "moderate"
-            : matchingLiveReports.length >= 1
-              ? "single"
-              : "none";
+        const occupancyPercent = getCrowdOccupancyPercent(
+          latestReport?.crowdLevel,
+          matchingLiveReports.length,
+        );
 
-      return {
-        ...spot,
-        liveReportCount: matchingLiveReports.length,
-        uniqueReporterCount,
-        latestLiveReport: latestReport,
-        liveSignalStrength,
-        corroborationLevel,
-        crowdTrend,
-        momentum,
-        recentTimeline,
-      };
-    });
-  }, [filteredNearbySpots, filteredLiveActivities]);
+        const momentum =
+          occupancyPercent >= 90
+            ? "peak"
+            : crowdTrend === "rising"
+              ? "building"
+              : crowdTrend === "falling"
+                ? "cooling"
+                : "steady";
+
+        const trustedReportCount = matchingLiveReports.filter(
+          (report) => report.trusted,
+        ).length;
+
+        const freshReportCount = matchingLiveReports.filter(
+          (report) => report.minutesAgo <= 30,
+        ).length;
+
+        let heatScore: number;
+
+        if (matchingLiveReports.length > 0) {
+          const weightedReports = matchingLiveReports.map((report) => {
+            const crowdScore =
+              report.crowdLevel === "Packed"
+                ? 95
+                : report.crowdLevel === "Busy"
+                  ? 72
+                  : report.crowdLevel === "Moderate"
+                    ? 45
+                    : report.crowdLevel === "Low"
+                      ? 20
+                      : 15;
+
+            const freshnessWeight =
+              report.minutesAgo <= 10
+                ? 1.25
+                : report.minutesAgo <= 30
+                  ? 1
+                  : report.minutesAgo <= 60
+                    ? 0.75
+                    : 0.5;
+
+            const trustWeight = report.trusted ? 1.15 : 1;
+
+            return {
+              score: crowdScore * freshnessWeight * trustWeight,
+              weight: freshnessWeight * trustWeight,
+            };
+          });
+
+          const weightedTotal = weightedReports.reduce(
+            (total, report) => total + report.score,
+            0,
+          );
+
+          const totalWeight = weightedReports.reduce(
+            (total, report) => total + report.weight,
+            0,
+          );
+
+          heatScore =
+            totalWeight > 0 ? weightedTotal / totalWeight : occupancyPercent;
+
+          heatScore += Math.min(12, matchingLiveReports.length * 3);
+          heatScore += Math.min(8, uniqueReporterCount * 2);
+          heatScore += trustedReportCount * 3;
+          heatScore += freshReportCount * 2;
+
+          if (momentum === "peak") {
+            heatScore += 15;
+          } else if (momentum === "building") {
+            heatScore += 10;
+          } else if (momentum === "cooling") {
+            heatScore -= 8;
+          }
+        } else {
+          const ratingSignal =
+            typeof spot.rating === "number"
+              ? Math.max(0, (spot.rating - 3) * 6)
+              : 0;
+
+          const reviewSignal =
+            typeof spot.reviewCount === "number"
+              ? Math.min(12, Math.log10(spot.reviewCount + 1) * 4)
+              : 0;
+
+          const openSignal =
+            spot.isOpen === true ? 6 : spot.isOpen === false ? -8 : 0;
+
+          heatScore = 10 + ratingSignal + reviewSignal + openSignal;
+        }
+
+        heatScore = Math.max(0, Math.min(100, Math.round(heatScore)));
+        return {
+          ...spot,
+
+          liveReportCount: matchingLiveReports.length,
+          uniqueReporterCount,
+
+          latestLiveReport: latestReport,
+          recentTimeline,
+
+          crowdTrend,
+          occupancyPercent,
+          momentum,
+          heatScore,
+
+          prediction: getTwinMePrediction({
+            occupancyPercent,
+            momentum,
+            crowdTrend,
+            heatScore,
+          }),
+
+          liveSignalStrength,
+          corroborationLevel,
+        };
+      })
+      .filter((spot) => {
+        if (heatFilter === "Hot") {
+          return spot.heatScore >= 85;
+        }
+
+        if (heatFilter === "Busy") {
+          return spot.heatScore >= 65 && spot.heatScore < 85;
+        }
+
+        if (heatFilter === "Calm") {
+          return spot.heatScore < 35;
+        }
+
+        return true;
+      })
+      .sort((firstSpot, secondSpot) => {
+        return secondSpot.heatScore - firstSpot.heatScore;
+      });
+  }, [filteredNearbySpots, filteredLiveActivities, heatFilter]);
 
   const twinMeNearbySuggestion = useMemo(() => {
     const timeOfDay = getTimeOfDayLabel();
@@ -1366,6 +1612,22 @@ export default function SpotsPage() {
     }
 
     const normalizedPartyStatus = (partyStatus || "").trim().toLowerCase();
+
+    const tonightVibe = (tonight.vibeLabel || "").trim().toLowerCase();
+    const tonightFeeling = (tonight.desiredFeeling || "").trim().toLowerCase();
+    const tonightDestination = (tonight.destination || "").trim().toLowerCase();
+    const tonightDressCode = (tonight.dressCode || "").trim().toLowerCase();
+    const tonightOccasion = (tonight.occasion || "").trim().toLowerCase();
+
+    const tonightSignal = [
+      tonightVibe,
+      tonightFeeling,
+      tonightDestination,
+      tonightDressCode,
+      tonightOccasion,
+    ]
+      .filter(Boolean)
+      .join(" ");
 
     const crewNeedsStability =
       riskCount > 0 ||
@@ -1510,6 +1772,78 @@ export default function SpotsPage() {
           }
         }
 
+        // R14.1 — CANONICAL TONIGHT CONTEXT
+        if (tonightSignal) {
+          const wantsHighEnergy =
+            tonightSignal.includes("we outside") ||
+            tonightSignal.includes("high energy") ||
+            tonightSignal.includes("party") ||
+            tonightSignal.includes("club") ||
+            tonightSignal.includes("nightlife") ||
+            tonightSignal.includes("dance") ||
+            tonightSignal.includes("lit");
+
+          const wantsCalm =
+            tonightSignal.includes("comfortable") ||
+            tonightSignal.includes("relaxed") ||
+            tonightSignal.includes("chill") ||
+            tonightSignal.includes("calm") ||
+            tonightSignal.includes("quiet");
+
+          const wantsFood =
+            tonightSignal.includes("dinner") ||
+            tonightSignal.includes("restaurant") ||
+            tonightSignal.includes("food") ||
+            tonightSignal.includes("date");
+
+          const wantsEvent =
+            tonightSignal.includes("event") ||
+            tonightSignal.includes("concert") ||
+            tonightSignal.includes("celebration") ||
+            tonightSignal.includes("birthday");
+
+          if (
+            wantsHighEnergy &&
+            (spot.category === "Nightlife" ||
+              vibe.includes("high energy") ||
+              vibe.includes("active"))
+          ) {
+            score += 24;
+            reasons.push("Matches what you want from tonight");
+          }
+
+          if (
+            wantsCalm &&
+            (vibe.includes("relaxed") ||
+              vibe.includes("calm") ||
+              spot.category === "Food")
+          ) {
+            score += 20;
+            reasons.push("Fits the calmer direction you want tonight");
+          }
+
+          if (wantsFood && spot.category === "Food") {
+            score += 18;
+            reasons.push("Fits tonight's food or dinner direction");
+          }
+
+          if (wantsEvent && spot.category === "Events") {
+            score += 18;
+            reasons.push("Fits tonight's event direction");
+          }
+
+          if (
+            wantsHighEnergy &&
+            (vibe.includes("relaxed") || vibe.includes("calm"))
+          ) {
+            score -= 8;
+          }
+
+          if (wantsCalm && vibe.includes("high energy")) {
+            score -= 12;
+          }
+        }
+
         // CREW ENERGY
         if (crewIsHighEnergy) {
           if (vibe.includes("high energy")) {
@@ -1591,8 +1925,454 @@ export default function SpotsPage() {
       reasons: topReasons,
       matchConfidence: bestSpot.matchConfidence,
       arrivalRecommendation,
+
+      // TWINCORE_VENUE_FIT_WINNING_EVIDENCE_R14_3D
+      //
+      // Internal structured evidence for R14.3.
+      // This does NOT change ranking or the winning venue.
+      venueEvidence: {
+        category: bestSpot.category ?? null,
+        vibe: bestSpot.vibe ?? null,
+
+        distanceKm:
+          typeof bestSpot.distanceKm === "number" ? bestSpot.distanceKm : null,
+
+        rating: typeof bestSpot.rating === "number" ? bestSpot.rating : null,
+
+        reviewCount:
+          typeof bestSpot.reviewCount === "number"
+            ? bestSpot.reviewCount
+            : null,
+
+        isOpen: typeof bestSpot.isOpen === "boolean" ? bestSpot.isOpen : null,
+
+        liveReportCount:
+          typeof bestSpot.liveReportCount === "number"
+            ? bestSpot.liveReportCount
+            : 0,
+
+        uniqueReporterCount:
+          typeof bestSpot.uniqueReporterCount === "number"
+            ? bestSpot.uniqueReporterCount
+            : 0,
+
+        liveSignalStrength:
+          typeof bestSpot.liveSignalStrength === "number"
+            ? bestSpot.liveSignalStrength
+            : 0,
+
+        corroborationLevel: bestSpot.corroborationLevel ?? "none",
+
+        crowdLevel: bestSpot.latestLiveReport?.crowdLevel ?? null,
+
+        crowdTrend: bestSpot.crowdTrend ?? null,
+
+        momentum: bestSpot.momentum ?? null,
+
+        heatScore:
+          typeof bestSpot.heatScore === "number" ? bestSpot.heatScore : null,
+      },
     };
-  }, [nearbySpotsWithLiveActivity, partyStatus, riskCount]);
+  }, [
+    nearbySpotsWithLiveActivity,
+    partyStatus,
+    riskCount,
+    tonight.vibeLabel,
+    tonight.desiredFeeling,
+    tonight.destination,
+    tonight.dressCode,
+    tonight.occasion,
+  ]);
+
+  useEffect(() => {
+    publishVenueRecommendation({
+      spotName: twinMeNearbySuggestion.spotName,
+      message: twinMeNearbySuggestion.message,
+      reasons: twinMeNearbySuggestion.reasons,
+      matchConfidence: twinMeNearbySuggestion.matchConfidence,
+      arrivalRecommendation:
+        twinMeNearbySuggestion.arrivalRecommendation ?? null,
+    });
+  }, [twinMeNearbySuggestion]);
+
+  // TWINCORE_VENUE_FIT_RUNTIME_R14_3D
+  const venueFit = useMemo(() => {
+    const evidence = twinMeNearbySuggestion.venueEvidence;
+
+    return explainVenueFit({
+      venue: {
+        spotName:
+          twinMeNearbySuggestion.spotName === "No recommendation yet"
+            ? null
+            : twinMeNearbySuggestion.spotName,
+
+        matchConfidence:
+          twinMeNearbySuggestion.matchConfidence > 0
+            ? twinMeNearbySuggestion.matchConfidence
+            : null,
+
+        recommendationReasons: twinMeNearbySuggestion.reasons,
+
+        category: evidence?.category ?? null,
+        vibe: evidence?.vibe ?? null,
+
+        distanceKm: evidence?.distanceKm ?? null,
+        rating: evidence?.rating ?? null,
+        reviewCount: evidence?.reviewCount ?? null,
+        isOpen: evidence?.isOpen ?? null,
+
+        liveReportCount: evidence?.liveReportCount ?? 0,
+
+        uniqueReporterCount: evidence?.uniqueReporterCount ?? 0,
+
+        liveSignalStrength: evidence?.liveSignalStrength ?? 0,
+
+        corroborationLevel:
+          evidence?.corroborationLevel === "strong"
+            ? "strong"
+            : evidence?.corroborationLevel === "moderate"
+              ? "moderate"
+              : evidence?.corroborationLevel === "single"
+                ? "single"
+                : "none",
+
+        crowdLevel: evidence?.crowdLevel ?? null,
+
+        crowdTrend: evidence?.crowdTrend ?? null,
+
+        momentum: evidence?.momentum ?? null,
+
+        heatScore: evidence?.heatScore ?? null,
+      },
+
+      tonight: {
+        vibeLabel: tonight.vibeLabel || null,
+        desiredFeeling: tonight.desiredFeeling || null,
+        destination: tonight.destination || null,
+        dressCode: tonight.dressCode || null,
+        occasion: tonight.occasion || null,
+      },
+
+      crew: {
+        partyStatus: partyStatus || null,
+
+        needsStability:
+          riskCount > 0 ||
+          (partyStatus || "").trim().toLowerCase().includes("heading home") ||
+          (partyStatus || "").trim().toLowerCase().includes("safe"),
+
+        highEnergy:
+          (partyStatus || "").trim().toLowerCase().includes("club") ||
+          (partyStatus || "").trim().toLowerCase().includes("drinking") ||
+          (partyStatus || "").trim().toLowerCase().includes("music"),
+      },
+
+      safety: {
+        riskCount,
+      },
+    });
+  }, [
+    twinMeNearbySuggestion,
+    tonight.vibeLabel,
+    tonight.desiredFeeling,
+    tonight.destination,
+    tonight.dressCode,
+    tonight.occasion,
+    partyStatus,
+    riskCount,
+  ]);
+
+  // TWINCORE_VENUE_FIT_PUBLISH_R14_3D
+  useEffect(() => {
+    publishVenueFit(venueFit);
+  }, [venueFit]);
+
+  // TWINCORE_SPOTS_MOVE_ENGINE_R14_2C
+  const moveCandidate = useMemo(() => {
+    const tonightHasMeaningfulContext = Boolean(
+      (tonight.vibeLabel || "").trim() ||
+      (tonight.desiredFeeling || "").trim() ||
+      (tonight.destination || "").trim() ||
+      (tonight.dressCode || "").trim() ||
+      (tonight.occasion || "").trim(),
+    );
+
+    // TWINCORE_SPOTS_MOVE_SUPPORT_R14_2C
+    //
+    // Support truth is intentionally conservative.
+    // Trusted visible Crew is strong support.
+    // Other visible Crew is treated as thin support.
+    // No visible Crew remains unknown rather than being
+    // incorrectly classified as "alone".
+    const moveSupportState =
+      trustedVisibleCount > 0
+        ? ("supported" as const)
+        : visibleCount > 0
+          ? ("thin" as const)
+          : ("unknown" as const);
+
+    // TWINCORE_SPOTS_MOVE_SAFETY_R14_2C
+    //
+    // riskCount is the real Spots risk signal discovered
+    // during the R14.2C scan.
+    const moveSafetyState =
+      riskCount > 0 ? ("elevated" as const) : ("clear" as const);
+
+    return decideMoveCandidate({
+      venue: {
+        spotName:
+          twinMeNearbySuggestion.spotName === "No recommendation yet"
+            ? null
+            : twinMeNearbySuggestion.spotName,
+        message: twinMeNearbySuggestion.message,
+        reasons: twinMeNearbySuggestion.reasons,
+        matchConfidence:
+          twinMeNearbySuggestion.matchConfidence > 0
+            ? twinMeNearbySuggestion.matchConfidence
+            : null,
+        arrivalRecommendation:
+          twinMeNearbySuggestion.arrivalRecommendation ?? null,
+      },
+
+      tonight: {
+        hasMeaningfulContext: tonightHasMeaningfulContext,
+        destination: tonight.destination || null,
+
+        // These fields remain optional until canonical
+        // Tonight Context values are explicitly wired here.
+        transportationMode: null,
+        needsRideHome: null,
+      },
+
+      safety: {
+        state: moveSafetyState,
+        riskCount,
+        helpSensitive: false,
+      },
+
+      support: {
+        state: moveSupportState,
+      },
+
+      // TWINCORE_SPOTS_MOVE_MOVEMENT_UNKNOWN_R14_2C
+      //
+      // R14.2C scan found no canonical user movement-state
+      // signal in Spots. Do not fabricate one.
+      movement: {
+        state: "unknown",
+      },
+    });
+  }, [
+    twinMeNearbySuggestion,
+    tonight.vibeLabel,
+    tonight.desiredFeeling,
+    tonight.destination,
+    tonight.dressCode,
+    tonight.occasion,
+    trustedVisibleCount,
+    visibleCount,
+    riskCount,
+  ]);
+
+  // TWINCORE_SPOTS_MOVE_PUBLISH_R14_2C
+  useEffect(() => {
+    publishMoveCandidate(moveCandidate);
+  }, [moveCandidate]);
+
+  // TWINCORE_SPOTS_RECOMMENDATION_ORCHESTRATION_R14_4D
+  //
+  // Spots owns the live R14.2 Move Candidate and
+  // R14.3 Venue Fit outputs available on this surface.
+  //
+  // R14.4 does not rescore either system. It only
+  // orchestrates their existing canonical outputs.
+  //
+  // Crew remains null here intentionally. Crew owns
+  // its own R13 recommendation intelligence and will
+  // publish into the canonical layer from /crew rather
+  // than being recreated inside Spots.
+  const twinMeRecommendation = useMemo(() => {
+    const hasMeaningfulTonightContext = Boolean(
+      (tonight.vibeLabel || "").trim() ||
+      (tonight.desiredFeeling || "").trim() ||
+      (tonight.destination || "").trim() ||
+      (tonight.dressCode || "").trim() ||
+      (tonight.occasion || "").trim(),
+    );
+
+    return orchestrateTwinMeRecommendation({
+      tonight: {
+        hasMeaningfulContext: hasMeaningfulTonightContext,
+      },
+
+      crew: null,
+
+      move: moveCandidate,
+
+      venueFit,
+    });
+  }, [
+    tonight.vibeLabel,
+    tonight.desiredFeeling,
+    tonight.destination,
+    tonight.dressCode,
+    tonight.occasion,
+    moveCandidate,
+    venueFit,
+  ]);
+
+  // TWINCORE_RECOMMENDATION_FRESHNESS_REAL_SIGNALS_R14_6D
+  //
+  // R14.6 consumes canonical bridge timestamps rather than
+  // manufacturing source freshness inside Spots.
+  //
+  // No canonical source currently exposes an explicit stale
+  // boolean, so stale remains UNKNOWN (null).
+  const recommendationFreshness = useMemo(() => {
+    const currentRecommendation = readTwinMeRecommendation();
+    const venueRecommendation = readVenueRecommendation();
+    const publishedMoveCandidate = readMoveCandidate();
+    const publishedVenueFit = readVenueFit();
+
+    const hasMeaningfulTonightContext = Boolean(
+      (tonight.vibeLabel || "").trim() ||
+      (tonight.desiredFeeling || "").trim() ||
+      (tonight.destination || "").trim() ||
+      (tonight.dressCode || "").trim() ||
+      (tonight.occasion || "").trim(),
+    );
+
+    return decideRecommendationFreshness({
+      currentRecommendation,
+
+      nextRecommendation: twinMeRecommendation,
+
+      sources: [
+        {
+          source: "RECOMMENDATION",
+          updatedAt: currentRecommendation?.updatedAt ?? null,
+          stale: null,
+          available: Boolean(currentRecommendation),
+        },
+        {
+          source: "TONIGHT_CONTEXT",
+          updatedAt: null,
+          stale: null,
+          available: hasMeaningfulTonightContext,
+        },
+        {
+          source: "VENUE_RECOMMENDATION",
+          updatedAt: venueRecommendation?.updatedAt ?? null,
+          stale: null,
+          available: Boolean(venueRecommendation?.spotName),
+        },
+        {
+          source: "VENUE_FIT",
+          updatedAt: publishedVenueFit?.updatedAt ?? null,
+          stale: null,
+          available: Boolean(
+            publishedVenueFit &&
+            publishedVenueFit.spotName &&
+            publishedVenueFit.hasMeaningfulFit,
+          ),
+        },
+        {
+          source: "MOVE_CANDIDATE",
+          updatedAt: publishedMoveCandidate?.updatedAt ?? null,
+          stale: null,
+          available: Boolean(publishedMoveCandidate),
+        },
+        {
+          source: "SAFETY",
+          updatedAt: publishedMoveCandidate?.updatedAt ?? null,
+          stale: null,
+          available: Boolean(publishedMoveCandidate),
+        },
+      ],
+    });
+  }, [
+    twinMeRecommendation,
+    tonight.vibeLabel,
+    tonight.desiredFeeling,
+    tonight.destination,
+    tonight.dressCode,
+    tonight.occasion,
+  ]);
+
+  // TWINCORE_RECOMMENDATION_FRESHNESS_RUNTIME_R14_6D
+
+  // TWINCORE_RECOMMENDATION_FRESHNESS_OBSERVE_R14_6F1
+  useEffect(() => {
+    publishRecommendationFreshness(recommendationFreshness);
+  }, [recommendationFreshness]);
+
+  //
+  // R14.6E maps freshness lifecycle decisions to canonical
+  // publication behavior without recreating recommendation
+  // intelligence inside TwinMe.
+  useEffect(() => {
+    // TWINCORE_RECOMMENDATION_FRESHNESS_DELIVERY_R14_6E
+    switch (recommendationFreshness.decision) {
+      case "KEEP":
+        // Preserve the current recommendation and its timestamp.
+        break;
+
+      case "REFRESH":
+        publishTwinMeRecommendation(twinMeRecommendation);
+        break;
+
+      case "SUPERSEDE":
+        // TWINCORE_RECOMMENDATION_OUTCOME_FRESHNESS_R14_7E
+        if (recommendationFreshness.currentRecommendation) {
+          publishRecommendationOutcome(
+            createRecommendationOutcomeRecord({
+              recommendation: recommendationFreshness.currentRecommendation,
+              state: "SUPERSEDED",
+              evidence: "FRESHNESS_SUPERSEDED",
+            }),
+          );
+        }
+
+        publishTwinMeRecommendation(twinMeRecommendation);
+        break;
+
+      case "EXPIRE":
+        // TWINCORE_RECOMMENDATION_OUTCOME_EXPIRED_R14_7E
+        if (recommendationFreshness.currentRecommendation) {
+          publishRecommendationOutcome(
+            createRecommendationOutcomeRecord({
+              recommendation: recommendationFreshness.currentRecommendation,
+              state: "EXPIRED",
+              evidence: "FRESHNESS_EXPIRED",
+            }),
+          );
+        }
+
+        publishTwinMeRecommendation({
+          lane: "HOLD",
+          headline: "Recommendation expired",
+          message:
+            "TwinCore is waiting for fresh authoritative intelligence before presenting another recommendation.",
+          action: "NONE",
+          destination: null,
+          crewNames: [],
+          reasons: [recommendationFreshness.reason],
+          sources: recommendationFreshness.currentRecommendation?.sources ?? [],
+          confidence: "unknown",
+          venueMatchConfidence: null,
+          moveDecisionConfidence: null,
+          hasMeaningfulVenueFit: false,
+          safetyOverride: false,
+          actionable: false,
+        });
+        break;
+
+      case "HOLD":
+        // Do not overwrite the current recommendation until
+        // enough trustworthy evidence exists.
+        break;
+    }
+  }, [recommendationFreshness, twinMeRecommendation]);
 
   async function loadRealNearbySpots() {
     if (!userCoords) {
@@ -1605,7 +2385,7 @@ export default function SpotsPage() {
       setNearbyError(null);
 
       const response = await fetch(
-        `/api/spots/nearby?lat=${userCoords.lat}&lng=${userCoords.lng}`,
+        apiUrl(`/api/spots/nearby?lat=${userCoords.lat}&lng=${userCoords.lng}`),
       );
 
       if (!response.ok) {
@@ -1627,7 +2407,7 @@ export default function SpotsPage() {
       console.error("Nearby discovery failed:", error);
 
       setNearbyError(
-        "Live nearby discovery is unavailable right now. Showing fallback places.",
+        "Live nearby discovery is unavailable right now. Try again shortly.",
       );
     } finally {
       setNearbyLoading(false);
@@ -1701,9 +2481,15 @@ export default function SpotsPage() {
       );
     }
 
+    const sharedProfile = await getSharedProfile(user.id);
+    const authoritativeDisplayName =
+      sharedProfile?.display_name?.trim() ||
+      displayName.trim() ||
+      "Crew Member";
+
     const payload = {
       user_id: user.id,
-      display_name: displayName,
+      display_name: authoritativeDisplayName,
       title: livePostType,
       area: normalizedArea,
       activity_type: activityType,
@@ -1779,10 +2565,10 @@ export default function SpotsPage() {
   }
   return (
     <AuthGuard>
-      <main className="min-h-screen overflow-hidden bg-[#0A0A0B] text-white">
+      <main className="relative min-h-screen overflow-hidden bg-[#06070a] text-white">
         <Link
           href="/"
-          className="relative z-20 inline-flex rounded-xl border border-white/15 px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/10"
+          className="twincore-spots-dashboard relative z-20 inline-flex rounded-xl border border-white/15 px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/10"
         >
           ← Dashboard
         </Link>
@@ -1797,17 +2583,18 @@ export default function SpotsPage() {
           <div className="absolute inset-0 opacity-[0.08] [background-image:linear-gradient(rgba(255,255,255,0.55)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.55)_1px,transparent_1px)] [background-size:26px_26px]" />
         </div>
 
-        <div className="relative mx-auto w-full max-w-2xl px-4 py-8 sm:px-6 lg:px-8">
-          <header className="mb-8">
-            <div className="mb-2 text-xs tracking-[0.3em] text-white/50">
-              TWINCORE
+        <div className="twincore-spots-content relative mx-auto w-full max-w-4xl px-4 pb-24 pt-8 sm:px-6 sm:pt-10 lg:px-8">
+          <header className="mb-9 border-b border-white/[0.07] pb-7">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-300/15 bg-cyan-300/[0.055] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.24em] text-cyan-100/75">
+              <span className="h-1.5 w-1.5 rounded-full bg-cyan-300 shadow-[0_0_12px_rgba(103,232,249,0.8)]" />
+              TwinCore • Live Discovery
             </div>
 
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h1 className="text-4xl font-semibold tracking-tight">Spots</h1>
+                <h1 className="text-4xl font-black tracking-[-0.04em] sm:text-5xl">Spots</h1>
                 <p className="mt-2 text-sm text-white/60">
-                  Crew awareness, nearby places, and live activity
+                  Know where to go, what it feels like, and what is changing around you.
                 </p>
               </div>
 
@@ -1824,24 +2611,24 @@ export default function SpotsPage() {
           </header>
 
           {/* SPOTS VIEW SWITCHER */}
-          <section className="mb-6 rounded-3xl border border-white/10 bg-white/[0.035] p-2 backdrop-blur-xl">
+          <section className="mb-8 rounded-[1.65rem] border border-white/10 bg-white/[0.035] p-2 shadow-[0_18px_60px_rgba(0,0,0,0.28)] backdrop-blur-xl">
             <div className="grid grid-cols-3 gap-2">
               {(
                 [
                   {
                     id: "crew",
-                    label: "Crew",
-                    description: "Private radar",
+                    label: "Crew Radar",
+                    description: "Private awareness",
                   },
                   {
                     id: "nearby",
-                    label: "Nearby",
-                    description: "Places & events",
+                    label: "Discover",
+                    description: "Places that fit",
                   },
                   {
                     id: "live",
-                    label: "Live",
-                    description: "Happening now",
+                    label: "Live Now",
+                    description: "What is changing",
                   },
                 ] as const
               ).map((view) => {
@@ -1872,7 +2659,7 @@ export default function SpotsPage() {
           {/* NEARBY VIEW */}
           {activeView === "nearby" ? (
             <div className="space-y-5">
-              <section className="rounded-3xl border border-fuchsia-300/20 bg-[radial-gradient(circle_at_top,rgba(217,70,239,0.14),transparent_45%),linear-gradient(180deg,#15111d,#0b0b0f)] p-5 shadow-[0_0_45px_rgba(217,70,239,0.10)]">
+              <section className="overflow-hidden rounded-[2rem] border border-fuchsia-300/20 bg-[radial-gradient(circle_at_18%_0%,rgba(217,70,239,0.18),transparent_38%),radial-gradient(circle_at_88%_18%,rgba(34,211,238,0.09),transparent_30%),linear-gradient(180deg,#15111d,#0b0b0f)] p-6 shadow-[0_24px_80px_rgba(217,70,239,0.10)]">
                 <div className="inline-flex items-center gap-2 rounded-full border border-fuchsia-300/20 bg-fuchsia-300/10 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-fuchsia-100">
                   <MapPin className="h-3.5 w-3.5" />
                   Nearby Discovery
@@ -1931,28 +2718,63 @@ export default function SpotsPage() {
                 })}
               </div>
 
+              <div className="mt-3">
+                <div className="mb-2 text-xs font-black uppercase tracking-[0.18em] text-white/40">
+                  Heat
+                </div>
+
+                <div className="flex items-center gap-2 overflow-x-auto py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {(["All", "Hot", "Busy", "Calm"] as const).map((filter) => {
+                    const active = heatFilter === filter;
+
+                    return (
+                      <button
+                        key={filter}
+                        type="button"
+                        onClick={() => setHeatFilter(filter)}
+                        className={`shrink-0 rounded-full border px-3 py-2 text-xs font-semibold transition ${
+                          active
+                            ? filter === "Hot"
+                              ? "border-red-300/30 bg-red-300/10 text-red-100"
+                              : filter === "Busy"
+                                ? "border-orange-300/30 bg-orange-300/10 text-orange-100"
+                                : filter === "Calm"
+                                  ? "border-cyan-300/30 bg-cyan-300/10 text-cyan-100"
+                                  : "border-white/20 bg-white/10 text-white"
+                            : "border-white/10 bg-white/[0.04] text-white/55"
+                        }`}
+                      >
+                        {filter === "Hot"
+                          ? "🔥 Hot"
+                          : filter === "Busy"
+                            ? "🟠 Busy"
+                            : filter === "Calm"
+                              ? "🧊 Calm"
+                              : "All"}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               <section className="space-y-3">
                 {nearbySpotsWithLiveActivity.map((spot) => (
                   <div
                     key={spot.id}
                     className={`rounded-3xl border p-4 transition-all duration-500 ${
-                      spot.name.trim().toLowerCase() ===
-                      twinMeNearbySuggestion.spotName.trim().toLowerCase()
-                        ? `
-      border-cyan-300/80
-      bg-[linear-gradient(180deg,#16344a,#0b1118)]
-      ring-1 ring-cyan-300/30
-      shadow-[0_0_50px_rgba(34,211,238,0.38)]
-      scale-[1.01]
-    `
-                        : `
-      border-white/10
-      bg-[linear-gradient(180deg,#14141a,#0c0c10)]
-    `
+                      spot.heatScore >= 85
+                        ? "border-red-400/40 bg-gradient-to-br from-red-500/15 via-red-900/10 to-black shadow-[0_0_35px_rgba(239,68,68,0.35)]"
+                        : spot.heatScore >= 65
+                          ? "border-orange-400/40 bg-gradient-to-br from-orange-500/12 via-orange-900/10 to-black shadow-[0_0_30px_rgba(249,115,22,0.30)]"
+                          : spot.heatScore >= 35
+                            ? "border-amber-400/35 bg-gradient-to-br from-amber-500/10 via-amber-900/10 to-black shadow-[0_0_24px_rgba(245,158,11,0.22)]"
+                            : "border-cyan-300/25 bg-gradient-to-br from-cyan-500/8 via-slate-900 to-black shadow-[0_0_18px_rgba(34,211,238,0.18)]"
                     }`}
                   >
-                    <div
-                      className={`relative mb-5 h-36 overflow-hidden rounded-2xl ${
+                    <Link
+                      href={Capacitor.isNativePlatform() ? `/spots/__native__?placeId=${encodeURIComponent(spot.id)}` : `/spots/${encodeURIComponent(spot.id)}`}
+                      aria-label={`Open details for ${spot.name}`}
+                      className={`relative mb-5 block h-36 overflow-hidden rounded-2xl ${
                         spot.category === "Food"
                           ? "bg-gradient-to-br from-orange-500/30 to-red-500/20"
                           : spot.category === "Nightlife"
@@ -1985,6 +2807,26 @@ export default function SpotsPage() {
                         </div>
                       ) : null}
 
+                      <div
+                        className={`absolute bottom-4 right-4 rounded-full border px-3 py-1 text-xs font-black backdrop-blur ${
+                          spot.heatScore >= 85
+                            ? "border-red-300/30 bg-red-500/20 text-red-100"
+                            : spot.heatScore >= 65
+                              ? "border-orange-300/30 bg-orange-500/20 text-orange-100"
+                              : spot.heatScore >= 35
+                                ? "border-amber-300/30 bg-amber-500/20 text-amber-100"
+                                : "border-cyan-300/30 bg-cyan-500/20 text-cyan-100"
+                        }`}
+                      >
+                        🔥 {spot.heatScore >= 85
+                          ? "Very busy"
+                          : spot.heatScore >= 65
+                            ? "Busy"
+                            : spot.heatScore >= 35
+                              ? "Moderate"
+                              : "Quiet"}
+                      </div>
+
                       <div className="absolute bottom-4 left-4">
                         <div className="text-xs font-black uppercase tracking-[0.25em] text-white/70">
                           {spot.category}
@@ -1994,7 +2836,7 @@ export default function SpotsPage() {
                           {spot.name}
                         </div>
                       </div>
-                    </div>
+                    </Link>
 
                     <div className="flex items-start justify-between gap-3">
                       <div>
@@ -2174,6 +3016,85 @@ export default function SpotsPage() {
                         </div>
                       </div>
                     ) : null}
+
+                    <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                      <div className="mb-2 flex items-center justify-between">
+                        <span className="text-xs font-black uppercase tracking-[0.18em] text-white/45">
+                          Crowd Level
+                        </span>
+
+                        <span className="text-sm font-semibold text-white/75">
+                          {spot.latestLiveReport?.crowdLevel ?? "Unknown"}
+                        </span>
+                      </div>
+
+                      <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-cyan-400 via-emerald-400 to-orange-400 transition-all duration-700"
+                          style={{
+                            width:
+                              (spot.latestLiveReport?.crowdLevel ?? "")
+                                .toLowerCase() === "packed"
+                                ? "100%"
+                                : (spot.latestLiveReport?.crowdLevel ?? "")
+                                      .toLowerCase() === "busy"
+                                  ? "75%"
+                                  : (spot.latestLiveReport?.crowdLevel ?? "")
+                                        .toLowerCase() === "moderate"
+                                    ? "50%"
+                                    : (spot.latestLiveReport?.crowdLevel ?? "")
+                                          .toLowerCase() === "low"
+                                      ? "25%"
+                                      : "0%",
+                          }}
+                        />
+                      </div>
+
+                      <div className="mt-2 flex justify-between text-[10px] uppercase tracking-wide text-white/35">
+                        <span>Quiet</span>
+                        <span>Moderate</span>
+                        <span>Busy</span>
+                        <span>Packed</span>
+                      </div>
+                    </div>
+
+                    <div
+                      className={`mt-4 rounded-2xl border p-4 ${
+                        spot.prediction.title === "Peak activity"
+                          ? "border-red-500/25 bg-red-500/[0.05]"
+                          : spot.prediction.title === "Getting busier"
+                            ? "border-orange-400/25 bg-orange-400/[0.05]"
+                            : spot.prediction.title === "Calming down"
+                              ? "border-sky-400/25 bg-sky-400/[0.05]"
+                              : "border-cyan-400/15 bg-cyan-400/[0.05]"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">
+                            {spot.prediction.icon}
+                          </span>
+
+                          <div>
+                            <div className="text-xs font-black uppercase tracking-[0.18em] text-cyan-200">
+                              TwinMe Prediction
+                            </div>
+
+                            <div className="mt-1 text-base font-bold text-white">
+                              {spot.prediction.title}
+                            </div>
+                          </div>
+                        </div>
+
+                        <span className="rounded-full bg-cyan-400/15 px-3 py-1 text-xs font-bold text-cyan-200">
+                          {spot.prediction.confidence}% Confidence
+                        </span>
+                      </div>
+
+                      <p className="mt-3 text-sm leading-6 text-white/70">
+                        {spot.prediction.message}
+                      </p>
+                    </div>
                   </div>
                 ))}
               </section>
@@ -2198,13 +3119,14 @@ export default function SpotsPage() {
                   </div>
 
                   <span className="text-xs text-white/45">
-                    {twinMeNearbySuggestion.matchConfidence >= 90
-                      ? "Excellent fit"
-                      : twinMeNearbySuggestion.matchConfidence >= 75
-                        ? "Strong fit"
-                        : twinMeNearbySuggestion.matchConfidence >= 60
-                          ? "Good fit"
-                          : "Possible fit"}
+                    {(() => {
+                      const score = twinMeNearbySuggestion.matchConfidence;
+
+                      if (score >= 90) return "Excellent fit";
+                      if (score >= 75) return "Strong fit";
+                      if (score >= 60) return "Good fit";
+                      return "Possible fit";
+                    })()}
                   </span>
 
                   <p className="mt-2 text-sm leading-6 text-white/75">
@@ -2272,7 +3194,7 @@ export default function SpotsPage() {
           {/* LIVE VIEW */}
           {activeView === "live" ? (
             <div className="space-y-5">
-              <section className="rounded-3xl border border-orange-300/20 bg-[radial-gradient(circle_at_top,rgba(251,146,60,0.14),transparent_45%),linear-gradient(180deg,#1c130e,#0b0b0f)] p-5 shadow-[0_0_45px_rgba(251,146,60,0.10)]">
+              <section className="overflow-hidden rounded-[2rem] border border-orange-300/20 bg-[radial-gradient(circle_at_18%_0%,rgba(251,146,60,0.18),transparent_38%),radial-gradient(circle_at_88%_18%,rgba(244,63,94,0.08),transparent_30%),linear-gradient(180deg,#1c130e,#0b0b0f)] p-6 shadow-[0_24px_80px_rgba(251,146,60,0.10)]">
                 <div className="inline-flex items-center gap-2 rounded-full border border-orange-300/20 bg-orange-300/10 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-orange-100">
                   <Flame className="h-3.5 w-3.5" />
                   Happening Now
@@ -2527,14 +3449,14 @@ export default function SpotsPage() {
           {/* CREW VIEW */}
           {activeView === "crew" ? (
             <div>
-              <section className="mb-6 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#14141a,#0c0c10)] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.42)]">
-                <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold tracking-[0.22em] text-white/80">
+              <section className="mb-6 overflow-hidden rounded-[2rem] border border-cyan-300/15 bg-[radial-gradient(circle_at_18%_0%,rgba(34,211,238,0.11),transparent_36%),linear-gradient(180deg,#12161c,#090b0f)] p-6 shadow-[0_24px_80px_rgba(34,211,238,0.08)]">
+                <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-300/15 bg-cyan-300/[0.07] px-3 py-1 text-xs font-semibold tracking-[0.22em] text-cyan-100/85">
                   <Radar className="h-3.5 w-3.5" />
-                  LIVE RADAR
+                  CREW RADAR
                 </div>
 
                 <h2 className="text-2xl font-semibold text-white">
-                  {displayName}&apos;s Awareness Grid
+                  {displayName}&apos;s Live Awareness
                 </h2>
 
                 <p className="mt-3 text-sm leading-6 text-white/70">
