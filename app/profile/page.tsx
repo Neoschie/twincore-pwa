@@ -67,20 +67,7 @@ useEffect(() => {
       data: { user },
     } = await supabase.auth.getUser();
 
-    console.log("PROFILE ACTIVE EMAIL:", user?.email);
-console.log("PROFILE ACTIVE USER ID:", user?.id);
-console.log(
-  "PROFILE STORAGE KEY:",
-  user ? getProfileStorageKey(user.id) : "no user"
-);
-console.log("PROFILE RAW DATA:", user ? localStorage.getItem(getProfileStorageKey(user.id)) : null);
-
-    console.log("PROFILE PAGE USER:", user?.email);
-console.log("PROFILE PAGE USER ID:", user?.id);
-console.log("PROFILE KEY USED:", user ? getProfileStorageKey(user.id) : "no user");
-console.log("ALL LOCAL STORAGE:", { ...localStorage });
-
-    if (!user) return;
+        if (!user) return;
 
     const raw = localStorage.getItem(getProfileStorageKey(user.id));
 
@@ -141,10 +128,6 @@ function addTrusted() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
-  console.log("SAVE PROFILE USER:", user?.email);
-console.log("SAVE PROFILE USER ID:", user?.id);
-console.log("SAVE PROFILE DATA:", profile);
 
   if (!user) {
   alert("No signed-in user found. Profile was not saved.");

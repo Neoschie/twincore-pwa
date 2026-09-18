@@ -246,18 +246,6 @@ async function getGooglePlacePhotoName(
     }>;
   };
 
-  console.log(
-  "Complete Google Place Details response:",
-  placeId,
-  JSON.stringify(data, null, 2)
-);
-
-  console.log(
-    "Google photo details result:",
-    placeId,
-    data.photos?.[0]?.name ?? "No photo returned"
-  );
-
   return data.photos?.[0]?.name ?? null;
 }
 

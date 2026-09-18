@@ -188,10 +188,7 @@ const [teaserProgress, setTeaserProgress] = useState(0);
 
         if (error) {
           const readable = getReadableError(error);
-          console.log("INVITE LOOKUP MESSAGE:", readable.message);
-          console.log("INVITE LOOKUP DETAILS:", readable.details);
-          console.log("INVITE LOOKUP HINT:", readable.hint);
-          console.log("INVITE LOOKUP CODE:", readable.code);
+          console.error("INVITE LOOKUP ERROR:", readable.message);
         }
 
         if (!error && data && active) {
@@ -358,10 +355,7 @@ const displayName = await getDisplayName(user.id);
         if (acceptanceError) {
           const readable = getReadableError(acceptanceError);
 
-          console.log("INVITE ACCEPT MESSAGE:", readable.message);
-          console.log("INVITE ACCEPT DETAILS:", readable.details);
-          console.log("INVITE ACCEPT HINT:", readable.hint);
-          console.log("INVITE ACCEPT CODE:", readable.code);
+          console.error("INVITE ACCEPT ERROR:", readable.message);
 
           setStatusMessage(
             readable.message || "Unable to join crew.",
@@ -439,10 +433,7 @@ const displayName = await getDisplayName(user.id);
     } catch (error) {
       const readable = getReadableError(error);
 
-      console.log("JOIN FLOW MESSAGE:", readable.message);
-      console.log("JOIN FLOW DETAILS:", readable.details);
-      console.log("JOIN FLOW HINT:", readable.hint);
-      console.log("JOIN FLOW CODE:", readable.code);
+      console.error("JOIN FLOW ERROR:", readable.message);
 
       setStatusMessage("Something went wrong while joining. Try again.");
     } finally {

@@ -141,8 +141,6 @@ export default function AuthPage() {
       localStorage.removeItem("twincore_onboarding_complete");
     }
 
-    console.log("AUTH RESULT USER:", user?.email);
-    console.log("AUTH RESULT USER ID:", user?.id);
     alert(`Logged in as: ${user?.email}`);
     if (user) {
       posthog.identify(user.id, { email: user.email });
@@ -169,8 +167,6 @@ const {
   data: { user: currentUser },
 } = await supabase.auth.getUser();
 
-console.log("CURRENT USER:", currentUser?.email);
-console.log("CURRENT USER ID:", currentUser?.id);
 
 const completedOnboarding =
   hasCompletedOnboarding(currentUser);

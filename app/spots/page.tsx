@@ -2432,7 +2432,6 @@ export default function SpotsPage() {
       return;
     }
 
-    console.log("Posting live update as user:", user.id);
 
     const activityType: LiveActivity["activityType"] =
       livePostType === "Calm spot"

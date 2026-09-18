@@ -401,7 +401,7 @@ export default function CrewPage() {
       .limit(20);
 
     if (error) {
-      console.log("CREW TIMELINE LOAD ERROR:", error);
+      console.error("CREW TIMELINE LOAD ERROR:", error);
       return;
     }
 
@@ -417,7 +417,7 @@ export default function CrewPage() {
       .limit(10);
 
     if (error) {
-      console.log("MEMORY LOAD ERROR:", error);
+      console.error("MEMORY LOAD ERROR:", error);
       return;
     }
 
@@ -466,10 +466,8 @@ export default function CrewPage() {
         .order("id", { ascending: false }),
     ]);
 
-    console.log("CREW PAGE USER:", user.email);
-    console.log("CREW PAGE USER ID:", user.id);
-    console.log("MEMBERS ERROR:", membersError);
-    console.log("STATUS ERROR:", statusError);
+    if (membersError) console.error("MEMBERS ERROR:", membersError);
+    if (statusError) console.error("STATUS ERROR:", statusError);
 
     const statuses =
       !statusError && Array.isArray(statusData)
@@ -580,7 +578,7 @@ export default function CrewPage() {
     const activeCrew = await getActiveCrew(user.id);
 
     if (!activeCrew) {
-      console.log("CREW STATUS ERROR: No active crew found.");
+      console.error("CREW STATUS ERROR: No active crew found.");
       return;
     }
 
@@ -605,7 +603,7 @@ export default function CrewPage() {
       .limit(1);
 
     if (existingError) {
-      console.log("CREW EXISTING ERROR:", existingError);
+      console.error("CREW EXISTING ERROR:", existingError);
       return;
     }
 
@@ -617,8 +615,6 @@ export default function CrewPage() {
         .eq("crew_id", activeCrew.id)
         .select();
 
-      console.log("SUPABASE UPDATE DATA:", updateData);
-      console.log("SUPABASE UPDATE ERROR:", updateError);
 
       if (updateError) return;
     } else {
@@ -627,8 +623,6 @@ export default function CrewPage() {
         .insert(payload)
         .select();
 
-      console.log("SUPABASE INSERT DATA:", insertData);
-      console.log("SUPABASE INSERT ERROR:", insertError);
 
       if (insertError) return;
     }
@@ -638,7 +632,7 @@ export default function CrewPage() {
 
   async function publishCurrentLocation() {
     if (!navigator.geolocation) {
-      console.log("CREW LOCATION ERROR: Geolocation is unavailable.");
+      console.error("CREW LOCATION ERROR: Geolocation is unavailable.");
       return;
     }
 
@@ -672,7 +666,7 @@ export default function CrewPage() {
           .limit(1);
 
         if (lookupError) {
-          console.log("CREW LOCATION LOOKUP ERROR:", lookupError);
+          console.error("CREW LOCATION LOOKUP ERROR:", lookupError);
           return;
         }
 
@@ -683,7 +677,7 @@ export default function CrewPage() {
             .eq("id", existingRows[0].id);
 
           if (updateError) {
-            console.log("CREW LOCATION UPDATE ERROR:", updateError);
+            console.error("CREW LOCATION UPDATE ERROR:", updateError);
             return;
           }
         } else {
@@ -699,7 +693,7 @@ export default function CrewPage() {
             });
 
           if (insertError) {
-            console.log("CREW LOCATION INSERT ERROR:", insertError);
+            console.error("CREW LOCATION INSERT ERROR:", insertError);
             return;
           }
         }
@@ -707,7 +701,7 @@ export default function CrewPage() {
         void loadCrewSignals();
       },
       (error) => {
-        console.log("CREW GEOLOCATION ERROR:", error.message);
+        console.error("CREW GEOLOCATION ERROR:", error.message);
       },
       {
         enableHighAccuracy: true,
@@ -737,7 +731,7 @@ export default function CrewPage() {
       .eq("crew_id", activeCrew.id);
 
     if (error) {
-      console.log("CREW HEARTBEAT ERROR:", error);
+      console.error("CREW HEARTBEAT ERROR:", error);
     }
   }
 
@@ -794,7 +788,6 @@ export default function CrewPage() {
           table: "crew_status",
         },
         (payload) => {
-          console.log("LIVE CREW STATUS CHANGE:", payload);
           void loadCrewSignals();
           setLiveTick((prev) => !prev);
         },
@@ -807,7 +800,6 @@ export default function CrewPage() {
           table: "crew_members",
         },
         (payload) => {
-          console.log("LIVE CREW MEMBER CHANGE:", payload);
           void loadCrewSignals();
           setLiveTick((prev) => !prev);
         },
@@ -820,13 +812,11 @@ export default function CrewPage() {
           table: "crew_checkins",
         },
         (payload) => {
-          console.log("LIVE CREW CHECK-IN CHANGE:", payload);
           void loadCrewCheckins();
           setLiveTick((prev) => !prev);
         },
       )
       .subscribe((status) => {
-        console.log("CREW LIVE CHANNEL:", status);
       });
 
     return () => {
@@ -8159,9 +8149,6 @@ export default function CrewPage() {
 
     setCrewMessage(message);
 
-    console.log("CREW ACTION CLICKED:", action);
-    console.log("CREW STATUS TO PUSH:", status);
-    console.log("CREW VIBE TO PUSH:", vibe);
 
     await pushCrewSignal(status, vibe);
 
@@ -8174,7 +8161,7 @@ export default function CrewPage() {
     const activeCrew = await getActiveCrew(user.id);
 
     if (!activeCrew) {
-      console.log("CREW CHECK-IN ERROR: No active crew found.");
+      console.error("CREW CHECK-IN ERROR: No active crew found.");
       return;
     }
 
@@ -8195,16 +8182,10 @@ export default function CrewPage() {
       });
 
     if (checkinError) {
-      console.log("CREW CHECK-IN HISTORY ERROR:", checkinError);
+      console.error("CREW CHECK-IN HISTORY ERROR:", checkinError);
       setCrewMessage(`${message}, but history could not be saved.`);
       return;
     }
-
-    console.log("CREW CHECK-IN HISTORY SAVED:", {
-      crewId: activeCrew.id,
-      userId: user.id,
-      status,
-    });
 
     const memoryType =
       action === "check-in"
@@ -8251,12 +8232,7 @@ export default function CrewPage() {
       });
 
     if (memoryError) {
-      console.log("TWINME MEMORY WRITE ERROR:", memoryError);
-    } else {
-      console.log("TWINME MEMORY SAVED:", {
-        memoryType,
-        title: memoryTitle,
-      });
+      console.error("TWINME MEMORY WRITE ERROR:", memoryError);
     }
 
     void loadCrewCheckins();

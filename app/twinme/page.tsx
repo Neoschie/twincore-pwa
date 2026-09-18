@@ -322,7 +322,6 @@ type AdaptiveGuidanceProfile = {
 /* -------------------------
    STORAGE KEYS
 --------------------------*/
-const DEBUG_TWIN = process.env.NODE_ENV === "development";
 const TWINCORE_BASELINE_KEY = "twincore_internal_baseline";
 const TWINCORE_LEARNING_KEY = "twincore_learning_profile";
 const TWINCORE_MESSAGES_KEY = "twincore_twinme_messages";
@@ -5137,115 +5136,6 @@ function generateTwinResponse({
 
   const selfTrajectoryOpening = getSelfTrajectoryOpening(selfTrajectory);
 
-  if (DEBUG_TWIN) {
-    console.log("🔥 TWIN DEBUG START");
-
-    console.warn("🔥 DEBUG HIT");
-
-    console.log("Twin Debug", {
-      baseTwinResponseIntent,
-
-      identityProfile,
-
-      valueMemory,
-
-      goalMemory,
-
-      boundaryMemory,
-
-      identityTimeline: updatedIdentityTimeline,
-      identityMomentum,
-      identityMomentumOpening,
-
-      boundaryAwareness,
-      boundaryAwarenessOpening,
-
-      boundaryEvolution,
-      boundaryEvolutionOpening,
-
-      baselineDrift,
-
-      selfTrajectory,
-      selfTrajectoryOpening,
-
-      memory: updatedMemory,
-
-      memoryTrajectory,
-      memoryTrajectoryOpening,
-
-      memoryWeight,
-
-      identityEvolution,
-      identityEvolutionOpening,
-
-      internalContradiction,
-      internalContradictionOpening,
-
-      goalDrift,
-      goalDriftOpening,
-
-      identityProtection,
-      identityProtectionOpening,
-
-      goalEvolution,
-      goalEvolutionOpening,
-
-      timelineInsight,
-      timelineInsightOpening,
-
-      identityStrengthening,
-      identityStrengtheningOpening,
-
-      identityRegression,
-      identityRegressionOpening,
-
-      longTermIdentityEvolution,
-      longTermIdentityEvolutionOpening,
-
-      identityNarrative,
-      identityNarrativeOpening,
-      narrativeMemory,
-
-      identityArchetype,
-      identityArchetypeOpening,
-
-      predictiveIdentity,
-      predictiveIdentityOpening,
-
-      narrativeSynthesis,
-      narrativeSynthesisOpening,
-
-      valueDrift,
-      valueDriftOpening,
-
-      valueEvolution,
-      valueEvolutionOpening,
-
-      recoverySignal,
-      recoveryOpening,
-
-      responsePriority,
-
-      identityShift,
-
-      emotionalState: twinEmotionalState,
-
-      energyState: conversationEnergyState,
-
-      intent: twinResponseIntent,
-
-      identityAwareOpening,
-
-      baselineDriftOpening,
-
-      passiveLoopCount,
-
-      supportWeakening,
-
-      ecosystemPressure,
-    });
-  }
-
   if (responsePriority === "protection" && identityProtectionOpening) {
     return identityProtectionOpening;
   }
@@ -6043,7 +5933,6 @@ function generateTwinResponse({
   };
 
   let intent = getConversationIntent(input);
-  console.log("Intent:", intent);
 
   for (const [key, keywords] of Object.entries(intentMap)) {
     if (keywords.some((word) => latestText.includes(word))) {
@@ -9454,8 +9343,6 @@ export default function TwinMePage() {
       });
 
       if (isLifeDecision) {
-        console.log("✅ Life decision detected");
-
         twinText =
           "I'd be happy to think it through with you. Tell me a little more about the decision you're facing.";
 
@@ -10233,8 +10120,6 @@ export default function TwinMePage() {
       const transcript =
         event.results?.[event.resultIndex]?.[0]?.transcript?.trim() || "";
 
-      console.log("🎤 heard:", transcript);
-
       if (!transcript) return;
 
       setInput(transcript);
@@ -10242,8 +10127,6 @@ export default function TwinMePage() {
       const lowered = transcript.toLowerCase();
 
       if (handsFreeRef.current) {
-        console.log("🤖 hands-free sending:", transcript);
-
         setTimeout(() => {
           handleSend(transcript);
         }, 100);
