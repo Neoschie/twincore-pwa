@@ -36,12 +36,19 @@ import type {
 } from "@/lib/twin/types";
 import { buildTwinSyncSnapshot } from "@/lib/twin/buildTwinSyncSnapshot";
 
+type TwinConversationRuntimeProfile = {
+  indecisionCount: number;
+  resistanceCount: number;
+  avoidanceCount: number;
+  clarityLevel: number;
+};
+
 declare global {
   interface Window {
     __twinMemoryCount?: number;
     __twinOverwhelmCount?: number;
     __twinResistanceCount?: number;
-    __twinConversationProfile?: any;
+    __twinConversationProfile?: TwinConversationRuntimeProfile;
   }
 }
 import { getPassiveAwareness } from "@/lib/twinme/passive-awareness";
@@ -7246,7 +7253,7 @@ function getPredictiveInterruption(
   desyncLevel: DesyncLevel,
   driftLevel: DriftLevel,
   noSupportActive: boolean,
-  crewCollapse: any,
+  crewCollapse: unknown,
   environmentLevel: string,
   movementLevel: string,
 ) {
