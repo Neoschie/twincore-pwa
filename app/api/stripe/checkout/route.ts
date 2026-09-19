@@ -108,8 +108,8 @@ const appUrl =
     return NextResponse.json({
       url: session.url,
     });
-  } catch (error) {
-    console.error(error);
+  } catch {
+    console.error("Stripe checkout failed.");
 
     return NextResponse.json(
       { error: "Stripe checkout failed." },

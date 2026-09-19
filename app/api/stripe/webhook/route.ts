@@ -104,8 +104,8 @@ export async function POST(req: Request) {
       signature,
       process.env.STRIPE_WEBHOOK_SECRET
     );
-  } catch (error) {
-    console.error("Stripe webhook signature error:", error);
+  } catch {
+    console.error("Stripe webhook signature validation failed.");
     return NextResponse.json(
       { error: "Invalid webhook signature." },
       { status: 400 }
@@ -208,8 +208,8 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ received: true });
-  } catch (error) {
-    console.error("Stripe webhook processing error:", error);
+  } catch {
+    console.error("Stripe webhook processing failed.");
 
     return NextResponse.json(
       { error: "Stripe webhook processing failed." },

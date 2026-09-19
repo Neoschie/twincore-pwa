@@ -10048,13 +10048,9 @@ export default function TwinMePage() {
       lastTwinMessageTimeRef.current = Date.now();
 
       setIsThinking(false);
-    } catch (err) {
-      console.error("🔥 FULL ERROR:", err);
-
-      const errorText =
-        err instanceof Error
-          ? `${err.name}: ${err.message}`
-          : JSON.stringify(err);
+    } catch {
+      const fallbackText =
+        "I had trouble responding just now. Please try again.";
 
       setMessages((prev) =>
         [
@@ -10062,12 +10058,12 @@ export default function TwinMePage() {
           {
             id: makeMessageId(),
             role: "twin" as const,
-            text: `DEBUG ERROR: ${errorText}`,
+            text: fallbackText,
           },
         ].slice(-20),
       );
 
-      speak(`Error: ${errorText}`);
+      speak(fallbackText);
 
       lastTwinMessageTimeRef.current = Date.now();
     } finally {

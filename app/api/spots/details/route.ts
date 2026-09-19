@@ -95,13 +95,7 @@ export async function GET(request: Request) {
   );
 
   if (!googleResponse.ok) {
-    const googleError = await googleResponse.text();
-
-    console.error(
-      "Google Place Details request failed:",
-      googleResponse.status,
-      googleError,
-    );
+    console.error("Google Place Details request failed:", googleResponse.status);
 
     return NextResponse.json(
       { error: "Unable to retrieve venue details." },

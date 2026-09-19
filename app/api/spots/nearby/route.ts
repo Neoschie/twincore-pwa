@@ -226,16 +226,7 @@ async function getGooglePlacePhotoName(
   );
 
   if (!response.ok) {
-    const errorText = await response.text();
-
-    console.error(
-      "Google Place Details photo request failed:",
-      {
-        placeId,
-        status: response.status,
-        response: errorText,
-      }
-    );
+    console.error("Google Place Details photo request failed:", response.status);
 
     return null;
   }
@@ -336,13 +327,7 @@ export async function GET(request: Request) {
   );
 
   if (!googleResponse.ok) {
-    const googleError = await googleResponse.text();
-
-    console.error(
-      "Google Places request failed:",
-      googleResponse.status,
-      googleError,
-    );
+    console.error("Google Places request failed:", googleResponse.status);
 
     return NextResponse.json(
       {
