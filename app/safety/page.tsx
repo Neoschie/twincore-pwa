@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export default function SafetyPage() {
   return (
-    <main className="relative min-h-screen overflow-hidden bg[[#05060a] text-white">
+    <main className="relative min-h-screen overflow-hidden bg-[#05060a] text-white">
       {/* TWINCORE_SAFETY_HUB_FOUNDATION_R17_3 */}
 
       <div
@@ -82,7 +82,7 @@ export default function SafetyPage() {
           <div className="grid gap-3 md:grid-cols-3">
             <Link
               href="/crew"
-              className="group relative overflow-hidden rounded-[1.55rem] border border-emerald-300/12 bg-emerald-300/[0.045] p5 transition duration-300 hover:border-emerald-300/25 hover:bg-emerald-300/[0.075]"
+              className="group relative overflow-hidden rounded-[1.55rem] border border-emerald-300/12 bg-emerald-300/[0.045] p-5 transition duration-300 hover:border-emerald-300/25 hover:bg-emerald-300/[0.075]"
             >
               <div
                 aria-hidden="true"
