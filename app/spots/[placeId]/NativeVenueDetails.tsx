@@ -94,7 +94,7 @@ export default function NativeVenueDetails() {
 
   if (!venue) {
     return (
-      <main className="min-h-screen bg-[#07090d] px-4 pb-24 pt-6 text-white">
+      <main className="min-h-screen bg-[#07090d] px-4 pb-80 pt-6 text-white">
         <div className="mx-auto max-w-2xl">
           <Link
             href="/spots"
@@ -132,7 +132,7 @@ export default function NativeVenueDetails() {
     `${APP_ORIGIN}/spots/${encodeURIComponent(venue.id)}`;
 
   return (
-    <main className="min-h-screen bg-[#07090d] px-4 pb-24 pt-6 text-white">
+    <main className="min-h-screen bg-[#07090d] px-4 pb-80 pt-6 text-white">
       <div className="mx-auto max-w-2xl">
         <Link
           href="/spots"
