@@ -10267,7 +10267,7 @@ export default function TwinMePage() {
           className="safe-screen flex justify-center items-start px-3 pt-24 text-white sm:px-4 sm:pt-28"
           style={{ background: theme.pageBg }}
         >
-          <div className="w-full max-w-[680px] space-y-5 px-1 pb-12 sm:space-y-6 sm:px-4">
+          <div className="w-full max-w-[680px] space-y-5 px-1 pb-48 sm:space-y-6 sm:px-4">
             <TwinMeHero
               displayName={displayName}
               orbState={orbState}
