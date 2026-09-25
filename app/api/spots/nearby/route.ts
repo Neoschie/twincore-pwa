@@ -242,6 +242,19 @@ async function getGooglePlacePhotoName(
 
  
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "https://localhost",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
+export function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: corsHeaders,
+  });
+}
+
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const { searchParams } = requestUrl;
@@ -255,7 +268,7 @@ export async function GET(request: Request) {
       {
         error: "Valid latitude and longitude values are required.",
       },
-      { status: 400 },
+      { status: 400, headers: corsHeaders },
     );
   }
 
@@ -272,7 +285,7 @@ export async function GET(request: Request) {
       {
         error: "Nearby provider is not configured.",
       },
-      { status: 503 },
+      { status: 503, headers: corsHeaders },
     );
   }
 
@@ -335,6 +348,7 @@ export async function GET(request: Request) {
       },
       {
         status: 502,
+        headers: corsHeaders,
       },
     );
   }
@@ -445,14 +459,19 @@ export async function GET(request: Request) {
       (firstSpot, secondSpot) => firstSpot.distanceKm - secondSpot.distanceKm,
     );
 
-  return NextResponse.json({
-    spots,
-    meta: {
-      source: "google-places",
-      latitude,
-      longitude,
-      resultCount: spots.length,
-      generatedAt: new Date().toISOString(),
+  return NextResponse.json(
+    {
+      spots,
+      meta: {
+        source: "google-places",
+        latitude,
+        longitude,
+        resultCount: spots.length,
+        generatedAt: new Date().toISOString(),
+      },
     },
-  });
+    {
+      headers: corsHeaders,
+    },
+  );
 }
