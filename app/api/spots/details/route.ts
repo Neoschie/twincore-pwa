@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
 
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "https://localhost",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
 type GooglePlaceDetails = {
   id?: string;
   displayName?: {
@@ -55,6 +61,13 @@ function mapCategory(primaryType?: string) {
   return "Events";
 }
 
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: CORS_HEADERS,
+  });
+}
+
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const placeId = requestUrl.searchParams.get("placeId")?.trim();
@@ -62,7 +75,7 @@ export async function GET(request: Request) {
   if (!placeId) {
     return NextResponse.json(
       { error: "A placeId value is required." },
-      { status: 400 },
+      { status: 400, headers: CORS_HEADERS },
     );
   }
 
@@ -71,7 +84,7 @@ export async function GET(request: Request) {
   if (!apiKey) {
     return NextResponse.json(
       { error: "Places provider is not configured." },
-      { status: 503 },
+      { status: 503, headers: CORS_HEADERS },
     );
   }
 
@@ -99,7 +112,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json(
       { error: "Unable to retrieve venue details." },
-      { status: 502 },
+      { status: 502, headers: CORS_HEADERS },
     );
   }
 
@@ -108,26 +121,29 @@ export async function GET(request: Request) {
   if (!place.id || !place.displayName?.text) {
     return NextResponse.json(
       { error: "Venue details are unavailable." },
-      { status: 404 },
+      { status: 404, headers: CORS_HEADERS },
     );
   }
 
-  return NextResponse.json({
-    venue: {
-      id: place.id,
-      name: place.displayName.text,
-      category: mapCategory(place.primaryType),
-      address: place.formattedAddress ?? null,
-      rating: typeof place.rating === "number" ? place.rating : null,
-      reviewCount:
-        typeof place.userRatingCount === "number"
-          ? place.userRatingCount
-          : null,
-      isOpen:
-        typeof place.currentOpeningHours?.openNow === "boolean"
-          ? place.currentOpeningHours.openNow
-          : null,
-      closingTime: place.currentOpeningHours?.nextCloseTime ?? null,
+  return NextResponse.json(
+    {
+      venue: {
+        id: place.id,
+        name: place.displayName.text,
+        category: mapCategory(place.primaryType),
+        address: place.formattedAddress ?? null,
+        rating: typeof place.rating === "number" ? place.rating : null,
+        reviewCount:
+          typeof place.userRatingCount === "number"
+            ? place.userRatingCount
+            : null,
+        isOpen:
+          typeof place.currentOpeningHours?.openNow === "boolean"
+            ? place.currentOpeningHours.openNow
+            : null,
+        closingTime: place.currentOpeningHours?.nextCloseTime ?? null,
+      },
     },
-  });
+    { headers: CORS_HEADERS },
+  );
 }
