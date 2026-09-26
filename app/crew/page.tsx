@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import {
   useCallback,
@@ -296,6 +297,8 @@ function dedupeCrewRows(rows: CrewStatusRow[]) {
 }
 
 export default function CrewPage() {
+  const router = useRouter();
+
   // TWINCORE_CREW_PARTY_CONTEXT_BRIDGE_R13_0
   const { tonight } = useTonightContext();
 
@@ -2149,7 +2152,7 @@ export default function CrewPage() {
       crewRecommendation.actionLabel === "Add Tonight Context" ||
       crewRecommendation.actionTarget === "who-fits-tonight"
     ) {
-      window.location.assign("/party");
+      router.push("/party");
       return;
     }
 
@@ -2158,7 +2161,7 @@ export default function CrewPage() {
     // Existing local R13.3 targets remain valid for Invite Crew
     // and general Crew review.
     scrollTo(crewRecommendation.actionTarget);
-  }, [crewRecommendation, currentUserId, displayRows]);
+  }, [crewRecommendation, currentUserId, displayRows, router]);
 
   // TWINCORE_CREW_PAYOFF_INTELLIGENCE_R13_5
   //
@@ -2320,12 +2323,12 @@ export default function CrewPage() {
   // TWINCORE_CREW_PAYOFF_ACTION_R13_5
   const executeCrewPayoff = useCallback(() => {
     if (crewPayoff.actionType === "party") {
-      window.location.assign("/party");
+      router.push("/party");
       return;
     }
 
     if (crewPayoff.actionType === "spots") {
-      window.location.assign("/spots");
+      router.push("/spots");
       return;
     }
 
@@ -2362,7 +2365,7 @@ export default function CrewPage() {
         block: "start",
       });
     });
-  }, [crewPayoff, currentUserId, displayRows]);
+  }, [crewPayoff, currentUserId, displayRows, router]);
 
   const relationshipIntelligence = useMemo(() => {
     const activeMembers = displayRows.length;
