@@ -15,47 +15,79 @@ type GooglePlaceDetails = {
   rating?: number;
   userRatingCount?: number;
   primaryType?: string;
+  types?: string[];
   currentOpeningHours?: {
     openNow?: boolean;
     nextCloseTime?: string;
   };
 };
 
-function mapCategory(primaryType?: string) {
-  const type = (primaryType || "").toLowerCase();
+function mapCategory(
+  primaryType?: string,
+  types: string[] = [],
+) {
+  const allTypes = [primaryType ?? "", ...types].map((type) =>
+    type.toLowerCase(),
+  );
+
+  const hasType = (...matches: string[]) =>
+    allTypes.some((type) => matches.some((match) => type.includes(match)));
 
   if (
-    type.includes("restaurant") ||
-    type.includes("cafe") ||
-    type.includes("bakery") ||
-    type.includes("food")
+    hasType(
+      "restaurant",
+      "cafe",
+      "bakery",
+      "meal_takeaway",
+      "meal_delivery",
+      "food",
+    )
   ) {
     return "Food";
   }
 
-  if (
-    type.includes("night_club") ||
-    type.includes("bar") ||
-    type.includes("pub")
-  ) {
+  if (hasType("night_club", "bar", "pub", "cocktail_bar", "wine_bar")) {
     return "Nightlife";
   }
 
   if (
-    type.includes("gym") ||
-    type.includes("stadium") ||
-    type.includes("sport")
+    hasType(
+      "gym",
+      "stadium",
+      "sports_complex",
+      "sports_club",
+      "athletic_field",
+      "fitness",
+    )
   ) {
     return "Sports";
   }
 
   if (
-    type.includes("park") ||
-    type.includes("beach") ||
-    type.includes("campground") ||
-    type.includes("marina")
+    hasType(
+      "park",
+      "beach",
+      "hiking_area",
+      "campground",
+      "marina",
+      "tourist_attraction",
+      "nature_preserve",
+    )
   ) {
     return "Outdoor";
+  }
+
+  if (
+    hasType(
+      "movie_theater",
+      "performing_arts_theater",
+      "event_venue",
+      "concert_hall",
+      "museum",
+      "art_gallery",
+    )
+  ) {
+    return "Events";
   }
 
   return "Events";
@@ -100,6 +132,7 @@ export async function GET(request: Request) {
           "rating",
           "userRatingCount",
           "primaryType",
+          "types",
           "currentOpeningHours",
         ].join(","),
       },
@@ -130,7 +163,7 @@ export async function GET(request: Request) {
       venue: {
         id: place.id,
         name: place.displayName.text,
-        category: mapCategory(place.primaryType),
+        category: mapCategory(place.primaryType, place.types),
         address: place.formattedAddress ?? null,
         rating: typeof place.rating === "number" ? place.rating : null,
         reviewCount:
