@@ -642,6 +642,8 @@ export default function PartyPage() {
     actions: [],
     level: "none",
   });
+  const [partyStateHydrated, setPartyStateHydrated] = useState(false);
+
   useEffect(() => {
     async function loadPartyPage() {
       const {
@@ -720,6 +722,7 @@ export default function PartyPage() {
 
       const privacySettings = await getPrivacySettings();
       setPrivacy(privacySettings);
+      setPartyStateHydrated(true);
     }
 
     void loadPartyPage();
@@ -782,6 +785,8 @@ export default function PartyPage() {
   }, [selectedStatus]);
 
   useEffect(() => {
+    if (!partyStateHydrated) return;
+
     supabase.auth.getUser().then(({ data }) => {
       const user = data.user;
       if (!user) return;
@@ -791,9 +796,11 @@ export default function PartyPage() {
         autoTracking ? "true" : "false",
       );
     });
-  }, [autoTracking]);
+  }, [autoTracking, partyStateHydrated]);
 
   useEffect(() => {
+    if (!partyStateHydrated) return;
+
     supabase.auth.getUser().then(({ data }) => {
       const user = data.user;
       if (!user) return;
@@ -803,7 +810,7 @@ export default function PartyPage() {
         partyActive ? "true" : "false",
       );
     });
-  }, [partyActive]);
+  }, [partyActive, partyStateHydrated]);
 
   useEffect(() => {
     if (!isPlaying) {
