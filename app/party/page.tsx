@@ -1128,18 +1128,9 @@ export default function PartyPage() {
   }
   function startAutoTracking() {
     if (!selectedStatus || !partyActive) return;
-    if (trackingRef.current) {
-      clearInterval(trackingRef.current);
-      trackingRef.current = null;
-    }
     setAutoTracking(true);
     setSyncState("syncing");
     setSyncMessage("Starting auto tracking...");
-    void syncCrewStatus(selectedStatus, "tracking", true);
-    trackingRef.current = setInterval(() => {
-      if (!selectedStatus) return;
-      void syncCrewStatus(selectedStatus, "tracking", true);
-    }, 12000);
   }
 
   useEffect(() => {
@@ -1168,7 +1159,7 @@ export default function PartyPage() {
   }, [selectedStatus]);
 
   useEffect(() => {
-    if (!selectedStatus) return;
+    if (!partyStateHydrated || !selectedStatus) return;
 
     supabase.auth.getUser().then(({ data }) => {
       const user = data.user;
@@ -1187,9 +1178,7 @@ export default function PartyPage() {
       stopAutoTracking();
       return;
     }
-
-    void syncCrewStatus(selectedStatus, "toggle", true);
-  }, [partyActive]);
+  }, [partyActive, partyStateHydrated]);
 
   useEffect(() => {
     if (!selectedStatus) return;
@@ -1209,25 +1198,36 @@ export default function PartyPage() {
   }, [privacy, autoTracking, lastCoords, selectedStatus, partyActive]);
 
   useEffect(() => {
-    if (!selectedStatus) return;
+    if (!partyStateHydrated || !selectedStatus) return;
+
     if (autoTracking && partyActive) {
       if (trackingRef.current) {
         clearInterval(trackingRef.current);
         trackingRef.current = null;
       }
+
+      void syncCrewStatus(selectedStatus, "tracking", true);
+
       trackingRef.current = setInterval(() => {
         void syncCrewStatus(selectedStatus, "tracking", true);
       }, 12000);
-      void syncCrewStatus(selectedStatus, "tracking", true);
+
       setSyncMessage("Auto tracking active");
     }
+
     return () => {
       if (trackingRef.current) {
         clearInterval(trackingRef.current);
         trackingRef.current = null;
       }
     };
-  }, [autoTracking, selectedStatus, privacy, partyActive]);
+  }, [
+    autoTracking,
+    selectedStatus,
+    privacy,
+    partyActive,
+    partyStateHydrated,
+  ]);
   useEffect(() => {
     return () => {
       if (trackingRef.current) {
