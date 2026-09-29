@@ -10,7 +10,7 @@ export default function SafetyPage() {
         className="pointer-events-none absolute inset-x-0 top-0 h-[42rem] bg-[radial-gradient(circle_at_50%_8%,rgba(52,211,153,0.12),transparent_32%),radial-gradient(circle_at_82%_24%,rgba(34,211,238,0.06),transparent_24%)]"
       />
 
-      <div className="twincore-safety-content relative mx-auto flex w-full max-w-5xl flex-col px-5 pb-40 pt-8 sm:px-8 sm:pt-12">
+      <div className="twincore-safety-content relative mx-auto flex w-full max-w-5xl flex-col px-5 pb-80 pt-8 sm:px-8 sm:pt-12">
         <header className="mx-auto flex max-w-3xl flex-col items-center text-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/15 bg-emerald-300/[0.06] px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.2em] text-emerald-200">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 shadow-[0_0_12px_rgba(110,231,183,0.85)]" />
