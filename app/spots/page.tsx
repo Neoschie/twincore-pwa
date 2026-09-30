@@ -423,7 +423,7 @@ function MiniMeter({ label, value }: { label: string; value: number }) {
         <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">
           {label}
         </span>
-        <span className="text-sm font-semibold text-white">{value}</span>
+        <span className="text-sm font-semibold text-white">{Math.round(value)}</span>
       </div>
 
       <div className="h-2 overflow-hidden rounded-full bg-white/10">
@@ -2826,7 +2826,7 @@ export default function SpotsPage() {
                               : "Quiet"}
                       </div>
 
-                      <div className="absolute bottom-4 left-4">
+                      <div className="absolute bottom-4 left-4 right-28">
                         <div className="text-xs font-black uppercase tracking-[0.25em] text-white/70">
                           {spot.category}
                         </div>
@@ -2850,7 +2850,7 @@ export default function SpotsPage() {
                         </div>
                       </div>
 
-                      <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-white/70">
+                      <span className="shrink-0 whitespace-nowrap rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-white/70">
                         {spot.distanceKm === 0
                           ? "Home"
                           : `${spot.distanceKm.toFixed(1)} km`}
@@ -3470,7 +3470,7 @@ export default function SpotsPage() {
                   </span>
 
                   <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
-                    {hasSharedLocation ? "LOCATION ON" : "LOCATION OFF"}
+                    {hasSharedLocation || userCoords ? "LOCATION ON" : "LOCATION OFF"}
                   </span>
 
                   <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
@@ -3723,7 +3723,7 @@ export default function SpotsPage() {
 
                   <div className="mt-3 flex flex-wrap gap-2">
                     <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
-                      Intensity {selectedSpot.intensity}
+                      Intensity {Math.round(selectedSpot.intensity)}
                     </span>
                     <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
                       Cluster {selectedSpot.clusterStrength}
