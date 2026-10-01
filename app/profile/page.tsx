@@ -13,6 +13,10 @@ import {
   shellStyle,
 } from "@/components/twincore-ui";
 import posthog from "posthog-js";
+import { Capacitor } from "@capacitor/core";
+import { App } from "@capacitor/app";
+import { PushNotifications } from "@capacitor/push-notifications";
+import { NotificationSettings } from "@/lib/native/notification-settings";
 
 import { supabase } from "@/lib/supabase/client";
 import { getSharedProfile, upsertSharedProfile } from "@/lib/shared-profile";
@@ -60,8 +64,42 @@ const handleSignOut = async () => {
 
 const [saved, setSaved] = useState(false);
 const [newTrusted, setNewTrusted] = useState("");
+const [notificationPermission, setNotificationPermission] = useState<string>("unknown");
+const [notificationBusy, setNotificationBusy] = useState(false);
 
 useEffect(() => {
+  async function loadNotificationPermission() {
+    if (!Capacitor.isNativePlatform()) return;
+
+    try {
+      if (Capacitor.getPlatform() === "android") {
+        const status = await NotificationSettings.getStatus();
+        setNotificationPermission(status.enabled ? "granted" : "denied");
+        return;
+      }
+
+      const status = await PushNotifications.checkPermissions();
+      setNotificationPermission(status.receive);
+    } catch (error) {
+      console.error("NOTIFICATION PERMISSION CHECK ERROR:", error);
+      setNotificationPermission("unknown");
+    }
+  }
+
+  void loadNotificationPermission();
+
+  let appStateListener: { remove: () => Promise<void> } | undefined;
+
+  if (Capacitor.isNativePlatform()) {
+    void App.addListener("appStateChange", ({ isActive }) => {
+      if (isActive) {
+        void loadNotificationPermission();
+      }
+    }).then((listener) => {
+      appStateListener = listener;
+    });
+  }
+
   async function loadProfile() {
     const {
       data: { user },
@@ -101,7 +139,44 @@ useEffect(() => {
   }
 
   loadProfile();
+
+  return () => {
+    if (appStateListener) {
+      void appStateListener.remove();
+    }
+  };
 }, []);
+
+async function openNotificationSettings() {
+  if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "android") return;
+
+  try {
+    await NotificationSettings.open();
+  } catch (error) {
+    console.error("OPEN NOTIFICATION SETTINGS ERROR:", error);
+  }
+}
+
+async function requestNotificationPermission() {
+  if (!Capacitor.isNativePlatform()) return;
+
+  setNotificationBusy(true);
+
+  try {
+    const status = await PushNotifications.requestPermissions();
+
+    if (Capacitor.getPlatform() === "android") {
+      const nativeStatus = await NotificationSettings.getStatus();
+      setNotificationPermission(nativeStatus.enabled ? "granted" : "denied");
+    } else {
+      setNotificationPermission(status.receive);
+    }
+  } catch (error) {
+    console.error("NOTIFICATION PERMISSION REQUEST ERROR:", error);
+  } finally {
+    setNotificationBusy(false);
+  }
+}
 
 function addTrusted() {
     if (!newTrusted.trim()) return;
@@ -509,6 +584,81 @@ function addTrusted() {
           </section>
         </div>
       </div>
+
+      {Capacitor.isNativePlatform() && (
+        <section
+          style={{
+            ...cardStyle,
+            marginTop: 30,
+            border: "1px solid rgba(59,130,246,.22)",
+            background:
+              "linear-gradient(145deg, rgba(59,130,246,.08), rgba(15,23,42,.82))",
+          }}
+        >
+          <div
+            style={{
+              color: "#93C5FD",
+              fontSize: 11,
+              fontWeight: 800,
+              letterSpacing: ".14em",
+              textTransform: "uppercase",
+              marginBottom: 5,
+            }}
+          >
+            Notifications
+          </div>
+
+          <h2
+            style={{
+              margin: "0 0 8px",
+              color: "white",
+              fontSize: 22,
+              fontWeight: 900,
+            }}
+          >
+            Stay in the loop
+          </h2>
+
+          <p
+            style={{
+              margin: "0 0 14px",
+              color: "#A1A1AA",
+              fontSize: 13,
+              lineHeight: 1.55,
+            }}
+          >
+            Permission status:{" "}
+            <strong style={{ color: "white" }}>
+              {notificationPermission}
+            </strong>
+          </p>
+
+          {notificationPermission !== "granted" && (
+            <button
+              onClick={requestNotificationPermission}
+              disabled={notificationBusy}
+              style={primaryButtonStyle}
+            >
+              {notificationBusy
+                ? "Checking..."
+                : "Allow Notifications"}
+            </button>
+          )}
+
+          {Capacitor.getPlatform() === "android" && (
+            <button
+              onClick={openNotificationSettings}
+              style={{
+                ...navButtonStyle,
+                marginTop:
+                  notificationPermission !== "granted" ? 10 : 0,
+              }}
+            >
+              Open Android Notification Settings
+            </button>
+          )}
+        </section>
+      )}
 
       <section
         style={{
