@@ -47,14 +47,22 @@ export default function NativeDeepLinkRuntime() {
     const isNativeIos =
       Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
 
+    const isNativeAndroid =
+      Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android";
+
     document.documentElement.classList.toggle(
       "twincore-native-ios",
       isNativeIos,
+    );
+    document.documentElement.classList.toggle(
+      "twincore-native-android",
+      isNativeAndroid,
     );
 
     if (!Capacitor.isNativePlatform()) {
       return () => {
         document.documentElement.classList.remove("twincore-native-ios");
+        document.documentElement.classList.remove("twincore-native-android");
       };
     }
 
@@ -80,6 +88,7 @@ export default function NativeDeepLinkRuntime() {
     return () => {
       active = false;
       document.documentElement.classList.remove("twincore-native-ios");
+      document.documentElement.classList.remove("twincore-native-android");
       void listenerPromise.then((listener) => listener.remove());
     };
   }, [router]);

@@ -1553,7 +1553,7 @@ animation:presenceGlow 7s ease-in-out infinite;
 
   .twincore-app-content {
     padding-top: 0;
-    padding-bottom: calc(6.75rem + env(safe-area-inset-bottom));
+    padding-bottom: calc(6.75rem + var(--safe-bottom));
   }
 
   .twincore-mobile-nav {
@@ -1564,7 +1564,7 @@ animation:presenceGlow 7s ease-in-out infinite;
     pointer-events: none;
     padding:
       0 0.65rem
-      max(0.6rem, env(safe-area-inset-bottom));
+      max(0.6rem, var(--safe-bottom));
   }
 
   .twincore-mobile-nav-inner {
@@ -1661,7 +1661,7 @@ animation:presenceGlow 7s ease-in-out infinite;
     pointer-events: auto;
     position: absolute;
     left: 50%;
-    bottom: calc(5.35rem + env(safe-area-inset-bottom));
+    bottom: calc(5.35rem + var(--safe-bottom));
     width: min(calc(100% - 1.3rem), 30rem);
     transform: translateX(-50%);
     overflow: hidden;
@@ -1808,13 +1808,13 @@ animation:presenceGlow 7s ease-in-out infinite;
 
 @media (max-width: 900px) {
   .twincore-app-content {
-    padding-bottom: calc(7.25rem + env(safe-area-inset-bottom));
+    padding-bottom: calc(7.25rem + var(--safe-bottom));
   }
 
   .twincore-mobile-nav {
     padding:
       0 0.7rem
-      max(0.65rem, env(safe-area-inset-bottom));
+      max(0.65rem, var(--safe-bottom));
   }
 
   .twincore-mobile-nav-shell {
@@ -1917,11 +1917,11 @@ animation:presenceGlow 7s ease-in-out infinite;
   }
 
   .twincore-mobile-more {
-    bottom: calc(5.75rem + env(safe-area-inset-bottom));
+    bottom: calc(5.75rem + var(--safe-bottom));
   }
 
   .twincore-global-twinme-dock {
-    bottom: calc(6.25rem + env(safe-area-inset-bottom));
+    bottom: calc(6.25rem + var(--safe-bottom));
     padding-inline: 0.7rem;
   }
 
@@ -2008,3 +2008,10 @@ animation:presenceGlow 7s ease-in-out infinite;
   padding-top: 4.75rem;
 }
 
+
+/* Native Android safe-area bridge.
+   Capacitor 8 injects the device-specific system-bar insets as CSS variables. */
+.twincore-native-android {
+  --safe-top: var(--safe-area-inset-top, env(safe-area-inset-top));
+  --safe-bottom: var(--safe-area-inset-bottom, max(env(safe-area-inset-bottom), 48px));
+}
