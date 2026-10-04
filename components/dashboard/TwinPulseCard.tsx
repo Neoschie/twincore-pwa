@@ -30,8 +30,8 @@ export function TwinPulseCard({
       icon: statusIcon,
     },
     {
-      label: "Location",
-      value: location ? "On" : "Off",
+      label: "Location Sharing",
+      value: location ? "Shared" : "Not shared",
       icon: <MapPin className="h-3.5 w-3.5 text-blue-200" />,
     },
     {

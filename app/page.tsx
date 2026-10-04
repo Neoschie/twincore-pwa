@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
 import { getSharedProfile } from "@/lib/shared-profile";
+import { getActiveCrew } from "@/lib/crew-system";
 import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
@@ -231,16 +232,64 @@ export default function HomePage() {
         return;
       }
 
-      const { data } = await supabase
-        .from("crew_status")
-        .select("id,name,status,updated_at,latitude,longitude")
-        .eq("user_id", user.id)
-        .order("updated_at", { ascending: false })
-        .limit(8);
+      const activeCrew = await getActiveCrew(user.id);
 
-      if (data) {
-        setCrewRows(data as CrewRow[]);
+      if (!activeCrew) {
+        setCrewRows([]);
+        return;
       }
+
+      const [
+        { data: statusData, error: statusError },
+        { data: membersData, error: membersError },
+      ] = await Promise.all([
+        supabase
+          .from("crew_status")
+          .select("id,user_id,name,status,updated_at,latitude,longitude")
+          .eq("crew_id", activeCrew.id)
+          .order("updated_at", { ascending: false }),
+
+        supabase
+          .from("crew_members")
+          .select("id,user_id,member_name,joined_at")
+          .eq("crew_id", activeCrew.id),
+      ]);
+
+      if (statusError || membersError) {
+        console.error("HOME CREW LOAD ERROR:", statusError || membersError);
+        setCrewRows([]);
+        return;
+      }
+
+      const statuses = Array.isArray(statusData) ? statusData : [];
+      const members = Array.isArray(membersData) ? membersData : [];
+
+      const statusByUserId = new Map<string, (typeof statuses)[number]>();
+
+      for (const statusRow of statuses) {
+        if (!statusRow.user_id || statusByUserId.has(statusRow.user_id)) continue;
+        statusByUserId.set(statusRow.user_id, statusRow);
+      }
+
+      const mergedRows: CrewRow[] = members.map((member) => {
+        const liveStatus = member.user_id
+          ? statusByUserId.get(member.user_id)
+          : undefined;
+
+        return {
+          id: member.user_id || member.id,
+          name:
+            member.member_name ||
+            liveStatus?.name ||
+            "Crew Member",
+          status: liveStatus?.status || "inactive",
+          updated_at: liveStatus?.updated_at || member.joined_at || null,
+          latitude: liveStatus?.latitude ?? null,
+          longitude: liveStatus?.longitude ?? null,
+        };
+      });
+
+      setCrewRows(mergedRows);
     }
 
     void loadCrew();

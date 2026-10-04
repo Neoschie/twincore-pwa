@@ -20,6 +20,7 @@ import { NotificationSettings } from "@/lib/native/notification-settings";
 
 import { supabase } from "@/lib/supabase/client";
 import { getSharedProfile, upsertSharedProfile } from "@/lib/shared-profile";
+import { getActiveCrew } from "@/lib/crew-system";
 import { ActivityCard } from "@/components/dashboard/ActivityCard";
 const getProfileStorageKey = (userId: string) =>
   `twincore_profile_${userId}`;
@@ -63,6 +64,8 @@ const handleSignOut = async () => {
 };
 
 const [saved, setSaved] = useState(false);
+const [hasSharedLocation, setHasSharedLocation] = useState(false);
+const [connectedCrewCount, setConnectedCrewCount] = useState(0);
 const [newTrusted, setNewTrusted] = useState("");
 const [notificationPermission, setNotificationPermission] = useState<string>("unknown");
 const [notificationBusy, setNotificationBusy] = useState(false);
@@ -94,6 +97,7 @@ useEffect(() => {
     void App.addListener("appStateChange", ({ isActive }) => {
       if (isActive) {
         void loadNotificationPermission();
+        void loadProfile();
       }
     }).then((listener) => {
       appStateListener = listener;
@@ -105,7 +109,24 @@ useEffect(() => {
       data: { user },
     } = await supabase.auth.getUser();
 
-        if (!user) return;
+    if (!user) {
+      setHasSharedLocation(false);
+      setConnectedCrewCount(0);
+      return;
+    }
+
+    const sharedLocation = localStorage.getItem(
+      `twincore_last_shared_location_${user.id}`,
+    );
+    setHasSharedLocation(Boolean(sharedLocation));
+
+    try {
+      const activeCrew = await getActiveCrew(user.id);
+      setConnectedCrewCount(activeCrew?.memberCount ?? 0);
+    } catch (error) {
+      console.error("PROFILE ACTIVE CREW LOAD ERROR:", error);
+      setConnectedCrewCount(0);
+    }
 
     const raw = localStorage.getItem(getProfileStorageKey(user.id));
 
@@ -319,8 +340,8 @@ function addTrusted() {
       </section>
 
       <ActivityCard
-        connected={0}
-        location={false}
+        connected={connectedCrewCount}
+        location={hasSharedLocation}
         ghostMode={profile.ghostMode}
         trustedOnly={profile.trustedOnly}
       />

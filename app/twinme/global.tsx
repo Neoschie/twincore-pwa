@@ -1,6 +1,7 @@
 "use client";
 import { usePathname } from "next/navigation";
 import { useTwinCorePresence } from "@/components/twincore/PresenceProvider";
+import { supabase } from "@/lib/supabase/client";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -97,7 +98,7 @@ function getTwinMeSurface(pathname: string, signals: LocalSignals): TwinMeSurfac
       insight:
         "Stay connected and notice changes early. TwinMe works best when your status, location, and crew signals stay current.",
       chips: [
-        signals.hasSharedLocation ? "LOCATION ON" : "LOCATION OFF",
+        signals.hasSharedLocation ? "LOCATION SHARED" : "NOT SHARED",
         "LIVE CREW",
       ],
       primaryHref: "/crew",
@@ -112,7 +113,7 @@ function getTwinMeSurface(pathname: string, signals: LocalSignals): TwinMeSurfac
         label: "Party Insight",
         insight:
           "It’s late and your location is not shared. Keep your movement predictable and avoid drifting off alone.",
-        chips: ["LATE NIGHT", "LOCATION OFF"],
+        chips: ["LATE NIGHT", "NOT SHARED"],
         primaryHref: "/crew",
         primaryLabel: "Open Crew",
       };
@@ -137,7 +138,7 @@ function getTwinMeSurface(pathname: string, signals: LocalSignals): TwinMeSurfac
         "Move with the energy, but stay ahead of drift. TwinMe is strongest when your crew can see your live state.",
       chips: [
         isLateNight ? "LATE NIGHT" : "ACTIVE",
-        signals.hasSharedLocation ? "LOCATION ON" : "LOCATION OFF",
+        signals.hasSharedLocation ? "LOCATION SHARED" : "NOT SHARED",
       ],
       primaryHref: "/party",
       primaryLabel: "Open Party",
@@ -210,7 +211,7 @@ function getTwinMeSurface(pathname: string, signals: LocalSignals): TwinMeSurfac
       label: "Dashboard Insight",
       insight:
         "It’s getting late. This is the best moment to stay intentional with movement, updates, and exits.",
-      chips: ["LATE NIGHT", signals.hasSharedLocation ? "LOCATION ON" : "LOCATION OFF"],
+      chips: ["LATE NIGHT", signals.hasSharedLocation ? "LOCATION SHARED" : "NOT SHARED"],
       primaryHref: "/twinme",
       primaryLabel: "Open TwinMe",
     };
@@ -222,7 +223,7 @@ function getTwinMeSurface(pathname: string, signals: LocalSignals): TwinMeSurfac
     insight:
       "Your system is strongest when Crew, Party Mode, and TwinMe all stay active together in real time.",
     chips: [
-      signals.hasSharedLocation ? "LOCATION ON" : "LOCATION OFF",
+      signals.hasSharedLocation ? "LOCATION SHARED" : "NOT SHARED",
       "SYSTEM READY",
     ],
     primaryHref: "/twinme",
@@ -343,9 +344,26 @@ const [expanded, setExpanded] = useState(false);
   useEffect(() => {
     setMounted(true);
 
-    const refreshSignals = () => {
-  setSignals(readLocalSignals());
-};
+    const refreshSignals = async () => {
+      const nextSignals = readLocalSignals();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      const partyStatus = user
+        ? window.localStorage.getItem(`twincore_party_status_${user.id}`)
+        : null;
+
+      const sharedLocation = user
+        ? window.localStorage.getItem(`twincore_last_shared_location_${user.id}`)
+        : null;
+
+      setSignals({
+        ...nextSignals,
+        partyStatus,
+        hasSharedLocation: Boolean(sharedLocation),
+      });
+    };
 
     refreshSignals();
 

@@ -29,12 +29,9 @@ type OwnerMembershipRow = {
 };
 
 async function countMembers(crewId: string) {
-  const { count, error } = await supabase
+  const { data, error } = await supabase
     .from("crew_members")
-    .select("id", {
-      count: "exact",
-      head: true,
-    })
+    .select("id")
     .eq("crew_id", crewId);
 
   if (error) {
@@ -43,7 +40,7 @@ async function countMembers(crewId: string) {
     );
   }
 
-  return count ?? 0;
+  return Array.isArray(data) ? data.length : 0;
 }
 
 async function resolveOwnerName(
