@@ -1925,7 +1925,8 @@ export default function PartyPage() {
   ]);
 
   return (
-    <main className="min-h-screen overflow-hidden bg-[#06050a] text-white">
+    <AuthGuard>
+      <main className="min-h-screen overflow-hidden bg-[#06050a] text-white">
       <div className="twincore-party-dashboard relative z-20 px-5 pt-5">
         <Link
           href="/"
@@ -2858,6 +2859,7 @@ export default function PartyPage() {
           </div>
         </TwinPage>
       </div>
-    </main>
+      </main>
+    </AuthGuard>
   );
 }
