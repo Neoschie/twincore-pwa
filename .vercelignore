@@ -1,0 +1,32 @@
+# Native application projects (not needed for Next.js web deployment)
+/android/
+/ios/
+
+# Generated build output
+/out/
+/build/
+/.next/
+/coverage/
+*.tsbuildinfo
+
+# Local TwinCore backups, diagnostics, and temporary artifacts
+.twincore-*
+*.bak
+*.backup-*
+*.before-*
+
+# Local environment files and credentials
+.env*
+*.pem
+
+# Local development artifacts
+/.expo/
+/....
+/=
+/PY
+/next
+/twincore-pwa@0.1.0
+
+# Development reports and generated archives
+*.tar.gz
+*.patch
