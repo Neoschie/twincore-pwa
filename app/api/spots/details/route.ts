@@ -1,10 +1,25 @@
 import { NextResponse } from "next/server";
+import { getAuthorizedApiUser } from "@/lib/supabase/api-auth";
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "https://localhost",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
-};
+const ALLOWED_NATIVE_ORIGINS = new Set([
+  "https://localhost",
+  "capacitor://localhost",
+]);
+
+function getCorsHeaders(request: Request) {
+  const origin = request.headers.get("origin");
+  const allowedOrigin =
+    origin && ALLOWED_NATIVE_ORIGINS.has(origin)
+      ? origin
+      : "https://localhost";
+
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Vary": "Origin",
+  };
+}
 
 type GooglePlaceDetails = {
   id?: string;
@@ -93,7 +108,9 @@ function mapCategory(
   return "Events";
 }
 
-export async function OPTIONS() {
+export async function OPTIONS(request: Request) {
+  const CORS_HEADERS = getCorsHeaders(request);
+
   return new NextResponse(null, {
     status: 204,
     headers: CORS_HEADERS,
@@ -101,6 +118,16 @@ export async function OPTIONS() {
 }
 
 export async function GET(request: Request) {
+  const CORS_HEADERS = getCorsHeaders(request);
+  const user = await getAuthorizedApiUser(request);
+
+  if (!user) {
+    return NextResponse.json(
+      { error: "Unauthorized." },
+      { status: 401, headers: CORS_HEADERS },
+    );
+  }
+
   const requestUrl = new URL(request.url);
   const placeId = requestUrl.searchParams.get("placeId")?.trim();
 

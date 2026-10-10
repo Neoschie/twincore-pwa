@@ -4,17 +4,29 @@ import { spawn } from "node:child_process";
 
 const apiDir = "app/api";
 const parkedApiDir = ".twincore-native-api";
+const proxyFile = "proxy.ts";
+const parkedProxyFile = ".twincore-native-proxy.ts";
 
 if (existsSync(parkedApiDir)) {
   throw new Error("Native API parking directory already exists.");
 }
 
-let parked = false;
+if (existsSync(parkedProxyFile)) {
+  throw new Error("Native proxy parking file already exists.");
+}
+
+let apiParked = false;
+let proxyParked = false;
 
 try {
   if (existsSync(apiDir)) {
     await rename(apiDir, parkedApiDir);
-    parked = true;
+    apiParked = true;
+  }
+
+  if (existsSync(proxyFile)) {
+    await rename(proxyFile, parkedProxyFile);
+    proxyParked = true;
   }
 
   const child = spawn("npx", ["next", "build"], {
@@ -22,6 +34,7 @@ try {
     env: {
       ...process.env,
       TWINCORE_NATIVE_BUILD: "1",
+      NEXT_PUBLIC_TWINCORE_NATIVE_REVIEW: "1",
     },
   });
 
@@ -34,7 +47,25 @@ try {
     process.exitCode = exitCode;
   }
 } finally {
-  if (parked) {
-    await rename(parkedApiDir, apiDir);
+  let restoreError = null;
+
+  if (proxyParked) {
+    try {
+      await rename(parkedProxyFile, proxyFile);
+    } catch (error) {
+      restoreError = error;
+    }
+  }
+
+  if (apiParked) {
+    try {
+      await rename(parkedApiDir, apiDir);
+    } catch (error) {
+      restoreError ??= error;
+    }
+  }
+
+  if (restoreError) {
+    throw restoreError;
   }
 }

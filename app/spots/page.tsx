@@ -2384,8 +2384,21 @@ export default function SpotsPage() {
       setNearbyLoading(true);
       setNearbyError(null);
 
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        throw new Error("Authentication is required to load nearby places.");
+      }
+
       const response = await fetch(
         apiUrl(`/api/spots/nearby?lat=${userCoords.lat}&lng=${userCoords.lng}`),
+        {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        },
       );
 
       if (!response.ok) {
@@ -2831,7 +2844,7 @@ export default function SpotsPage() {
                           {spot.category}
                         </div>
 
-                        <div className="mt-1 text-2xl font-black text-white">
+                        <div className="mt-1 line-clamp-2 break-words text-2xl font-black text-white">
                           {spot.name}
                         </div>
                       </div>

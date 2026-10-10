@@ -8,6 +8,7 @@ import RecommendationAdaptationConsumptionRuntime from "@/components/twincore/Re
 import LifeContextRuntime from "@/components/twincore/LifeContextRuntime";
 import NativeDeepLinkRuntime from "@/components/twincore/NativeDeepLinkRuntime";
 import TwinCoreNavigation from "@/components/twincore/ui/TwinCoreNavigation";
+import PrelaunchAccessGate from "@/components/auth/PrelaunchAccessGate";
 
 export const metadata: Metadata = {
   title: "TwinCore",
@@ -32,7 +33,8 @@ export default function RootLayout({
   return (
     <html lang="en" className="bg-[#0A0A0B]">
       <body className="min-h-screen bg-[#0A0A0B] text-white antialiased">
-        <PresenceProvider>
+        <PrelaunchAccessGate>
+          <PresenceProvider>
           <RecommendationLearningRuntime />
           <RecommendationAdaptationRuntime />
           <RecommendationAdaptationConsumptionRuntime />
@@ -55,7 +57,8 @@ export default function RootLayout({
 
             <ConditionalTwinMeGlobal />
           </div>
-        </PresenceProvider>
+          </PresenceProvider>
+        </PrelaunchAccessGate>
       </body>
     </html>
   );

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { apiUrl } from "@/lib/api-url";
+import { supabase } from "@/lib/supabase/client";
 import InviteCrewButton from "./InviteCrewButton";
 import SaveVenueButton from "./SaveVenueButton";
 import ShareVenueButton from "./ShareVenueButton";
@@ -57,8 +58,22 @@ export default function NativeVenueDetails() {
       setLoading(true);
 
       try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (!session?.access_token) {
+          if (!cancelled) setVenue(null);
+          return;
+        }
+
         const response = await fetch(
           apiUrl(`/api/spots/details?placeId=${encodeURIComponent(placeId)}`),
+          {
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+            },
+          },
         );
 
         if (!response.ok) {
