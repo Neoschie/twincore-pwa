@@ -5,6 +5,7 @@ import {
   type ReactNode,
   useCallback,
   useEffect,
+  useRef,
   useState,
 } from "react";
 
@@ -15,7 +16,7 @@ type Props = {
   children: ReactNode;
 };
 
-type GateState = "checking" | "signin" | "denied" | "allowed";
+type GateState = "checking" | "signin" | "denied" | "allowed" | "error";
 
 const REVIEW_BUILD =
   process.env.NEXT_PUBLIC_TWINCORE_NATIVE_REVIEW === "1";
@@ -28,8 +29,12 @@ export default function PrelaunchAccessGate({ children }: Props) {
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const verificationId = useRef(0);
 
   const verifyAccess = useCallback(async (accessToken: string) => {
+    const requestId = ++verificationId.current;
+    setGateState("checking");
+
     try {
       const response = await fetch(apiUrl("/api/prelaunch/access"), {
         method: "GET",
@@ -39,10 +44,12 @@ export default function PrelaunchAccessGate({ children }: Props) {
         cache: "no-store",
       });
 
+      if (requestId !== verificationId.current) return;
+
       if (response.ok) {
-        const body = (await response.json()) as {
-          allowed?: boolean;
-        };
+        const body = (await response.json()) as { allowed?: boolean };
+
+        if (requestId !== verificationId.current) return;
 
         if (body.allowed === true) {
           setStatus("");
@@ -51,12 +58,18 @@ export default function PrelaunchAccessGate({ children }: Props) {
         }
       }
 
-      setGateState("denied");
-      setStatus("This account is not approved for pre-launch access.");
+      if (response.status === 401 || response.status === 403) {
+        setGateState("denied");
+        setStatus("This account is not approved for pre-launch access.");
+      } else {
+        setGateState("error");
+        setStatus("Pre-launch access could not be verified. Please retry.");
+      }
     } catch (error) {
+      if (requestId !== verificationId.current) return;
       console.error("PRELAUNCH ACCESS CHECK ERROR:", error);
-      setGateState("denied");
-      setStatus("Pre-launch access could not be verified.");
+      setGateState("error");
+      setStatus("Pre-launch access could not be verified. Please retry.");
     }
   }, []);
 
@@ -68,43 +81,41 @@ export default function PrelaunchAccessGate({ children }: Props) {
 
     let active = true;
 
-    async function loadSession() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!active) return;
-
-      if (!session?.access_token) {
-        setGateState("signin");
-        return;
-      }
-
-      await verifyAccess(session.access_token);
-    }
-
-    void loadSession();
-
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!active) return;
 
       if (!session?.access_token) {
+        ++verificationId.current;
         setStatus("");
         setGateState("signin");
         return;
       }
 
-      setGateState("checking");
       void verifyAccess(session.access_token);
     });
 
     return () => {
       active = false;
+      ++verificationId.current;
       subscription.unsubscribe();
     };
   }, [verifyAccess]);
+
+  async function retryVerification() {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session?.access_token) {
+      ++verificationId.current;
+      setGateState("signin");
+      return;
+    }
+
+    await verifyAccess(session.access_token);
+  }
 
   async function handleSignIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -130,11 +141,12 @@ export default function PrelaunchAccessGate({ children }: Props) {
       return;
     }
 
-    await verifyAccess(data.session.access_token);
+    // The auth state listener handles verification after sign-in.
     setIsSubmitting(false);
   }
 
   async function handleSignOut() {
+    ++verificationId.current;
     await supabase.auth.signOut();
     setPassword("");
     setStatus("");
@@ -169,7 +181,30 @@ export default function PrelaunchAccessGate({ children }: Props) {
           Pre-launch access
         </h1>
 
-        {gateState === "denied" ? (
+        {gateState === "error" ? (
+          <>
+            <p className="mt-3 text-sm leading-6 text-white/55">
+              We couldn't verify your access. Check your connection and try again.
+            </p>
+            <div role="status" className="mt-5 text-sm text-white/70">
+              {status}
+            </div>
+            <button
+              type="button"
+              onClick={() => void retryVerification()}
+              className="mt-6 h-12 w-full rounded-2xl bg-white text-sm font-semibold text-black"
+            >
+              Retry verification
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleSignOut()}
+              className="mt-4 w-full text-sm text-white/60"
+            >
+              Sign in with another account
+            </button>
+          </>
+        ) : gateState === "denied" ? (
           <>
             <p className="mt-3 text-sm leading-6 text-white/55">
               This build is limited to approved pre-launch reviewers.
