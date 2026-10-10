@@ -260,6 +260,7 @@ function getCorsHeaders(request: Request) {
     "Access-Control-Allow-Methods": "GET, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Vary": "Origin",
+    "Cache-Control": "no-store",
   };
 }
 
