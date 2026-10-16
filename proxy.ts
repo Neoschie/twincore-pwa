@@ -13,7 +13,9 @@ export function proxy(request: NextRequest) {
   if (
     pathname.startsWith("/_next/") ||
     pathname === "/favicon.ico" ||
-    pathname === "/twincore-prelaunch.html"
+    pathname === "/twincore-prelaunch.html" ||
+    pathname === "/brand/twincore-flames-approved.mp4" ||
+    pathname === "/brand/twincore-neon-flame-infinity.png"
   ) {
     return NextResponse.next();
   }
